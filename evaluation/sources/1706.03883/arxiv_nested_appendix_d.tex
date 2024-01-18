@@ -1,0 +1,113 @@
+In this appendix, we offer details on the data generation processes 
+utilized in the simulation studies presented in Section \ref{Section:data_analysis} in the main text. %\ref{Section:data_analysis}. 
+The notions of $m, n, d, M$ are given in the main text. 
+Let $K_i$ be the number of supporting atoms of $H_i$ and $k_{j}$
+the number of atoms of $G_{j}$. For any $d \geq 1$, we denote $\vec{1}_{d}$ to be d dimensional vector with all components to be 1. Furthermore, $\mathcal{I}_{d}$ is an identity matrix with d dimensions. 
+
+%Note that our approach is model free and we can not guarantee to recover the truth exactly, as it is not necessarily identical to the corresponding barycenters. 
+\paragraph{Comparison metric (Wasserstein distance to truth)}
+%(G_1,\ldots ,G_m; H_1,\ldots, H_M | \hat G_1,\ldots,\hat G_m; \hat H_1,\ldots,\hat H_M) 
+\begin{eqnarray}
+\text{W}:= \frac{1}{m}\sum_{j=1}^m W_2(\hat G_j, G_j) + d_{\mathcal{M}}(\hat {\Hbold}, \Hbold) \nonumber
+\end{eqnarray}
+where $\hat{\Hbold} := \{\hat H_1,\ldots,\hat H_M\}$, $\Hbold := \{H_1,\ldots,H_M\}$ and $d_{\mathcal{M}}(\hat H, H)$ is a minimum-matching distance \cite{tang2014understanding, Nguyen-2015}:
+$$d_{\mathcal{M}}(\hat{\Hbold}, \Hbold) := \max\{\overline{d}(\hat{\Hbold}, \Hbold), \overline{d}(\Hbold, \hat{\Hbold})\}$$
+where
+$$\overline{d}(\hat{\Hbold}, \Hbold) := \max\limits_{1 \leq i \leq M}\,\,\min\limits_{1 \leq j \leq M} \,\, W_2(H_{i},\hat H_{j}).$$
+%The above metric allows to compare clusterings with misspecified $M$.
+
+\paragraph{Multilevel Wasserstein means setting}
+The global clusters are generated as follows:
+\begin{eqnarray*}
+\left.\begin{aligned}
+& \text{means for atoms } \mu_i := 5(i-1), i=1,\ldots, M. \\
+& \text{atoms of } H_i: \phi_{ij} \thicksim \mathcal{N}(\mu_i \vec{1}_d, \mathcal{I}_d), j=1,\ldots, K_i.\\
+& \text{weights of atoms: } \pi_i \thicksim \text{Dir}(\vec{1}_{K_i}). \\
+& \text{Let } H_i := \sum_{j=1}^{K_i} \pi_{ij}\delta_{\phi_{ij}}.
+\end{aligned}\right.
+\end{eqnarray*}
+For each group $j=1,\ldots,m$, generate local measures and data as follows:
+\begin{eqnarray*}
+\left.\begin{aligned}
+& \text{pick cluster label } z_j \thicksim \text{Unif}( \{1,\ldots, M\}).\\
+& \text{mean for atoms}: \tau_{ji} \thicksim H_{z_j}, i=1,\ldots, k_j.\\
+& \text{atoms of } G_j: \theta_{ji} \thicksim \mathcal{N}(\tau_{ji},\mathcal{I}_d), i=1,\ldots, k_j.\\
+& \text{weights of atoms } p_j \thicksim \text{Dir}(\vec{1}_{k_j}). \\
+& \text{Let } G_j := \sum_{i=1}^{k_j} p_{ji}\delta_{\theta_{ji}}. \\
+& \text{data mean } \mu_i \thicksim G_j, i=1,\ldots, n_j. \\
+& \text{observation } X_{j,i} \thicksim \mathcal{N}(\mu_i,\mathcal{I}_d).
+\end{aligned}\right.
+\end{eqnarray*}
+For the case of non-constrained variances, 
+the variance to generate atoms $\theta_{ji}$ of $G_{j}$ is set to be proportional to global cluster label $z_{j}$ assigned to $G_{j}$.
+
+\textbf{Multilevel Wasserstein means with sharing setting}\\
+The global clusters are generated as follows:
+\begin{eqnarray*}
+\left.\begin{aligned}
+& \text{means for atoms } \mu_i := 5(i-1), i=1,\ldots, M.\\
+& \text{atoms of } H_i: \phi_{ij} \thicksim \mathcal{N}(\mu_i \vec{1}_d, \mathcal{I}_d), j=1,\ldots, K_i.\\
+& \text{weights of atoms } \pi_i \thicksim \text{Dir}(\vec{1}_{K_i}).\\
+& \text{Let }
+H_i := \sum_{j=1}^{K_i} \pi_{ij}\delta_{\phi_{ij}}. \\
+\end{aligned}\right.
+\end{eqnarray*}
+For each shared atom $k=1,\ldots,K$:
+\begin{eqnarray*}
+\left.\begin{aligned}
+& \text{pick cluster label } z_k \thicksim \text{Unif}( \{1,\ldots ,M \}).\\
+& \text{mean for atoms}: \tau_k \thicksim H_{z_k}.\\
+& \text{atoms of } S_K: \theta_k \thicksim \mathcal{N}(\tau_k,\mathcal{I}_d).
+\end{aligned}\right.
+\end{eqnarray*}
+For each group $j=1,\ldots,m$ generate local measures and data as follows:
+\begin{eqnarray*}
+\left.\begin{aligned}
+& \text{pick cluster label } \tilde z_j \thicksim \text{Unif}( \{1,\ldots ,M \}).\\
+& \text{select shared atoms } s_j = \{k:z_k=\tilde z_j\}.\\
+& \text{weights of atoms } p_{s_j} \thicksim \text{Dir}(\vec{1}_{|s_j|});
+\quad
+G_j := \sum_{i \in s_j} p_{i}\delta_{\theta_{i}}.\\
+& \text{data mean } \mu_i \thicksim G_j, i=1,\ldots,n_j.\\
+& \text{observation } X_{j,i} \thicksim \mathcal{N}(\mu_i,\mathcal{I}_d).
+\end{aligned}\right.
+\end{eqnarray*}
+For the case of non-constrained variances, the variance to generate atoms $\theta_{i}$ of $G_{j}$ where $i \in s_{j}$ is set to be proportional to global cluster label $\tilde z_{j}$ assigned to $G_{j}$.
+
+
+%& \text{weights of atoms } p_i \thicksim \text{Dir}(\vec{1}_{k_i});
+%\quad
+%G_i := \sum_{j=1}^{k_i} p_{ij}\delta_{\theta_{ij}} \\
+%& \text{data mean } \mu_n \thicksim G_i, n=1,\ldots,N_i \\
+%& \text{observation } X_{in} \thicksim \mathcal{N}(\mu_n,\mathcal{I}_d)
+%\end{aligned}\right.
+%\end{eqnarray*}
+
+\textbf{Three-stage K-means}
+First, we estimate $G_j$ for each group $1 \leq j \leq m$ by using K-means 
+algorithm with $k_{j}$ clusters.
+Then, we cluster labels using K-means algorithm with $M$ clusters based on the collection of  all atoms of $G_j$s.
+Finally, we estimate the atoms of each $H_i$ via K-means algorithm with exactly $L$ clusters for each 
+group of local atoms. Here, $L$ is some given threshold being used in Algorithm \ref{alg:multilevels_Wasserstein_means} in 
+Section \ref{Section:multilevel_kmeans} in the main text to speed up the computation (see final remark regarding Algorithm \ref{alg:multilevels_Wasserstein_means} in Section \ref{Section:multilevel_kmeans}). 
+The three-stage K-means algorithm is summarized in Algorithm \ref{alg:three_stages_K_means}.
+\setcounter{algorithm}{2}
+\begin{algorithm}
+   \caption{Three-stage K-means}
+   \label{alg:three_stages_K_means}
+\begin{algorithmic}
+   \STATE {\bfseries Input:} Data $X_{j,i}$, $k_{j}$, $M$, $L$.
+   \STATE {\bfseries Output:} local measures $G_{j}$ and global elements $H_{i}$ of $\Hbold$.
+   \STATE {\emph{Stage 1}}
+   \FOR{$j=1$ {\bfseries to} $m$}
+   \STATE $G_{j} \leftarrow$ $k_{j}$ clusters of group j with K-means (atoms as centroids and weights as label frequencies).
+   \ENDFOR
+   	\STATE $\mathcal{C} \leftarrow$ collection of all atoms of $G_{j}$.
+   \STATE {\emph{Stage 2}}
+   	\STATE $\left\{D_{1},\ldots,D_{M}\right\} \leftarrow$ $M$ clusters from K-means on $\mathcal{C}$.
+   	\STATE {\emph{Stage 3}}
+   \FOR{$i=1$ {\bfseries to} $M$}
+   \STATE $H_i \leftarrow$ $L$ clusters of $D_i$ with K-means (atoms as centroids and weights as label frequencies).
+   \ENDFOR 
+\end{algorithmic}
+\end{algorithm}

@@ -1,0 +1,36 @@
+\section{Introduction}
+Non-autoregressive Transformer~\cite[NAT,][]{nat,nat_reg,iter_nat,cmlm} is a promising text generation model for machine translation. 
+It introduces the conditional independent assumption among the target language outputs and simultaneously generates the whole sentence, bringing in a remarkable efficiency improvement~(more than $10\times$ speed-up) versus the autoregressive model. 
+However, the NAT models still lay behind the autoregressive models in terms of BLEU~\citep{bleu} for machine translation. 
+We attribute the low-quality of NAT models to the lack of dependencies modeling for the target outputs, making it harder to model the generation of the target side translation. %between the source language and target language. %large, which leads to the challenge of the non-autoregressive translation.
+
+A promising way is to model the dependencies of the target language by the latent variables. 
+A line of research works~\cite{lt,vqvae,lv_nar,flowseq} introduce latent variable modeling to the non-autoregressive Transformer and improves translation quality. 
+The latent variables could be regarded as the springboard to bridge the modeling gap, introducing more informative decoder inputs than the previously copied inputs. 
+More specifically, the latent-variable based model first predicts a latent variable sequence conditioned on the source representation, where each variable represents a chunk of words. The model then simultaneously could generate all the target tokens conditioning on the latent sequence and the source representation since the target dependencies have been modeled into the latent sequence.
+
+However, due to the modeling complexity of the chunks, the above approaches always rely on a large number~(more than $2^{15}$,~\citealp{lt,vqvae}) of latent codes for discrete latent spaces, which may hurt the translation efficiency---the essential goal of non-autoregressive decoding.
+
+
+%or multiple iterative refinements~(more than four iteration,~\citealp{flowseq}) for continuous latent spaces, which may hurt the translation efficiency---the essential goal of non-autoregressive decoding.
+
+~\citet{syn_st} introduce syntactic labels as a proxy to the learned discrete latent space and improve the NATs' performance.  
+The syntactic label greatly reduces the search space of latent codes, leading to a better performance in both quality and speed. However, it needs an external syntactic parser to produce the reference syntactic tree, which may only be effective in limited scenarios.
+Thus, it is still challenging to model the dependency between latent variables for non-autoregressive decoding efficiently.% still is an opening question.
+
+In this paper, we propose to learn a set of latent codes that can act like the syntactic label, which is learned without using the explicit syntactic trees. 
+To learn these codes in an unsupervised way, we use each latent code to represent a fuzzy target category instead of a chunk as the previous research~\cite{syn_st}.
+More specifically, we first employ vector quantization~\cite{vqvae} to discretize the target language to the latent space with a smaller number~(less than 128) of latent variables, which can serve as the fuzzy word-class information each target language word.
+We then model the latent variables with conditional random fields~\cite[CRF,][]{crf,nat_crf}.
+To avoid the mismatch of the training and inference for latent variable modeling, we propose using a gated neural network to form the decoder inputs. 
+Equipping it with scheduled sampling~\cite{bengio2015scheduled}, the model works more robustly.
+
+Experiment results on WMT14 and IWSLT14 show that \method achieves the new state-of-the-art performance without knowledge distillation. 
+With the sequence-level knowledge distillation and reranking techniques, the \method is comparable to the current state-of-the-art iterative-based model while keeping a competitive decoding speedup.
+
+% In this paper, we propose to learn a set of latent codes that can act like the syntactic label, which is learned without using the explicit syntactic trees. 
+% To learn these codes in an unsupervised way, we use each latent code to represent a fuzzy target word-class instead of a chunk as the previous research~\cite{syn_st}.
+% More specifically, we first employ vector quantization~\cite{vqvae} to discretize the target language to the latent space with a smaller number~(less than 128) of latent variables, which serve as the categorical codes for each target language word.
+% We then model the latent sequence with conditional random fields~\cite[CRF,][]{crf}, which is widely used in dependencies modeling~\cite{nat_crf}. 
+% To avoid the mismatch of the training and inference for latent variable modeling, we propose using a gated neural network to form the decoder inputs. 
+% Equipping it with scheduled sampling~\cite{bengio2015scheduled} in training, the model becomes more robust.

@@ -1,0 +1,220 @@
+\section{Introduction}
+\label{sec:introduction}
+
+
+% 1.videoQA overview-----------------------------------------
+% 第一段介绍背景：
+% 一句话介绍VideoQA的重要性；
+% 一句话介绍VideoQA的task；
+% 然后引出现有VideoQA models都是black-box的困扰；
+% 2-3句话介绍black-box的坏处是啥。
+
+\wx{Video Question Answering (VideoQA) \cite{fan2019heterogeneous} is a keystone in interactive AI, such as vision-language navigation and communication systems.
+It aims to answer the natural language question based on the video content.
+Nourished by the multi-modal nature, VideoQA \emph{per se} has relished an expansion in the model design, which spans from fostering the vision-language alignment \cite{jiang2020reasoning,park2021bridge} to revisiting the visual input structure \cite{le2021hierarchical,dang2021hierarchical}.
+However, existing VideoQA models usually work as black boxes, which fail to exhibit the working mechanism behind the predictions and hardly reveal ``What knowledge should the model use to answer the question about the video?''.
+% However, existing VideoQA models usually work as black boxes, which fail to exhibit the intrinsic rationale behind the predictions and hardly answer ``What knowledge should the model use to answer the question about the video?''.
+As a result, the black-box nature causes concern for the model reliability and hinders the model deployment, especially in applications on safety and security.
+
+}
+
+% More frustratingly, the system gives
+% no hint about which part of such systems is the
+% culprit for a wrong answer
+
+\begin{figure}[t]
+\centering
+\includegraphics[scale=0.47]{fig/f1.pdf}
+\caption{Illustration of causal-equivariant and environment-invariant principles, where $C,E$ are the causal and environment of input video, $f_{\hat{A}}$ is a map from input space to answer space, $T_{\epsilon}$ and $T_{\iota}$ are transformations (instantiated as a mixture of two data points) that applies to causal and non-causal factors, respectively.}
+% (\textcolor[rgb]{0,0.5,0}{Green}: causal-equivarince; \textcolor[rgb]{0.03,0.27,0.49}{Navy}: complement-invariance)}
+\vspace{-18pt}
+\label{fig:overview}
+\end{figure}
+
+
+% 2.problem of interpretable-------------------------------
+% 第二段介绍explainability/interpretability in VideoQA：
+% 一句话描述：对于black-box nature的concerns，explainability in VideoQA非常重要；
+% 一句话描述：explainability in VideoQA是要回答什么问题：which part of the video should the model look at to answer the question?
+% 然后说明现在都是post-hoc explanations，这里要点出来post-hoc的基本概念是啥；然后一两句话介绍post-hoc为啥有缺陷。
+
+
+% \wx{
+% The concern on the black-box nature calls for explainability of VideoQA models.
+% Here we focus on visual-explainability \cite{CSS,DBLP:conf/ijcai/RossHD17}, aiming to answer ``Which part of the video should the model look at to answer the question?''.
+% It inspires us to ground a subset of visual scenes --- rationale --- which are the right reasons for the right answering \cite{DBLP:conf/ijcai/RossHD17}.
+% Towards this end, the current studies \cite{gao2018motionappearance,DBLP:conf/iccv/Liu0WL21,10.1145/3474085.3475620} dwell on the ``learning to attend'' paradigm \cite{DBLP:conf/nips/VaswaniSPUJGKP17,DBLP:conf/icml/XuBKCCSZB15}, which uses the attention mechanism to identify some informative scenes as the explanation.
+% To optimize the attention mechanism, empirical risk minimization (ERM)
+% }
+
+
+\wx{
+The concern on the black-box nature calls for explainability of VideoQA models.
+Here we focus on visual-explainability \cite{CSS,DBLP:conf/ijcai/RossHD17}, aiming to reveal ``Which part of the video should the model look at to answer the question?''.
+It requires us to find a subset of visual scenes --- rationale --- which are the right reasons for the right answering \cite{DBLP:conf/ijcai/RossHD17}.
+Taking Figure \ref{fig:overview} as an example, when answering the question ``What is the girl doing?'', the rationale should focus on the ``girl-riding on-horse'' scene in the first two clips.
+% Towards this end, there are two prevalent paradigms: post-hoc explainability, intrinsic interpretability.
+Towards this end, the current studies \cite{gao2018motionappearance,DBLP:conf/iccv/Liu0WL21,10.1145/3474085.3475620} dwell mainly on the paradigm of \textbf{post-hoc explainability} \cite{LIME,DBLP:conf/iccv/SelvarajuCDVPB17}, which distributes the target model's predicted answer to the input visual features via an additional explainer method.
+They visualize the attention weights or gradient-like signals about the visual features, and then identify a salient pattern as the rationale.
+However, post-hoc explainability has several major limitations:
+(1) It fails to make the target model intrinsically interpretable \cite{DBLP:conf/cvpr/YangZQ021,DBLP:conf/iccv/WangZSZ21}, only approximating the decision-making process of the model.
+As a result, the identified rationale cannot faithfully reveal how the model leverages the multi-modal information.
+(2) Such visual inspections are fragile against input perturbations, since some artifacts can be easily captured as explanations instead of genuine knowledge from the data \cite{DBLP:conf/ijcai/LaugelLMRD19,slack2020fooling,heo2019fooling,ghorbani2019interpretation}.
+}
+
+
+% Trust concern on the black-box nature of existing methods calls upon a comprehensive study on model interpretability, \ie how they arrive at a specific prediction. 
+% %
+% In the context of the VideoQA, a favorable interpretation ought to answer the million-dollar question "which part of the video should the model look at to answer the question?" 
+% %
+% Despite the necessity, the explainability of the current design still dwells on the post-hoc paradigm \cite{gao2018motionappearance,DBLP:conf/iccv/Liu0WL21,10.1145/3474085.3475620}, where interpretations are approximated by extracting a salience pattern from the trained predictive model without any inductive knowledge ( \eg visualize attention weight).
+% %
+% Unfortunately, the visual justification via the post-hoc method is fragile against input perturbations, since some artifacts can be easily captured as explanations instead of genuine knowledge from the data \cite{DBLP:conf/ijcai/LaugelLMRD19,slack2020fooling,heo2019fooling,ghorbani2019interpretation}. As a result, peeking through output (\za{\eg LIME \cite{LIME}}, Grad-CAM \cite{DBLP:conf/iccv/SelvarajuCDVPB17}) cannot faithfully reveal how machine leverage the multi-modal information, which left our million-dollar concern unaddressed.
+
+% which is fragile against input perturbations, and less instructive to the predictive mechanism. 
+
+
+% In addition, it is debatable whether attention mechanisms are indeed explanations (Wiegreffe and Pinter, 2019; Jain and Wallace, 2019). M
+
+% Worse still, overwhelming computational power has provoked the model complexity with billions of parameters, which, as a seed of distrust, shadowed the model's transparency along with our faith. 
+%
+
+
+% 3.partition the video to get interpretation ------------
+% 第三段讲我们要研究的内容：
+% 一句话介绍我们关注intrinsic interpretability，但是研究的人很少；
+% 一句话描述我们的self-interpretable问题是“which part of the video is critical/causal to answering the question?”
+% 然后引出我们要把visual scenes分成两部分一部分是causal scene，一部分是environmental scenes：分别介绍这两个具有啥子semantics。
+
+\wx{The limitations of post-ho explainability inspire us to explore the paradigm of \textbf{intrinsic interpretability} \cite{ghorbani2019interpretation}, which implants a rationalization module into the model to make the decision-making process transparent.
+Surprisingly, intrinsic interpretability of VideoQA models is until-now lacking but our focus in this work.
+To fill the void, we draw on \textbf{causal theory} \cite{pearl2016causal,pearl2009causal} to formulate the interpretability task as answering ``Which part of the video is critical/causal to answering the question?''.
+Concretely, we aim to identify the causal component of input video on-the-fly, which holds the question-response information and filters the question-irrelevant cues out.
+Following this essence, one straightforward realization is to ground the input video into two segments:
+(1) \textbf{causal scene}, which retains the question-critical visual content and sufficiently approaches the answer, thus naturally serving as the rationale;
+(2) \textbf{environment scene}, which holds the question-irrelevant visual content and can be seen as the rationale's complement.
+}
+
+
+
+% 4.euiqvariant and invariant -------------------------------
+% 要突出的是grounding，title中是Equivariant and invariant grounding，所以要让这些关键词尽早的出现。
+% 这个例子融入到下面的Causal-Equivariance和Environmental-Invariance中去。
+%
+\wx{However, discovering causal scene without the supervision of ground-truth rationale is challenging.
+With a causal look at the reasoning process (\cf Section \ref{sec:causal-view}), we argue the crux of intrinsic interpretability is to amplify the connection between the causal scene and the answer, while blocking the non-causal effect of the environment scene.
+Following this line, we propose two principles to guide the grounding of the rationale:}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Causal-Equivariance.}
+    \wx{By ``equivariance'', we mean that answering should be sensitive to the semantic changes on the causal scene and question (termed E-intervention), \eg any change on the causal scene and question should be faithfully reflected on the predicted answer. For example, the ``girl-riding on-horse'' and \lyc{``man-surfing in-ocean''} scenes are the oracle rationales of ``What is the girl doing?'' and ``What is the man doing?'', respectively. The intervention applied on the input (\ie mixing the ``girl-riding on-horse'' and \lyc{``man-surfing in-ocean''} scene, and combining two questions as ``What is the girl doing? What is the man doing?'') should set off an equivariant change in the answer (\ie changing from ``Ride'' to ``Ride+\lyc{Surf}'').
+    }
+    
+    
+    % In essence, transformation on the causal scene should cause the parallel change on the representation manifold. By introspecting ``How would the predictive answer vary if the causal scenes change?'', the grounding mechanism is aware of the transformations and thus maintains the predictive interpretation.
+    % %
+    % As exemplified in Figure \ref{fig:overview}, equivariance implies that transformation applied to question-critic information (\ie causal scene and question) should set off an equivariant semantic change in answer space.
+    % %
+    % Correspondingly, a cautious formulation of such co-variation should help the model pinpoint the 'girl-on-horse' scene as a grounding rationale for ``ride''.
+    
+    \item \textbf{Environment-Invariance.}
+    \wx{By ``invariance'', we mean that answering should be insensitive to the changes in the environment (termed I-intervention), conditioning on the causal scene and question.
+    Considering Figure \ref{fig:overview} again, the intervention applied on the environment (\ie mixing the ``meadow'' and \lyc{``ocean''} scenes) implies no impact towards answering ``What is the girl doing?'', reflecting a homogeneity in the answer space.
+    }
+
+    
+    % % 是它不符合human cognition以及它会产生spurious correlation
+    % On the ground of the prophet, permutation on environment scene should be invariant to predictive answer, since environment implies no impact to the predictive answer except spurious correlation, comprising it as rationale runs counter to the human cognition. 
+    % % On ground of the prophet, the predictive answer is invariant against permutation on environment scene, as it does not contribute to the reasoning mechanism or interpretation.
+    % %
+    % Consider the example in Figure \ref{fig:overview} again, since an environment like ``landscape'' provides no evidence toward the answer ``ride'', its corresponding transformation should reflect a homogeneity in the answer space. The invariance principle epitomizes such assumption by ruling a transformation that is in-vary to answer permutation.
+\end{itemize}
+
+
+%5.overall idea ------------------------------------------------------------------
+% Aspiring to capture grounding rationale, we formalize a model-agnostic learning framework, Equivariant and Invariant Grounding for Interpretable VideoQA (EIV), 
+% %
+% by asking the question ``what and how transformation should the model be equivariant or invariant to?'' 
+% %
+% Different from the previous effort that design supervised proxy task for geometric transformation \cite{DBLP:conf/iccv/ChengSM21}, 
+% % we adopted philosophy of causal intervention and design a saliency-aware temporal mix method for the video input, and impose 
+% we answer the ``what'' question by adopting the philosophy of causality \cite{pearl2009causal} and configure transformation as causal intervention operation that imposes scene-aware mixup \cite{DBLP:conf/iclr/ZhangCDL18} on the multi-modal input.
+% %
+% As for the question of how, we present a unified view of equivariant and invariant principles via the lens of temporal self-supervised learning, where the contrastive counterparts are bred through a disruption on the causal scene, environment scene as well as vision-language alignment.
+
+% where the contrastive counterparts are bred through a disruption on the causal and environment scene, respectively.
+
+% implemetation ----------------------------------------------
+% 这一段的写作逻辑应该是如何实现equivariant、invariant principles的；可以不用follow IGV的写法；
+
+% 可以这么组织：
+% 一句话介绍三个modules；
+% 然后如何用这三个modules来实现两个principle的：首先用grouidng indicator去roughly partition videos into two parts：causal and environmental scenes；然后基于这两部分引入causal-equivariance：利用interventer对于causal scenes做interventions，期望answer部分产生相对应的变化；利用interventer对于environmental scenes做interventions，期待这部分不会对于answering产生影响。
+
+\wx{To impose these two principles for intrinsic interpretability, we propose a new framework, \underline{E}quivariant and \underline{I}nvariant \underline{G}rounding for Interpretable \underline{V}ideoQA (\textbf{EIGV}).
+EIGV equips the VideoQA backbone model with three additional modules:
+a grounding indicator, an intervener, and a disruptor.
+First, the grounding indicator learns to attend the causal scene based on the input question, while leaving the rest as the environment.
+% However, this grounding only roughly estimates the oracle partition of causal and environment scenes.
+Then, the intervener parameterizes these principles to guide the grounding.
+Specifically, towards the causal-equivariance principle, it conducts the E-intervention on the causal scene and question --- that is, mix them with the counterparts from another video-question pair --- and encourages the answering to be anticipated accordingly.
+Towards the environment-invariance principle, when leaving the causal scene and question untouched, it applies the I-intervention on the environment --- that is, mix it with the environmental stratification of a memory bank --- and enforces the predicted answer to be invariant.
+On the top of intervened video-question pairs, the disruptor constructs the contrastive twins.
+}
+
+
+% In light of the proposed princes, we formalize EIGV (\underline{E}quivariant and \underline{I}nvariant \underline{G}rounding for Interpretable \underline{V}ideoQA),
+% a model-agnostic explainer to capture the stable visual rationale VideoQA models.
+% % 一句话介绍三个modules；
+% Specifically, EGV absorbs three modules in addition to the backbone VideoQA model: a grounding indicator, an intervener, and a disruptor. 
+%
+%grounding indicator
+In particular, the grounding indicator learns to separate the causal scenes as the interpretation and leave the rest as the environment. 
+%
+% causal-equivariance
+Then, for the causal scene of interest, an intervener imposes the equivariance principle via a convex combination of two data points, while anticipating a corresponding change in the answer space.  
+%
+% environment-invariance
+As for the environment counterpart, the invariant principle is realized using a similar intervener, but expecting an unchanged answer.
+% %
+% Noticeably, since mixing environment does not affect the reasoning dynamics, the answer is modified with the same ratio as the causal scene but independent to environmental one. 
+%
+% By capturing the equivariance from the answer to the causal scene and the invariance to environment, the model perceives a faithful interpretation that preserves the predictive mechanism.
+%
+On top of the intervened video, we present a unified view of equivariant and invariant principles via the lens of temporal self-supervised learning. 
+%
+Concretely, a disruptor substitutes the environment and causal scene with the stratification sampled from a memory bank (a collection of other training videos) to constitute the contrastive twins, respectively. 
+%
+% To fortify visual-question pair-wise cohesiveness, we also develops alternatives in addition to visual negatives by disrupting the visual-question coupling.
+%
+In addition to the visual negatives, we also develop alternatives by disrupting the visual-question coupling, to fortify their pair-wise cohesiveness.
+
+% where the contrastive counterparts are bred through a disruption on the causal scene, environment scene as well as vision-language alignment.
+
+% On top of the intervened video, the disruptor substitutes the complement scene with the stratification sampled from a memory bank (a collection of other training videos) and constitutes the “counterfactual video” as the positive sample.
+% Likewise, the negative sample is constructed via replacement on the causal scene. 
+% %
+% In addition to the visual negatives that ``disrupt'' the causal scene, the disruptor also develops alternatives by disrupting the visual-question coupling, to fortify their pair-wise cohesiveness.
+% 
+After acquiring anchor representation alongside its contrastive twins, the auxiliary contrastive objective reveals the discriminative representation purely from the scene of interest, thus fostering the robustness of interpretation.
+
+Briefly put, our contributions are: 
+\begin{itemize}[leftmargin=*]
+    \item We propose EGV, a model-agnostic VideoQA explainer that captures the intrinsic causal pattern in a self-interpretable manner.
+    
+    \item We investigate the soundness of grounding rationale by posing the equivariant-invariant principle on visual grounding and realize it via the causal instrument.
+    
+    \item We justify the superiority of EGV on three popular benchmark datasets (\ie MSVD-QA \cite{DBLP:conf/mm/XuZX0Z0Z17}, MSRVTT-QA \cite{DBLP:conf/mm/XuZX0Z0Z17},  NExT-QA \cite{DBLP:conf/cvpr/XiaoSYC21}) with extensive experiments, where our design outmatches all the state-of-the-art models.
+\end{itemize}
+
+
+
+
+
+
+
+
+
+
+
+
+

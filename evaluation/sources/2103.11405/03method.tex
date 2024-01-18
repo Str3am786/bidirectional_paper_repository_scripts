@@ -1,0 +1,154 @@
+\section{Approach}
+In this section, we present our proposed~\method, an extension to the Transformer incorporated with non-autoregressive decoding for target tokens and autoregressive decoding for latent sequences. 
+
+In brief, \method follows the architecture of Latent Transformer~\cite{lt}, except for the latent variable modeling~(in $\S$~\ref{ss:vq} and $\S$~\ref{ss:crf}) and inputs initialization~(in $\S$~\ref{ss:input}). 
+% We first introduce the categoical modeling for the target language in $\S$~\ref{ss:vq}. 
+% Then, we describe the general architecture of~\method in $\S$~\ref{ss:arch}, where we explain how we to translate the sentence from the modeled \vq. 
+% The details of model training and inference is discussed in $\S$~\ref{ss:train} and $\S$~\ref{ss:inference}, respectively.
+
+% - Transfer the dependencies model from the target outputs to the latent spaces.
+
+% - How we model the target language to the latent variables
+
+% - How we generate the translation from the latent variables
+
+\subsection{Modeling Target Categorical Information by Vector Quantization}\label{ss:vq}
+Categorical information has achieved great success in neural machine translation, such as part-of-speech~(POS) tag in autoregressive translation~\cite{latent_pos} and syntactic label in non-autoregressive translation~\cite{syn_st}.
+
+Inspired by the broad application of categorical information, we propose to model the implicit categorical information of target words in a non-autoregressive Transformer. 
+Each target sequence $\y=y_{1:m}$ will be assigned to a discrete latent variable sequence $\z = z_{1:m}$. 
+We assume that each $z_i$ will capture the fuzzy category of its token $y_i$.
+Then, the conditional probability $p(\y|\x)$ is factorized with respect to the categorical latent variable:
+\begin{equation}\label{eqn:pos}
+    p(\y|\x) = \sum_{\z} p(\z | \x) \cdot p(\y|\z,\x).
+\end{equation}
+However, it is computationally intractable to sum all configurations of latent variables. 
+Following the spirit of the latent based model~\cite{lt,vqvae}, we employ a vector quantized technique to maintain differentiability through the categorical modeling and learn the latent variables straightforward.
+% , thus could be optimized jointly.
+
+\paragraph{Vector Quantization.}
+The vector quantization based methods have a long history of being successfully in machine learning models. 
+In vector quantization, each target representation $\operatorname{repr}(y_i) \in \mathbb{R}^{d_\text{model}}$ is passed through a discretization bottleneck using a nearest-neighbor lookup on embedding matrix $\Q\in \mathbb{R}^{K \times d_\text{model}}$, where $K$ is the number of categorical codes.
+
+For each $y_i$ in the target sequence, we define its categorical variable $z_i$ and latent code $q_i$ as:
+\begin{equation}
+\begin{split}
+    z_i &= k,\ q_i = \Q_k, \\
+\text{and}\ k & =\argmin_{j\in [K]} || \operatorname{repr}(y_i) - \Q_j ||_{2},
+\end{split}
+\label{eqn:vq}
+\end{equation}
+where $||\cdot||_{2}$ is the ${l}_2$ distance, $[K]$ denote the set $\{1,2,\cdots,K\}$.
+Intuitively, we adopt the embedding of $\y$ as the target representation:
+\begin{equation*}
+    \operatorname{repr}(y_i) = \operatorname{embedding}(y_i)
+\end{equation*}
+where the embedding matrix of the target language is shared with the $\operatorname{softmax}$ layer of the decoder.
+
+\paragraph{Exponential Moving Average.} 
+Following the common practice of vector quantization, we also employ the exponential moving average~(EMA) technique to regularize the categorical codes. 
+
+Put simply, the EMA technique could be understood as basically the k-means clustering of the hidden states with a sort of momentum.  
+We maintain an EMA over the following two quantities for each $j \in [K]$: 1) the count $c_j$ measuring the number of target representations that have $\Q_j$ as its nearest neighbor, and 2) $\Q_j$. 
+The counts are updated over a mini-batch of targets $\{y_1, y_2,\cdots,y_{m\times B}\}$ with:
+\begin{equation}
+    c_j  = \lambda c_j + (1-\lambda) \sum_{i}^{m\times B} \operatorname{1}[z_i=j],
+    \label{eqn:ema_c}
+\end{equation}
+then, the latent code $\Q_j$ being updated with:
+\begin{equation}
+    \Q_j = \lambda \Q_j + (1-\lambda)\sum_{i}^{m\times B}\frac{\operatorname{1}[z_i=j]\operatorname{repr}(y_i)}{c_j},
+    \label{eqn:ema_q}
+\end{equation}
+where $\operatorname{1}[\cdot]$ is the indicator function and $\lambda$ is a decay parameter, $B$ is the size of the batch.
+
+
+\subsection{Modeling Categorical Sequence with Conditional Random Fields}\label{ss:crf}
+Our next insight is transferring the dependencies among the target outputs into the latent spaces. 
+Since the categorical variable captures the fuzzy target class information, it can be a proxy of the target outputs. 
+We further employ a structural prediction module instead of the standard autoregressive Transformer to model the latent sequence. 
+The former can explicitly model the dependencies among the latent variables and performs exact decoding during inference.
+
+\paragraph{Conditional Random Fields.}
+We employ a linear-chain conditional random fields~\cite[CRF,][]{crf} to model the categorical latent variables, which is the most common structural prediction model.
+
+Given the source input $\x=(x_1,\cdots,x_n)$ and its corresponding latent variable sequence $\z=(z_1,\cdots,z_m)$, the CRF model defines the probability of $\z$ as:
+\begin{equation}\begin{split}
+    p(\z|\x)=\frac{1}{\mathbb{Z}(\x)}&\operatorname{exp}\Big(\sum_{i=1}^{m}s(z_i,\x,i) \\ 
+    &+\sum_{i=2}^{m}t(z_{i-1},z_i,\x,i) \Big), 
+    \label{eqn:crf}
+\end{split}
+\end{equation}
+where $\mathbb{Z}(\x)$ is the normalize factor, $s(z_i,\x,i)$ is the emit score of $z_i$ at the position $i$, and the $t(z_{i-1},z_i,\x,i)$ is the transition score from $z_{i-1}$ to $z_i$. 
+
+Before computing the emit score and transition score in Eq.~\ref{eqn:crf}, we first take $\h=h_{1:m}$ as the inputs and compute the representation $\bm f = \operatorname{Transfer}(\h)$, where $\operatorname{Transfer}(\cdot)$ denotes a two-layer vanilla Transformer decoding function including a self-attention block, an encoder-decoder block followed by a feed-forward neural network block~\cite{transformer}.
+
+We then compute the emit score and the transition score. 
+For each position $i$, we compute the emit score with a linear transformation: $s(z_i,\x,i)=(W^{T}f_{i}+b)_{z_i}$ where $W \in \mathbb{R}^{d_\text{model}\times K}$ and $b \in \mathbb{R}^{K}$ are the parameters. 
+We incorporate the positional context and compute its transition score with:
+\begin{equation}
+    \begin{split}
+        &\bm M_\text{d}^{i} = \operatorname{Biaffine}([f_{i-1};f_i]), \\
+        &\bm M^{i}  = \bm E_{1}^{T}\bm M_\text{d}^{i}\bm E_2,\\
+        &t(z_{i-1},z_i,\x,i) =\bm M_{z_{i-1},z_{i}}^{i},
+    \end{split}
+\end{equation}
+where $\operatorname{Biaffine}(\cdot):\mathbb{R}^{2d_\text{model}} \to \mathbb{R}^{d_\text{t}\times d_\text{t}} $ is a biaffine neural network~\cite{biaffine}, $\bm E_1$ and $\bm E_2\in\mathbb{R}^{d_\text{t}\times K}$ are the transition matrix.
+
+\subsection{Fusing Source Inputs and Latent Codes via Gated Function}\label{ss:input}
+One potential issue is that the mismatch of the training and inference stage for the used categorical variables. 
+Suppose we train the decoder with the quantized categorical variables $\z$, which is inferred from the target reference. 
+In that case, we may fail to achieve satisfactory performance with the predicted categorical variables during inference.
+
+We intuitively apply the gated neural network~(denote as \textbf{GateNet}) to form the decoder inputs by fusing the copied decoder inputs $\h=h_{1:m}$ and the latent codes $\bm q=q_{1:m}$, since the copied decoder inputs $\h$ is still informative to non-autoregressive decoding:
+\begin{equation}
+\begin{split}
+    g_i &= \sigma(\operatorname{FFN}([h_i;q_i])), \\
+     o_i &= h_i*g_i + q(z_i)*(1-g_i), 
+\end{split}
+\end{equation}
+where the $\operatorname{FFN}(\cdot): \mathbb{R}^{2d_\text{model}}\to \mathbb{R}^{d_\text{model}}$ is a two-layer feed-forward neural networks and $\sigma(.)$ is the $\operatorname{sigmoid}$ function.
+\subsection{Training}
+While training, we first compute the reference $\z^\text{ref}$ by the vector quantization and employ the EMA to update the quantized codes.
+The loss of the CRF-based predictor is computed with:
+\begin{equation}
+    \mathcal{L}_\text{crf} = -\operatorname{log} p(\z^\text{ref}|\x).
+\end{equation}
+To equip with the GateNet, we randomly mix the $\z^\text{ref}$ and the predicted $\z^\text{pred}$ as:
+\begin{equation}
+    \z_i^\text{mix}=\left\{
+\begin{aligned}
+\z_i^\text{pred} &\quad \text{if}\ p \geq \tau \\
+\z_i^\text{ref\ \ \ } &\quad \text{if}\ p < \tau 
+\end{aligned}
+\right.,
+\label{eqn:mix}
+\end{equation}
+where $p\sim \mathbb{U}[0,1]$ and $\tau$ is the threshold we set 0.5 in our experiments. 
+Grounding on the $\z_\text{mix}$, the non-autoregressive translation loss is computed with: %$\mathcal{L}_\text{NAT} =  -\operatorname{log} p(y|\z^\text{mix},x;\theta)$.
+\begin{equation}
+    \mathcal{L}_\text{NAT} =  -\operatorname{log} p(\y|\z^\text{mix},\x;\theta).
+\end{equation}
+With the hyper-parameter $\alpha$, the overall training loss is:
+\begin{equation}
+    \mathcal{L} = \mathcal{L}_\text{NAT} + \alpha\mathcal{L}_\text{crf}.
+    \label{eqn:loss}
+\end{equation}
+% While training, we jointly optimize this CRF module with neural network using negative log-likelihood loss $\mathcal{L}_\text{categorical} = -\operatorname{log} p(z_\text{ref}|h)$, where the $z_\text{ref} = \{z(y_1),z(y_2)\cdots,z(y_m)\}$ with Eq.~\ref{eqn:vq}.
+
+% While inference, we can predict the categorical variable sequence with \texttt{Vitebi Decoding}, which is an exact decoding method and can solve the label bias problem.
+
+
+% \subsection{Inference}\label{ss:inference}
+
+% \paragraph{Argmax Decoding} 
+\subsection{Inference} 
+% We follow the common choice of decoding algorithms~\citep{lt} used in Latent Transformer for neural machine translation.
+\method selects the best sequence by choosing the highest-probability latent sequence $z$ with \textit{Viterbi decoding}~\cite{viterbi1967error}, then generate the tokens with:
+\begin{align*}
+    \z^{*} &= \argmax_{\z} p(\z|\x;\theta), \\ 
+    \text{and}\ \y^{*} &=\argmax_{\y}p(\y|\z^{*},\x;\theta),
+\end{align*}
+where identifying $\y^{*}$ only requires independently maximizing the local probability for each output position.
+
+

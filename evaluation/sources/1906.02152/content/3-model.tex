@@ -1,0 +1,238 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Model}\label{sec:model}
+
+Our model couples a number of variables of interest in a risk transfer market between stablecoin holders and speculators. The stablecoin protocol dictates the logic of how agents can interact with the smart contracts that form the system; the design of this influences how the market plays out. Many DStablecoin designs have been proposed. We set up our model to emulate a DStablecoin protocol like Dai with global settlement, but the model is adaptable to different design choices. Note that our model is formulated with very few parameters given the problem complexity.
+
+Our model builds on the model of traditional financial markets in \cite{farmer2015} but is new in design by incorporating endogenous stablecoin structure. In the model, we assume that the underlying consensus layer (e.g., blockchain) works well to confirm transactions without censorship or attack and that the system of contracts executes as intended.
+
+
+
+
+
+\paragraph{Agents.} Two agents participate in the market.
+\begin{itemize}
+	\item The \textbf{stablecoin holder} seeks stability and chooses a portfolio to achieve this.
+	\item The \textbf{speculator} chooses leverage in a speculative position behind the DStablecoin.
+\end{itemize}
+
+
+Stablecoin holders are motivated by risk aversion, trade limitations, and budget constraints. They are inherently willing to hold cryptoassets. In the current setting, this means they are likely either traders looking for short-term stability, users from countries with unstable fiat currencies, or users who are using cryptocurrencies to move money across borders. In the future, cryptocurrencies may be more accepted in economic exchange. In this case, stablecoin holders may be ordinary consumers who face risk aversion and budgeting for required consumption.
+
+Speculators are motivated by (1) access to leverage and (2) security lending to borrow against their Ether holdings without triggering tax incidence or giving up Ether ownership. In order to begin participating, speculators need to either have confidence in the future of cryptocurrencies, think they can make money trading the markets, or face unusually high tax rates (or other barriers) that make security lending cheaper than outright selling assets. The model in this paper focuses on the first motivation. We propose an extension to the model that considers the second motivation.
+
+
+
+
+
+\paragraph{Assets.} There are two assets. For simplicity, we give these assets specific names; however, they could be abstracted to other cryptocurrencies or outside of a cryptocurrency setting.
+\begin{itemize}
+	\item \textbf{Ether}:  high risk asset whose USD market prices $p^E_t$ are exogenous
+	\item \textbf{DStablecoin}: a `stable' asset collateralized in Ether whose USD price $p^D_t$ is endogenous
+\end{itemize}
+
+Notably, a large DStablecoin system may have endogenous amplification effects on Ether price, similarly to how CDOs affected underlying assets in the 2008 financial crisis. We discuss this further in Section~\ref{sec:discussion} but leave formal modeling of this to future work.
+
+There are several barriers for trading between crypto and fiat, which motivate our choice of assets. Most crypto-fiat pairs are through Bitcoin or Ether, which act as a gateway to other cryptoassets. Trading to fiat can involve moving assets between a number of exchanges and can take considerable time to confirm on the blockchain. Trading to a stablecoin is comparatively simple. Trading to fiat can also trigger more clear tax incidence. Additionally, some countries have imposed strict capital controls on trading between fiat and crypto.
+
+
+\paragraph{Model outline.}
+At $t=0$, the agents have endowments and prior beliefs. In each period $t$:
+\begin{enumerate}
+	\item New Ether price is revealed
+	\item Ether expectations are updated
+	\item Stablecoin holder decides portfolio weights
+	\item Speculator, seeing demand, decides leverage
+	\item DStablecoin market is cleared
+\end{enumerate}
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Stablecoin holder}
+The stablecoin holder starts with an initial endowment and decides portfolio weights to attain the desired stability. The following table defines the agent's state variables.
+\begin{center}
+	\begin{tabular}{c|l}
+		\textbf{Variable}	&	\textbf{Definition} \\
+		\hline
+		$\bar n_t$		&	Ether held at time $t$ \\
+		$\bar m_t$		&	DStablecoin held at time $t$ \\
+		$\mathbf{w_t}$			&	Portfolio weights chosen at time $t$
+	\end{tabular}
+\end{center}
+
+The stablecoin holder weights its portfolio by $\mathbf{w_t}$. We denote the components as $w^E_t$ and $w^D_t$ for Ether and DStablecoin weights respectively. The stablecoin holder's portfolio value at time $t$ is
+$$\mathcal{A}_t = \bar n_t p^E_t + \bar m_t p^D_t = \bar n_{t-1} p^E_t + \bar m_{t-1} p^D_t.$$
+Given weights, $\bar n_t$ and $\bar m_t$ will be determined based on the stablecoin clearing price $p_t^D$.
+
+
+The basic results in Section~\ref{sec:dynamics} hold generally for any $\mathbf{w_t}\geq 0$ (i.e., there is no shorting). In this case, $\mathbf{w_t}$ could be chosen, e.g., from Sharpe ratio optimization, mean-variance optimization, or Kelly criterion (among others). In Sections~\ref{sec:stable_v_unstable}~\&~\ref{sec:simulations}, in order to focus on the effects of speculator decisions, we simplify the stablecoin holder as exogenous with unit price-elastic demand. In this case, DStablecoin demand is constant in dollar terms.
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Speculator}
+The speculator starts with an endowment of Ether and initial beliefs about Ether's returns and variance and decides leverage to maximize expected returns subject to protocol and self-imposed constraints. The following tables define variables and parameters for the speculator.
+\begin{center}
+	\begin{tabular}{c|l}
+		\textbf{Variable}	&	\textbf{Definition} \\
+		\hline
+		$n_t$		&	Ether held at time $t$ \\
+		$r_t$		&	Expected return of Ether at time $t$ \\
+		%$\mu_t$		&	Expected log return of Ether at time $t$ \\
+		$\sigma^2_t$	&	Expected variance of Ether at time $t$ \\
+		$\mathcal{L}_t$		&	Total stablecoins issued at time $t$ \\
+		$\Delta_t$	&	Change to stablecoin supply at time $t$ \\
+		$\tilde\lambda_t$	&	Leverage bound at time $t$
+	\end{tabular}
+\end{center}
+\begin{center}
+	\begin{tabular}{c|l}
+		\textbf{Parameter}	&	\textbf{Definition} \\
+		\hline
+		$\gamma$	&	Memory parameter for return estimation \\
+		$\delta$	&	Memory parameter for variance estimation \\
+		$\beta$		&	Collateral liquidation threshold \\
+		$\alpha$	&	Parameter governing risk measure (inversely related to VaR) \\
+		%$\sigma_{-}^2$ &	Constant added to perceived risk \\
+		$b$			&	Cyclicality parameter in risk constraint: pro- ($b>0$) or counter-cyclic ($b<0$)
+	\end{tabular}
+\end{center}
+
+
+\subsubsection{Ether expectations} The speculator updates expected returns $r_t$, log-returns $\mu_t$ (used for the variance estimation), and variance $\sigma_t^2$ based on observed Ether returns as follows:
+\begin{equation}
+\begin{aligned}
+r_t &= (1-\gamma) r_{t-1} + \gamma \frac{p^E_t}{p^E_{t-1}}, \\
+\mu_t &= (1-\delta)\mu_{t-1} + \delta \log \frac{p_t^E}{p^E_{t-1}}, \\
+\sigma_t^2 &= (1-\delta) \sigma_{t-1}^2 + \delta \Big( \log \frac{p^E_t}{p^E_{t-1}} - \mu_t\Big)^2.
+\end{aligned}
+\end{equation}\label{eq:expectations}
+%Multiplicative returns $r_t$ are relevant in the speculator's objective whereas log returns $\mu_t$ and variance $\sigma_t^2$ are relevant to the constraint. 
+For fixed memory parameters $\gamma,\delta$ (lower memory parameter = longer memory), these are exponential moving averages consistent with the RiskMetrics approach commonly used in finance \cite{longerstaey1996}. For sufficiently stepwise decreasing memory levels and assuming i.i.d. returns, this process will converge to the true values supposing they are well-defined and finite. In reality, speculators don't outright know the Ether return distribution and, as we will see in the simulations, the stablecoin system dynamics occur on timescales shorter than required for convergence of expectations. Thus, we focus on the simpler case of fixed memory parameters.
+
+Note that $\gamma \neq \delta$ may be reasonable. Current cryptocurrency markets are not very price efficient, and so traders might reasonably take into account momentum when estimating returns while using a wider memory for estimating covariance.
+
+We additionally consider the case in which the speculator knows the Ether distribution outright and $\gamma=\delta=0$. This is consistent with a rational expectations standpoint but ignores how the speculator arrives at that knowledge.
+
+
+\subsubsection{Optimize leverage: choose $\Delta_t$}
+
+
+The speculator is liable for $\mathcal{L}_t$ DStablecoins at time $t$. At each time $t$, it decides the number of DStablecoins to create or repurchase. This changes the stablecoin supply $\mathcal{L}_t = \mathcal{L}_{t-1} + \Delta_t$. If $\Delta_t>0$, the speculator creates and sells new DStablecoin in exchange for Ether at the clearing price. If $\Delta_t<0$, the speculator repurchases DStablecoin at the clearing price.
+
+Strictly speaking, the speculator will want to maximize its long-term withdrawable value. At time $t$, the speculator's withdrawable value is the value of its ETH holdings minus collateral required for any issued stablecoins: $n_t p_t^E - \beta\mathcal{L}_t$. Maximizing this is not amenable to a myopic view, however, as maximizing the next step's withdrawable value is only a good choice when the speculator intends to exit in the next step.
+
+Instead, we frame the speculator's objective as maximizing expected equity: $n_t p_t^E - \mathbf{E}[p^D] \mathcal{L}_t$. In this, the speculator expects to be able to settle liabilities at a long-term expected value of $\mathbf{E}[p^D]$. The market price of DStablecoin will fluctuate above and below \$1 naturally depending on prevailing market conditions. The actual expected value is nontrivial to compute as it depends on the stability of the DStablecoin system. For individual speculators with small market power, we argue that $\mathbf{E}[p^D]=1$ is a an assumption they may realistically make, as we discuss further below. This is additionally the value realized in the event of global settlement.
+
+We suggest that this optimization is a candidate for `honest' behavior of a speculator as it is consistent with the speculator acting on perceived arbitrage in mispricings of DStablecoin from the peg. In essence, the speculator expects to increase (reduce) leverage `at a discount' when $p_t^D$ is above (below) target. This is the typically cited mechanism by which these systems maintain their peg and thus how the designers \emph{intend} for speculators to behave. However, this assumes that $p_t^D$ is sufficiently stable/mean-reverting to \$1 and so this behavior may not in fact be a best response.
+
+
+
+
+\paragraph{Aggregate vs. individual speculators.}
+In our model, the single speculative agent, which is not a price-taker, is intended to reflect the aggregate behavior of many individual speculators, each with small market power.\footnote{We propose to relax this simplification in follow-up work by considering the interaction of many speculators with longer term strategic thinking.} In a normal liquid market, an individual speculator would be able to repurchase DStablecoins at dollar cost and walk away with the equity. By maximizing equity, the aggregate speculator considers its liabilities to be \$1 per DStablecoin. This may turn out to be untrue during liquidity crises as the repurchase price may be higher. In our model, speculator's don't know the probability of crises and instead account for this in a conservative risk constraint.
+
+
+
+
+\paragraph{Formal optimization problem.}
+The speculator chooses $\Delta_t$ by maximizing expected equity in the next period subject to a leverage constraint:
+$$\begin{aligned}
+\max_{\Delta_t} \hspace{0.5cm} & r_t\Big(n_{t-1}p^E_t + \Delta_t p^D_t(\mathcal{L}_t)\Big) - \mathcal{L}_t \\
+\text{s.t.} \hspace{0.5cm} & \Delta_t \in \mathcal{F}_t
+\end{aligned}$$
+where $\mathcal{F}_t$ is the feasible set for the leverage constraint. This is composed of two separate constraints: (1) a \textbf{liquidation constraint} that is fundamental to the protocol, and (2) a \textbf{risk constraint} that encodes the speculator's desired behavior. Both are introduced below.
+
+If the leverage constraint is unachievable, we assume the speculator enters a `recovery mode', in which it tries to maximize its chances of returning to the normal setting. In this case, it solves the optimization using only the liquidation constraint. If the liquidation constraint is unachievable, the DStablecoin system fails with a global settlement.
+
+
+
+
+\subsubsection{Liquidation constraint: enforced by the protocol}
+The liquidation constraint is fundamental to the DStablecoin protocol. A speculator's position undergoes forced liquidation at time $t$ if either (1)~after $p_t^E$ is revealed, $n_{t-1} p^E_t < \beta \mathcal{L}_{t-1}$, or (2)~after $\Delta_t$ is executed, $n_t p_t^E < \beta \mathcal{L}_t$. The speculator aims to control against this as liquidations can occur at unfavorable prices and are associated with fees in existing protocols (we exclude these fees from our simple model, but they can be easily added).
+
+Define the speculator's leverage as the $\beta$-weighted ratio of liabilities to assets\footnote{We choose this definition to simplify the model. The alternative definition $\lambda'~=~\frac{\text{assets}}{\text{assets} - \beta\cdot\text{liabilities}}$ describes the same idea scaled from 0 to $\infty$. I.e., $\lambda' = \frac{1}{1-\lambda}$ is monotonically increasing in $\lambda$ for $0\leq \lambda' < 1$.}
+
+$$\lambda_t = \frac{\beta \cdot \text{liabilities}}{\text{assets}}.$$
+The liquidation constraint is then $\lambda_t \leq 1$.
+
+
+
+\subsubsection{Risk constraint: self-imposed speculator behavior}
+The risk constraint encodes the speculator's desired behavior into the model. \emph{We assume no specific type for the risk constraint in our analytical results, which are generic.} For our simulations, we explore a variety of speculator behaviors via the risk constraint. We first consider Value-at-Risk (VaR) \emph{as an example} of a constraint realistically used in markets. This is consistent with narratives shared by Dai speculators about leaving a margin of safety to avoid liquidations. We then construct a generalization that goes well beyond VaR and allows us to explore a spectrum of pro-cyclical and counter-cyclical behaviors encoded in the risk constraint.
+
+Manipulation and instability resulting from similar \emph{externally-imposed} VaR rules is a well-known problem in the risk management and financial regulatory literature (see e.g., \cite{farmer2015}). This is of less concern here as the precise parameters of the risk constraint are selected and self-imposed by speculators to approximate their own utility optimization and are not part of the DStablecoin protocol. Further, we consider constraints that go \emph{beyond VaR}. We instead need to show that our results are robust to a variety of risk constraints that speculators could select.
+
+\paragraph{Example: VaR-based constraint.}
+The VaR-based version of the risk constraint is
+$$\lambda_t \leq \exp(\mu_t - \alpha \sigma_t),$$
+where $\alpha>0$ is inversely related to riskiness. This is consistent with VaR for normal and maximally heavy-tailed symmetric return distributions with finite variance.
+
+Let $\text{VaR}_{a,t}$ be the $a$-quantile per-dollar VaR of the speculator's holdings at time $t$. This is the minimum loss on a dollar in an $a$-quantile event. With a VaR constraint, the speculator aims to avoid triggering the liquidation constraint in the next period with probability $1-a$, i.e.,
+$\mathbf{P} \Big( n_t p^E_{t+1} \geq \beta \mathcal{L}_t \Big) \geq 1-a.$ To achieve this, the speculator chooses $\Delta_t$ such that
+$$\Big(n_{t-1}p^E_t + \Delta_t p_t^D(\mathcal{L}_t)\Big) (1-\text{VaR}_{a,t}) \geq \beta \mathcal{L}_t.$$
+This requires $\lambda_t \leq 1-\text{VaR}_{a,t}$, which addresses the probability that the liquidation constraint is satisfied next period and implies that it is satisfied this period.
+
+Define $\tilde \lambda_t := \exp(\mu_t -\alpha\sigma_t)$. Then $\tilde \lambda_t$ is increasing in $\mu_t$ and decreasing in $\sigma_t$. Further, the fatter the speculator thinks the tails of the return distribution are, the greater $\alpha$ will be, and the lesser $\tilde \lambda_t$ will be, as we demonstrate next.
+
+\paragraph{VaR constraint with normal returns.}
+If the speculator assumes Ether log returns are $(\mu_t, \sigma_t)$ normal, then
+$\text{VaR}_{a,t} = 1 - \exp\Big(\mu_t + \sqrt{2} \sigma_t \text{erf}^{-1}(2a-1)\Big).$
+Defining $\alpha = - \sqrt{2}\text{erf}^{-1}(2a-1)$, which is positive for appropriately small $a$, the VaR constraint is
+$\lambda_t \leq 1 - \text{VaR}_{a,t} = \exp(\mu_t - \alpha \sigma_t).$
+
+\paragraph{VaR constraint with heavy tails.}
+If Ether log returns $X$ are symmetrically distributed with finite mean $\mu_t$ and finite variance $\sigma_t^2$, then for any $\alpha>1$, Chebyshev's inequality gives us
+$$\mathbf{P}(X < \mu_t -\alpha\sigma_t) \leq \frac{1}{2\alpha^2}.$$
+For the maximally heavy-tailed case, this inequality is tight. Then for VaR quantile $a$, we can find the corresponding $\alpha$ such that $a = \frac{1}{2\alpha^2}$. The log return VaR is $\mu_t-\alpha\sigma_t$, which gives the per-dollar $\text{VaR}_{a,t} = 1-\exp(\mu_t-\alpha\sigma_t)$. Then the VaR constraint is $\lambda_t \leq \exp(\mu_t - \alpha\sigma_t)$.
+
+
+\paragraph{Generalized risk constraint.}
+Similarly to \cite{farmer2015}, we can generalize the bound to explore a spectrum of different behaviors:
+$$\ln \tilde \lambda = \mu_t - \alpha \sigma_t^b,$$
+where $\alpha$ is an inverse measure of riskiness and $b$ is a cyclicality parameter. A positive $b$ means that $\tilde \lambda_t$ decreases with perceived risk (pro-cyclical). A negative $b$ means that $\tilde \lambda_t$ increases with perceived risk (counter-cyclical). %Riskiness $\alpha$ can be further made time-dependent to accommodate a fuller range of behaviors.
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{DStablecoin market clearing}
+
+The DStablecoin market clears by setting demand = supply in dollar terms:
+$$w^D_t \Big(\bar n_{t-1}p^E_t + \bar m_{t-1}p^D_t(\mathcal{L}_t)\Big) = \mathcal{L}_t p^D_t(\mathcal{L}_t).$$
+The demand (left-hand side) comes from the stablecoin holder's portfolio weight and asset value. Notice that while the asset value depends on $p_t^D$, the portfolio weight $w_t^D$ does not. That is, the stablecoin holder buys with market orders based on weight. This simplification allows for a tractable market clearing; however, it is not a full equilibrium model.
+
+We justify this choice of simplified market clearing with the following observations:
+\begin{itemize}
+	\item The clearing is similar to constant product market maker model used in the Uniswap decentralized exchange (DEX) \cite{zhang2018}.
+	\item Sophisticated agents are known to be able to front-run DEX transactions \cite{daian2019}. As speculators are likely more sophisticated than ordinary stablecoin holders, in many circumstances they can see demand before making supply decisions.\footnote{This said, DEX mechanics differ slightly from our specific formulation. To make the model more realistic, stablecoin holders could issue buy offers in token units instead of weights at the expense of greater model complexity.}
+	\item Evidence from Steem Dollars suggests that demand need not decrease tremendously with price in the unique setting in which stable assets are not efficiently available. Steem Dollars is a stablecoin with a mechanism for price `floor' but not `ceiling'. Over significant stretches of time, it has traded at premiums of up to $15\times$ target.
+\end{itemize}
+
+In most of our results, the time period context is clear. To simplify notation, in a given time $t$, we drop subscripts and write with the following quantities:
+
+\begin{center}
+	\begin{tabular}{l c l}
+		\textbf{Quantity}					&\textbf{Sign}&\textbf{Interpretation} \\
+		\hline
+		$x:=w^D_t \bar n_{t-1} p^E_t$ 		&$x\geq 0$	& New DStablecoin demand available	\\
+		$y:=w^D_t \bar m_{t-1} - \mathcal{L}_{t-1}$	&	$y\leq 0$	& $|y| = $ `free supply' in DStablecoin market \\
+		$z:=n_{t-1} p^E_t$ 			&	$z\geq 0$	& Speculator value available to maintain market \\
+		\hline
+	\end{tabular}
+\end{center}
+\begin{center}
+	\begin{tabular}{r c l}
+		\hline
+		$\mathcal{L}$	&$:=$&	$\mathcal{L}_{t-1}$ \\
+		$\Delta$		&$:=$&	$\Delta_t$ \\
+		$\tilde \lambda$&$:=$&	$\tilde \lambda_t$ \\
+		$\mathbf{w}$	&$:=$&	$\mathbf{w_t}$ \\
+		\hline
+	\end{tabular}
+\end{center}
+
+With $\Delta > y$, which turns out to be always true as discussed later, the clearing price is
+$$p_t^D(\Delta) = \frac{x}{\Delta-y}.$$
+
+As the model is defined thus far, stablecoin holders only redeem coins for collateral through global settlement. However, this assumption is easily relaxed to accommodate algorithmic or manual settlements.

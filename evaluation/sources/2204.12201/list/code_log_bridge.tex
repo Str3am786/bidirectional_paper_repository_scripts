@@ -1,0 +1,73 @@
+\begin{figure}[b]
+%\scriptsize
+\begin{minipage}{\linewidth}
+\begin{lstlisting}[language=C++,
+caption={Logistic regression with data filtering using bridging.},
+style=mystyle, label=list:log_bridge,
+%framexrightmargin=-37pt,
+% xleftmargin=0.4cm,
+% xrightmargin=-0.12\linewidth,
+% linewidth=0.88\linewidth
+]
+template <class T> vector<vector<T>>
+appendCol(vector<vector<T>> m, T value)
+{
+  for (auto & v : m) v.push_back(value);
+  return m;
+}
+
+template <int S>
+vector<vector<SecureInt<S>>>
+filter(vector<vector<SecureInt<S>>> m,
+  SecureInt<S> threshold, vector<int> pos)
+{
+  for (auto & idx : pos)
+  {
+    for (auto & v : m)
+    {
+      auto cond = v[idx] > threshold;
+      v[idx] = cond * threshold
+            + !cond * v[idx];
+    }
+  }
+  return m;
+}
+
+
+vector<vector<SecureMod>>
+mm(vector<vector<SecureMod>> a,
+  vector<vector<SecureMod>> b)
+{
+  auto n = a.size();
+  auto m = b.size();
+  auto p = b[0].size();
+  vector<vector<SecureMod>> c(n);
+  for (size_t i=0; i<n; i++)
+  {
+    for (size_t j=0; j<p; j++)
+    {
+      vector<SecureMod> t;
+      for (size_t k=0; k<m; k++)
+        t.push_back(a[i][k] * b[k][j]);
+      c[i].push_back(sum(t));
+    }
+  }
+  return c;
+}
+
+template <int S>
+vector<vector<SecureMod>>
+logreg(vector<vector<SecureInt<S>>> inputs,
+  vector<vector<SecureMod>> weights,
+  SecureInt<S> threshold, vector<int> pos)
+{
+  SecureMod one = _1_M;
+  filter(inputs, threshold, pos);
+  auto inputsU = convert(inputs, one);
+  appendCol(inputsU, one);
+  return mm(inputsU, weights);
+}
+\end{lstlisting}
+\end{minipage}
+% \vspace{\lstbspace}
+\end{figure}

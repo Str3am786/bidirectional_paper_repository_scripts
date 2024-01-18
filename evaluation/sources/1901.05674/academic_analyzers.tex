@@ -1,0 +1,50 @@
+\section{Details on PDF Scanners}
+
+\subsection{Setup of Academic and Open-Source Scanners}
+\label{sec:scanner setup}
+
+The following describes the academic and open-source scanners, i.e.,
+Slayer, SAFE-PDF, PDF Scrutinizer, and Cuckoo Sandbox,
+and how we set them up for our study.
+In addition, we briefly go through the internals of SploitGuard, which, even though a commercial scanner, is based on an  academic work~\cite{payer2015fine}.
+
+Slayer~\cite{maiorca2012pattern}, also known as PDF Malware Slayer or PDFMS, is a machine learning-based static scanner. It predicts whether a document is malicious based on the document's internal structure.
+We train Slayer with a set of malicious and benign PDF files that are obtained from Mila Parkour, the owner of Contagiodump\footnote{http://contagiodump.blogspot.com/}, a public malware repository.
+The malicious sets comprises more than 11,000 files, which are labeled as 'MALWARE\_PDF\_CVEsorted\_173\_files' and 'MALWARE\_PDF\_PRE\_04-2011\_10982\_files'.
+The benign set comprises 9,000 files labeled as 'CLEAN\_PDF\_9000\_files'.
+
+SAFE-PDF statically reasons about a file based on abstract interpretation. 
+It is designed to cope with malicious PDF documents that incorporate evasions.
+By abstract interpretation, it over-approximates the run-time behavior of a document to examine all its possible execution paths.
+
+PDF Scrutinizer~\cite{schmitt2012pdf} extracts all JavaScript code snippets from a PDF document, executes the code in Mozilla Rhino, and uses libemu to find and analyze the payload.
+The tool combines both static and dynamic analysis techniques, but as more weight is put on the dynamic part, we classify it as a dynamic scanner.
+
+Cuckoo Sandbox~\cite{guarnieri2013cuckoo} (in short Cuckoo) scores each analyzed sample on a scale of 0 (benign) to 10 (certainly malicious).
+To map this score into a binary score (malicious or not), which is necessary to compare Cuckoo with other scanners, we set a threshold on the score reported by Cuckoo.
+To this end, we scan documents with the bare exploits, i.e., without any evasion, with Cuckoo and take the minimum score among them, 3.0, as the maliciousness threshold.
+We consider any score greater than or equal to this threshold as a ``malicious'' classification, and any score smaller than the threshold as ``benign''.
+We evaluate Cuckoo out-of-the-box with no additional extensions installed, except Cuckoo Signatures\footnote{https://github.com/cuckoosandbox/community/}, which are community rules that assign score to observed behaviors (e.g., dropping executable files).
+We configure Cuckoo's guest machine with two processors, 2 GB of memory, and one virtual monitor having 720p resolution (important for ``mons'' and ``resol'' evasions).
+The guest machine runs Windows~7, 64-bit, and has Adobe Reader 9.0, the version vulnerable to our exploits, installed.
+
+SploitGuard is a dynamic scanner based on Lockdown~\cite{payer2015fine} that detects the exploitation of vulnerabilities by enforcing different policies during the execution of a program, for example Adobe Reader. By design, SploitGuard does not need to be trained, and the result for a given document is a binary decision ``malicious'' or ``benign''.
+
+
+
+\subsection{Other Considered Analyzers}
+\label{sec:other analyzers}
+
+We considered several other academic scanners but could not include all of them, because some are either not available or have some issues in our local setup. The following is a list of scanners that we considered but unfortunately could not include in our study.
+\begin{itemize}
+    \item PDFRate~\cite{smutz2012malicious}: A learning-based PDF scanner that decides whether a document is malicious based on its structure. PDFRate's online service\footnote{https://csmutz.com/pdfrate/} was not available at the time of writing this paper.
+    \item MDScan~\cite{tzermias2011combining}: Combining static and dynamic analysis, MDScan specifically targets PDF files. The dynamic analysis is via extracting JavaScript snippets and running them on an emulator. The source code for MDScan is not available in the public domain.
+    \item Lux0r~\cite{corona2014lux0r}: A machine learning approach aimed at detecting malicious JavaScript code in general, but  evaluated with malicious JavaScript-bearing PDF documents. By tapping into the JavaScript interpreter, Lux0r anticipates a malicious behavior based on the API usage. Lux0r is not publicly available.
+    \item MPScan~\cite{lu2013obfuscation}: MPScan extracts and de-obfuscates the JavaScript code on the fly by hooking into Adobe Reader, and then statically analyzes it to detect a malicious behavior. MPScan's source code is not publicly available.
+    \item ShellOS~\cite{snow2011shellos}: Even-though designed mainly for executable files, ShellOS can find the payload in a malicious PDF document and analyze it too. However, the tool is not publicly available.
+    \item The tool by Carmony et al.~\cite{carmony2016extract}: To improve the detection accuracy, Carmony et al. improve extraction of the JavaScript snippets of a PDF document. The tool then uses PJScan~\cite{laskov2011static} for classification of the extracted snippets. The tool is not publicly available.
+    \item CWXDetector~\cite{willems2012using}: By disabling data execution prevention (DEP), CWXDetector monitors the execution of code from non-executable pages (former exploits usually tried to execute code from the heap, which is non-executable). Once such a write happens, the page fault handler is invoked and the page's content is dumped for further analysis. CWXDetector can be used for several file types such as executable and PDF files. However, it is not available online.
+    \item Tool by Liu et al.~\cite{liu2014detecting}: By statically instrumenting a document to insert context-monitoring code, the instrumented document's behavior is observed at run-time. The tool is not publicly available.
+    \item PJScan~\cite{laskov2011static}: A static scanner that uses machine learning to detect malicious files. We tried to train PJScan\footnote{https://sourceforge.net/p/pjscan/home/Home/} with the same sets of files used for training Slayer, but unfortunately, it did not find any JavaScript code (even though most of the files contain embedded JavaScript). Therefore it could not be trained and evaluated in our setup.
+    \item PlatPal~\cite{xu2017platpal}: Runs a PDF document in Adobe Reader and track its behavior on Windows and macOS. Based on the discrepancies in the execution traces (e.g. the amount of dynamically allocated memory), it marks the document as either malicious or benign. We hit compilation errors while trying to build the tool\footnote{https://github.com/sslab-gatech/platpal} locally and unfortunately the documentation did not help us to resolve them.
+\end{itemize}

@@ -1,0 +1,79 @@
+\section{OCR Post-Correction Model}
+\label{sec:model}
+In this section, we describe our proposed OCR post-correction model. The base architecture of the model is a multi-source sequence-to-sequence framework~\cite{zoph-knight-2016-multi,libovicky-helcl-2017-attention} that uses an LSTM encoder-decoder model with attention~\cite{bahdanau2015neural}. We propose improvements to training and modeling for the multi-source architecture, specifically tailored to ease learning in data-scarce settings.
+
+\subsection{Multi-source Architecture}
+\label{sec:base}
+\input{images/multisourcemodel}
+Our post-correction formulation takes as input the first pass OCR of the endangered language segment $\boldsymbol{x}$ and the OCR of the translated segment $\boldsymbol{t}$, to predict an error-free endangered language text $\boldsymbol{y}$. The model architecture is shown in \autoref{fig:multisourcemodels}.
+
+The model consists of two encoders --- one that encodes $\boldsymbol{x}$ and one that encodes $\boldsymbol{t}$. Each encoder is a character-level bidirectional LSTM~\cite{hochreiter1997long} and transforms the input sequence of characters to a sequence of hidden state vectors: $\mathbf{h}^x$ for the endangered language text and $\mathbf{h}^t$ for the translation.
+
+The model uses an attention mechanism during the decoding process to use information from the encoder hidden states. We compute the attention weights over each of the two encoders independently. At the decoding time step $k$:
+\begin{align}
+e^x_{k,i}=\mathbf{v}^x \tanh\left(\mathbf{W}_1^x \mathbf{s}_{k-1} + \mathbf{W}_2^x \mathbf{h}^x_i\right)
+\label{eq:attn}
+\end{align}
+$$\boldsymbol{\alpha}_k^x = \mathrm{softmax}\left(\mathbf{e}_k^x\right)$$
+$$\mathbf{c}^x_k = \left[\Sigma_i \alpha^x_{k,i} \mathbf{h}^x_i\right]$$
+\noindent
+where $\mathbf{s}_{k-1}$ is the decoder state of the previous time step and $\mathbf{v}^x$, $\mathbf{W}_1^x$ and $\mathbf{W}_2^x$ are trainable parameters. The encoder hidden states $\mathbf{h}^x$ are weighted by the attention distribution $\boldsymbol{\alpha}^x_k$ to produce the context vector $\mathbf{c}^x_k$. We follow a similar procedure for the second encoder to produce $\mathbf{c}^t_k$.
+We concatenate the context vectors to combine attention from both sources~\cite{zoph-knight-2016-multi}:
+$$\mathbf{c}_k=\left[\mathbf{c}_k^x;\mathbf{c}_k^t\right]$$
+$\mathbf{c}_k$ is used by the decoder LSTM to compute the next hidden state $\mathbf{s}_k$ and subsequently, the probability distribution for predicting the next character $\mathbf{y}_k$ of the target sequence $\boldsymbol{y}$:
+\begin{align} 
+\mathbf{s}_k &= \mathrm{lstm}\left(\mathbf{s}_{k-1}, \mathbf{c}_k, \mathbf{y}_{k-1}\right)\\
+P\left(\mathbf{y}_k\right) &= \mathrm{softmax}\left(\mathbf{W}\mathbf{s}_k + \mathbf{b}\right)
+\label{eq:decoder}
+\end{align}
+
+\paragraph{Training and Inference} The model is trained for each language with the cross-entropy loss ($\mathcal{L}_\mathrm{ce}$) on the small amount of transcribed data we have. Beam search is used at inference time.
+
+
+\subsection{Model and Training Improvements}
+\label{sec:recipe1}
+
+With the minimal annotated data we have, it is challenging for the neural network to learn a good distribution over the target characters. We propose a set of adaptations to the base architecture that improves the post-correction performance without additional annotation. The adaptations are based on characteristics of the OCR task itself and the performance of the upstream OCR tool (\autoref{sec:analysis}).
+
+\paragraph{Diagonal attention loss} As seen in \autoref{sec:analysis}, substitution errors are more frequent in the OCR task than insertions or deletions; consequently, we expect the source and target to have similar lengths. Moreover, post-correction is a monotonic sequence-to-sequence task, and reordering rarely occurs~\cite{schnober-etal-2016-still}. 
+Hence, we expect attention weights to be higher at characters close to the diagonal for the endangered language encoder.
+
+We modify the model such that all the elements in the attention vector that are not within $j$ steps (we use $j=3$) of the current time step $k$ are added to the training loss, thereby encouraging elements away from the diagonal to have lower values. The diagonal loss summed over all time steps for a training instance, where $N$ is the length of $\boldsymbol{x}$, is:
+$$\mathcal{L}_\mathrm{diag} = \sum_k \left(\sum_{i=1}^{k-j} \alpha^x_{k,i} + \sum_{i=k+j}^N \alpha^x_{k,i}\right)$$
+
+\paragraph{Copy mechanism} \autoref{tab:google_metrics} indicates that the first pass OCR predicts a majority of the characters accurately. In this scenario, enabling the model to directly copy characters from the first pass OCR rather than generate a character at each time step might lead to better performance~\cite{gu-etal-2016-incorporating}.
+
+We incorporate the copy mechanism proposed in~\citet{see-etal-2017-get}. The mechanism computes a \ba\ba generation probability'' at each time step $k$, which is used to choose between \emph{generating} a character (\autoref{eq:decoder}) or \emph{copying} a character from the source text by sampling from the attention distribution $\boldsymbol{\alpha}_k^x$.
+
+\paragraph{Coverage} Given the monotonicity of the post-correction task, the model should not attend to the same character repeatedly. However, repetition is a common problem for neural encoder-decoder models~\cite{mi-etal-2016-coverage,tu-etal-2016-modeling}. To account for this problem, we adapt the coverage mechanism from~\citet{see-etal-2017-get}, which keeps track of the attention distribution over past time steps in a coverage vector. For time step $k$, the coverage vector would be $\mathbf{g}_k = \sum_{k'=0}^{k-1} \boldsymbol{\alpha}^x_{k'}$. 
+
+$\mathbf{g}_k$ is used as an extra input to the attention mechanism, ensuring that future attention decisions take the weights from previous time steps into account. \autoref{eq:attn}, with learnable parameter $\mathbf{w}_g$, becomes:
+$$e^x_{k,i}=\mathbf{v}^x \tanh\left(\mathbf{W}_1^x \mathbf{s}_{k-1} + \mathbf{W}_2^x \mathbf{h}^x_i + \mathbf{w}_g g_{k,i}\right)$$
+$\mathbf{g}_k$ is also used to penalize attending to the same locations repeatedly with a coverage loss. The coverage loss summed over all time steps $k$ is:
+$$\mathcal{L}_\mathrm{cov} = \sum_k \sum_{i=1}^n \min\left(\alpha_{k,i}^x, g_{k,i}\right)$$
+Therefore, with our model adaptations, the loss for a single training instance:
+\begin{align}
+\mathcal{L} = \mathcal{L}_\mathrm{ce} + \mathcal{L}_\mathrm{diag} + \mathcal{L}_\mathrm{cov}
+\label{eq:loss}
+\end{align}
+
+\subsection{Utilizing Untranscribed Data}
+\label{sec:recipe2}
+
+As discussed in \autoref{sec:dataset}, given the effort involved, we transcribe only a subset of the pages in each scanned book.
+Nonetheless, we leverage the remaining unannotated pages for pretraining our model. We use the upstream OCR tool to get a first pass transcription on all the unannotated pages.
+
+We then create \ba\ba pseudo-target'' transcriptions for the endangered language text as described below:
+\begin{itemize}
+    \item \textbf{Denoising rules}\quad Using a small fraction of the available annotated pages, we compute the edit distance operations between the first pass OCR and the gold transcription. The operations of each type (insertion, deletion, and replacement) are counted for each character and divided by the number of times that character appears in the first pass OCR. This forms a probability of how often the operation should be applied to that specific character.
+    
+    We use these probabilities to form rules, such as $p(\text{replace d with \d{d}})\!=\!0.4$ for Griko and $p(\text{replace ? with \textipa{\textglotstop}})\!=\!0.7$ for Yakkha. These rules are applied to remove errors from, or \ba\ba denoise'', the first pass OCR transcription.
+    \item \textbf{Sentence alignment}\quad We use Yet Another Sentence Aligner~\cite{yasa-1336} for unsupervised alignment of the endangered language and translation on the unannotated pages. 
+\end{itemize}
+Given the aligned first pass OCR for the endangered language text and the translation along with the pseudo-target text, $\boldsymbol{x}$, $\boldsymbol{t}$ and $\boldsymbol{\hat{y}}$ respectively, the pretraining steps, in order, are:
+
+\begin{itemize}
+    \item \textbf{Pretraining the encoders}\quad We pretrain both the forward and backward LSTMs of each encoder with a character-level language model objective: the endangered language encoder on $\boldsymbol{x}$ and the translation encoder on $\boldsymbol{t}$.
+    \item \textbf{Pretraining the decoder}\quad The decoder is pretrained on the pseudo-target $\boldsymbol{\hat{y}}$ with a character-level language model objective.
+    \item \textbf{Pretraining the seq-to-seq model}\quad The model is pretrained with $\boldsymbol{x}$ and $\boldsymbol{t}$ as the sources and the pseudo-target $\boldsymbol{\hat{y}}$ as the target transcription, using the post-correction loss function~$\mathcal{L}$ as defined in \autoref{eq:loss}.
+\end{itemize}

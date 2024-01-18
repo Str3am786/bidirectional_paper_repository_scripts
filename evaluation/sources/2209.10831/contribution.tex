@@ -1,0 +1,554 @@
+\section{Main results}
+\label{sec:main_result}
+We first show 
+a unified view of the boosting algorithms 
+via Fenchel duality. 
+From this view, LPBoost, ERLPBoost, and C-ERLPBoost can be seen as 
+instances of the Frank-Wolfe algorithm 
+with different step sizes and objectives. 
+Using this knowledge, we derive a new boosting scheme. 
+\subsection{A unified view of boosting for the soft margin optimization}
+This section assumes that the weak learner 
+always returns a hypothesis $h \in \hset$ 
+that maximizes the edge w.r.t. the given distribution. 
+We start by revisiting C-ERLPBoost. 
+Recall that C-ERLPBoost (and ERLPBoost) aim to solve the convex program 
+\begin{align}
+    \label{eq:smoothed_problem}
+    \min_{\bm{d}}
+    \max_{j \in [n]} (\bm{d}^\top A)_j + \tilde{f}^\star (\bm{d}),
+\end{align}
+where $\tilde{f} = f + \frac{1}{\eta} \Delta$. 
+Since $\frac{1}{\eta} \Delta$ is 
+a $\frac{1}{\eta}$-strongly convex function w.r.t. $\ell_1$-norm, 
+so does $\tilde{f}$. 
+By Fenchel duality, the dual problem is 
+\begin{align}
+    \label{eq:smoothed_softmargin}
+    \max_{\bm{w} \in \psimplex{n}} - \tilde{f}^\star( -A \bm{w} )
+    = - \min_{\bm{w} \in \psimplex{n}}
+        \tilde{f}^\star( -A \bm{w} )
+    = - \min_{\bm{\theta} \in -A\psimplex{n}}
+        \tilde{f}^\star(\bm{\theta}),
+\end{align}
+where $-A \psimplex{n} = \{ -A \bm{d} \mid \bm{d} \in \psimplex{n}\}$, 
+with zero duality gap. 
+Further, $\tilde{f}^\star$ is an $\eta$-smooth function 
+w.r.t. $\ell_\infty$-norm. 
+Thus, the soft margin optimization problem becomes 
+a minimization problem of a smooth function. 
+
+In each iteration $t$, 
+C-ERLPBoost updates the distribution $\bm{d}_t \in \psimplex{m}_{\nu}$ 
+over examples as the optimal solution of~(\ref{eq:cerlpb_update}). 
+This computation corresponds to the gradient computation 
+$\nabla \tilde{f}^\star( \theta_t )$, where $\theta_t = - A\bm{w}_t$. 
+Then, obtain a basis vector $\bm{e}_{j_{t+1}} \in \psimplex{n}$ 
+corresponding to hypothesis $h_{j_{t+1}} \in \hset$ 
+that maximizes the edge; 
+$j_{t+1} \in \arg \max_{j \in [n]} (\bm{d}_t^\top A)_j$. 
+We can write this calculation regarding the gradient of $\tilde{f}^\star$;
+\begin{align*}
+    \arg \max_{\bm{e}_j : j \in [n]} \bm{d}_t^\top A \bm{e}_j
+    = \arg \min_{\bm{e}_j : j \in [n]}
+        (-A\bm{e}_j)^\top \nabla \tilde{f}^\star (\bm{\theta}_t)
+    = \arg \min_{\bm{\theta} \in -A\psimplex{n}}
+        \bm{\theta}^\top \nabla \tilde{f}^\star (\bm{\theta}_t).
+\end{align*}
+Thus, finding a hypothesis that maximizes edge corresponds to 
+solving linear programming in the Frank-Wolfe algorithm. 
+Further, C-ERLPBoost updates the weights as 
+$\bm{w}_{t+1} = \bm{w}_t + \lambda_t (\bm{e}_{j_{t+1}} - \bm{w}_t)$, 
+where $\lambda_t$ is the short-step~\footnote{%
+    They also suggests the line search update. %
+    This case yields a better progress than short-step, %
+    so the same iteration bound holds. %
+}, as in eq.~(\ref{eq:short_step_update}).
+From these observations, we can say that the C-ERLPBoost is 
+an instance of the Frank-Wolfe algorithm. 
+Since $\tilde{f}^\star$ is $\eta$-smooth, we can say that 
+this algorithm converges in $O(\eta/\epsilon)$ iterations 
+for a max-edge weak learner. 
+
+Similarly, we can say that LPBoost and ERLPBoost are 
+instances of the Frank-Wolfe algorithm. 
+Let $J_t := \{j_1, j_2, \dots, j_{t} \}$ be the set of indices 
+corresponding to the hypotheses $\{h_{j_1}, h_{j_2}, \dots, h_{j_{t}}\}$ 
+and $\eset_t := \{ \bm{e}_{j} \mid j \in J_t \}$ be 
+the corresponding basis vectors. 
+LPBoost and ERLPBoost update the distribution as 
+the optimal solutions 
+$\bm{d}_t^{\rm{L}} \in \partial f^\star( -A \bm{w}_t^{\rm L})$ 
+and $\bm{d}_t^{\rm{E}} = \nabla \tilde{f}^\star (-A \bm{w}_t^{\rm E})$, 
+where 
+\begin{alignat}{2}
+    \label{eq:lpb_weight}
+    \text{(LPBoost)} & \quad &
+        \bm{w}_t^{\rm{L}} \gets \arg \max_{\bm{w} \in \convhull(\eset_t)}
+        - f^\star (-A \bm{w}), \\
+    \label{eq:erlpb_weight}
+    \text{(ERLPBoost)} & \quad &
+        \bm{w}_t^{\rm{E}} \gets \arg \max_{\bm{w} \in \convhull(\eset_t)}
+        - \tilde{f}^\star (-A \bm{w}).
+\end{alignat}
+Therefore, we can say that LPBoost and ERLPBoost are 
+instances of the fully-corrective FW algorithm 
+for objectives $f^\star$ and $\tilde{f}^\star$, respectively. 
+Under the max-edge weak learner assumption, 
+one can derive the same iteration bound for ERLPBoost 
+since $\tilde{f}^\star$ is $\eta$-smooth. 
+We summarize these connections to the following theorem. 
+\begin{thm.}
+    LPBoost, ERLPBoost, and C-ERLPBoost are instances of the FW algorithm. 
+\end{thm.}
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+%
+\subsection{Generic schemes for margin-maximizing boosting}
+\begin{algorithm}[t]
+    % \SetAlgoLined
+    \caption{A theoretically guaranteed boosting scheme}
+    \begin{algorithmic}[1]
+        \REQUIRE{%
+            Training examples 
+            $
+                S = \left( (\bm{x}_i, y_i) \right)_{i=1}^m
+                \in (\xset \times \{\pm 1\})^m
+            $, %
+            a hypothesis set $\hset \subset [-1, +1]^\xset$, 
+            a FW algorithm $\fwalg$, 
+            a secondary algorithm $\secalg$, %
+            and parameters $\nu > 0$ and $\epsilon > 0$. %
+        }
+        \STATE{Set $A = \left(y_i h_j(\bm{x}_i)\right)_{i, j} \in [-1, +1]^{m \times n}$.}
+        \STATE{%
+            Send $\bm{d}_0 = \frac{1}{m} \bm{1}$ to the weak learner %
+            and obtain a hypothesis $h_{j_1} \in \hset$. %
+        }
+
+        \STATE{Set $\bm{w}_{1} = \bm{e}_{j_1}$.}
+
+        \FOR{$t=1, 2, \dots, T$}
+            \STATE{
+                Compute the distribution 
+                $
+                    \bm{d}_t 
+                    = \nabla \tilde{f}^\star(- A \bm{w}_t)
+                    = \arg \min_{\bm{d} \in \psimplex{m}_{\nu}}
+                    \left[
+                    \bm{d}^\top A \bm{w}_t + \frac 1 \eta \Delta (\bm{d})
+                    \right]
+                $.
+            }
+
+            \STATE{%
+                Obtain a hypothesis $h_{j_{t+1}} \in \hset$ 
+                and the corresponding basis vector 
+                $\bm{e}_{j_{t+1}} \in \psimplex{n}$. 
+            }
+
+            \STATE{
+                Set $
+                    \epsilon_t := \min_{0 \leq \tau \leq t}
+                    (\bm{d}_\tau^\top A)_{j_{\tau + 1}}
+                    + \tilde{f}^\star(- A\bm{w}_t)
+                $ and let
+                $\eset_{t+1} := \{ \bm{e}_{j_\tau} \}_{\tau=1}^{t+1}$.
+            }
+
+            \IF{$\epsilon_t \leq \epsilon / 2$}
+                \STATE{Set $T = t$, \textbf{break}.}
+            \ENDIF
+
+            \STATE{
+                Compute the FW weight 
+                $
+                    \bm{w}_{t+1}^{(1)}
+                    = \fwalg
+                    % \left(
+                    (
+                        A, \bm{w}_{t}, \bm{e}_{j_{t+1}},
+                        \eset_{t}, \bm{d}_t
+                        % \eset_{t}, \nabla \tilde{f}^\star (-A\bm{w}_t)
+                    )
+                    % \right)
+                $.
+            }
+            \STATE{%
+                Compute the secondary weight %
+                $\bm{w}_{t+1}^{(2)} = \secalg(A, \eset_{t+1})$.
+            }
+
+            \STATE{
+                Update the weight 
+                $
+                    \bm{w}_{t+1} 
+                    \gets \arg \min_{\bm{w}_{t+1}^{(k)}: k \in \{1, 2\}} 
+                    \tilde{f}^\star (-A\bm{w}_{t+1}^{(k)})
+                $.
+            }
+        \ENDFOR
+        \ENSURE{Combined classifier $H_T = \sum_{t=1}^T w_{T, t} h_t$.}
+    \end{algorithmic}
+    \label{alg:our_scheme}
+\end{algorithm}
+
+\begin{algorithm}[th]
+    \begin{algorithmic}[1]
+        \REQUIRE{%
+            A matrix %
+            $
+                A = \left( y_i h_j (\bm{x}_i) \right)_{i, j}
+                \in [-1, +1]^{m \times n}
+            $ %
+            and a set of basis vectors $\eset_{t+1} \subset \psimplex{n}$. %
+        }
+
+        \ENSURE{%
+            $
+                \bm{w} \gets \arg\max_{\bm{w} \in \convhull (\eset_{t+1})} 
+                    \min_{\bm d \in \psimplex{m}_{\nu}}
+                    \bm{d}^\top A \bm{w}
+            $.
+        }
+    \end{algorithmic}
+    \caption{LPBoost rule $\secalg (A, \eset_{t+1})$}
+    \label{alg:lpb_subroutine}
+\end{algorithm}
+%
+% Short step scheme
+%
+\begin{algorithm}[th]
+    \begin{algorithmic}[1]
+        \ENSURE{
+            $
+                \bm{w}_{t+1}^{(1)} 
+                = \bm{w}_t + \lambda_t (\bm{e}_{j_{t+1}} - \bm{w}_t)
+            $, where 
+            $
+                \lambda_t = 
+                \clip
+                \frac
+                    {\bm{d}_t^\top A (\bm{e}_{j+1} - \bm{w}_t)}
+                    % {\nabla \tilde{f}^\star(-A\bm{w}_t)^{\top} A (\bm{e}_{j+1} - \bm{w}_t)}
+                    {\eta \| A (\bm{e}_{j+1} - \bm{w}_t) \|_{\infty}^2}
+            $.
+        }
+    \end{algorithmic}
+    \caption{Short step rule
+        $
+            \fwalg
+            (
+                A, \bm{w}_t, \bm{e}_{j_{t+1}},
+                \eset_{t}, \bm{d}_t
+                % \eset_{t}, \nabla \tilde{f}^\star (-A \bm{w}_t)
+            )
+        $
+    }
+    \label{alg:ss_rule}
+\end{algorithm}
+We propose FW-like boosting schemes 
+from the above observations, 
+shown in Algorithm~\ref{alg:our_scheme}. 
+Algorithm~\ref{alg:our_scheme} takes two update rules, 
+a FW update rule $\fwalg$ and 
+a secondary update rule $\secalg$. 
+Both algorithms return a weight $\bm{w} \in \psimplex{n}$. 
+Intuitively, the FW update rule $\bm{w}_t^{(1)}$ is 
+a safety net for the convergence guarantee. 
+Further, the convergence analysis only depends on 
+the FW update $\bm{w}_{t+1}^{(1)}$, 
+so that one can incorporate any update rule to $\secalg$. 
+For example, one can use the update rule~(\ref{eq:erlpb_weight}) 
+as $\secalg(A, \eset_{t+1})$. 
+Algorithm~\ref{alg:our_scheme} becomes 
+ERLPBoost in this case 
+since $\bm{w}_{t+1} = \bm{w}_{t+1}^{(2)}$ holds for any $t$. 
+Even though this setting, the convergence guarantee holds 
+so that we can prove the same convergence rate for ERLPBoost 
+by our general analysis. 
+
+Recall that our primary objective is to find a weight vector $\bm{w}$ 
+that optimizes the linear program~(\ref{eq:soft_margin_maximization}). 
+The most practical algorithm, LPBoost, 
+solves the optimization problem over past hypotheses, 
+so using the solution as $\secalg$ is a natural choice. 
+Algorithm~\ref{alg:lpb_subroutine} summarizes this update. 
+Note that the LPBoost update 
+differs from the fully-corrective FW algorithm 
+since the objective function is $\tilde{f}^\star$, not $f^\star$. 
+
+Furthermore, as described in~\citep{shalev-shwartz+:jml10}, 
+one can compute the distribution 
+$\bm{d}_t = \nabla \tilde{f}^\star (-A \bm{w}_t)$ 
+by a sorting-based algorithm, 
+which takes $O(m \ln m)$ iterations\footnote{%
+They also suggest a linear time algorithm, %
+see~\citep{herbster+:jmlr01}. %
+}. 
+Thus, the time complexity per iteration depends on 
+the secondary algorithm $\secalg$. 
+
+
+Before getting into the convergence analysis, 
+we first justify the stopping criterion 
+in Algorithm~\ref{alg:lpb_subroutine}. 
+This criterion is similar to the one in C-ERLPBoost 
+but better than it. 
+Therefore, our algorithms tend to converge in early iterations. 
+\begin{lem.}
+    \label{lem:stopping_criterion}
+    Let 
+    $
+        \epsilon_t 
+        := \min_{0 \leq \tau \leq t} (\bm{d}_{\tau}^\top A)_{j_{\tau + 1}}
+        + \tilde{f}^\star( -A \bm{w}_t)
+    $ be the optimality gap defined in Algorithm~\ref{alg:lpb_subroutine} 
+    and let $\eta = 2 \ln(m / \nu) / \epsilon$. 
+    Then, $\epsilon_t \leq \epsilon / 2$ implies 
+    $- f^\star (- A \bm{w}_t ) \geq g - \epsilon$. 
+\end{lem.}
+\begin{proof}
+    By the weak-learnability assumption, 
+    $\epsilon_t \geq g + \tilde{f}^\star ( -A \bm{w}_t )$. 
+    The statement follows from Lemma~\ref{lem:fenchel_conjugate_functions}.
+\end{proof}
+Now, we prove the convergence rate for our scheme. 
+This theorem shows the same convergence guarantee for 
+ERLPBoost and C-ERLPBoost. 
+\begin{thm.}[A convergence rate for Algorithm~\ref{alg:our_scheme}]
+    \label{thm:mlpboost_convergence_guarantee}
+    Assume that the weak learner returns 
+    a hypothesis $h_{j_{t+1}} \in \hset$ that satisfies
+    $(\bm{d}_t^\top A)_{j_{t+1}} \geq g$ 
+    for some unknown guarantee $g$. 
+    Let $\fwalg$ be a FW update with 
+    classic step $\lambda_t = \frac{2}{t+2}$, or
+    short-step as in Algorithm~\ref{alg:ss_rule}. 
+    Then, for any secondary algorithm $\secalg$, 
+    Algorithm~\ref{alg:our_scheme} converges to 
+    an $\epsilon$-accurate solution of~(\ref{eq:soft_margin_maximization}) 
+    in $O\left( \frac{1}{\epsilon^2} \ln \frac{m}{\nu} \right)$ iterations. 
+\end{thm.}
+\begin{proof}
+    First of all, we prove the bound for the classic step size. 
+    We start by showing the recursion 
+    \begin{align}
+        \label{eq:convergence_proof_0}
+        \epsilon_{t+1}
+        \leq (1 - \lambda_t) \epsilon_t + 2 \eta \lambda_t^2.
+    \end{align}
+    By using the definition of $\bm{w}_{t+1}$ 
+    and the $\eta$-smoothness of $\tilde{f}^\star$, 
+    \begin{align}
+        \epsilon_t - \epsilon_{t+1}
+            & \geq \tilde{f}^\star ( -A \bm{w}_t )
+                - \tilde{f}^\star ( -A \bm{w}_t^{(1)} ) \nonumber \\
+            & = \tilde{f}^\star ( -A \bm{w}_t )
+                - \tilde{f}^\star (
+                    -A \bm{w}_t + \lambda_t A(\bm{w}_t - \bm{e}_{{j_t+1}})
+                ) \nonumber \\
+            \label{eq:convergence_proof_1}
+            & \geq \lambda_t ( A (\bm{e}_{j_{t+1}} - \bm{w}_{t}) )^\top
+                \nabla \tilde{f}^\star (- A \bm{w}_t) - 2\eta \lambda_t^2,
+    \end{align}
+    where eq.~(\ref{eq:convergence_proof_1}) holds since 
+    $A \in [-1, +1]^{m \times n}$ 
+    and $\bm{e}_{j_{t+1}}, \bm{w}_t \in \psimplex{n}$. 
+    By the non-negativity of the entropy function 
+    and the definition of $\bm{d}_t$, we get
+    \begin{align}
+            \lambda_t ( A (\bm{e}_{j_{t+1}} - \bm{w}_{t}) )^\top
+                \nabla \tilde{f}^\star (- A \bm{w}_t)
+            & = \lambda_t \bm{d}_t^\top A (\bm{e}_{j_{t+1}} - \bm{w}_{t})
+                \nonumber \\
+            & \geq \lambda_t
+                \left[
+                    \min_{0 \leq \tau \leq t} 
+                    (\bm{d}_\tau^\top A)_{j_{\tau + 1}} 
+                    - \bm{d}_{t}^\top A \bm{w}_t 
+                    - \frac{1}{\eta} \Delta (\bm{d}_t)
+                \right]
+                \nonumber \\
+            \label{eq:convergence_proof_2}
+            & = \lambda_t
+                \left[
+                    \min_{0 \leq \tau \leq t} 
+                    (\bm{d}_\tau^\top A)_{j_{\tau + 1}} 
+                    + \tilde{f}^\star( - A\bm{w}_t )
+                \right]
+            = \lambda_t \epsilon_t.
+    \end{align}
+    Combining eq.~(\ref{eq:convergence_proof_1}) 
+    and~(\ref{eq:convergence_proof_2}), 
+    we obtain~(\ref{eq:convergence_proof_0}). 
+
+    Now, we prove the following inequality by induction on $t$.
+    \begin{align}
+        \label{eq:convergence_proof_3}
+        \epsilon_t \leq \frac{8 \eta}{t + 2}, 
+        \quad \forall t = 1, 2, \dots
+    \end{align}
+    For the base case $t = 1$, 
+    the inequality~(\ref{eq:convergence_proof_3}) holds; 
+    $
+        \epsilon_1
+        \leq (1 - \lambda_0) \epsilon_0 + 2 \eta \lambda_0^2
+        = 2 \eta
+        \leq \frac{8\eta}{1 + 2}
+    $. Assume that~(\ref{eq:convergence_proof_3}) holds for $t \geq 1$. 
+    By the inductive assumption,
+    \begin{align*}
+        \epsilon_{t+1}
+            \leq (1 - \lambda_t) \epsilon_t + 2 \eta \lambda_t^2 
+            \leq \frac{t}{t + 2} \frac{8 \eta}{t + 2} 
+                + 2 \eta \left( \frac{2}{t + 2} \right)^2 
+            = 8 \eta \frac{t}{t + 2} \frac{t + 1}{t + 2}
+            \leq \frac{8 \eta}{t + 3}.
+    \end{align*}
+    Therefore,~(\ref{eq:convergence_proof_3}) holds 
+    for all $t \geq 1$.
+
+    By the definition of $\eta$, 
+    $\epsilon_T \leq \frac{\epsilon}{2}$ holds 
+    after $T \geq \frac{32}{\epsilon^2} \ln \frac{m}{\nu} - 2$ 
+    iterations. Lemma~\ref{lem:stopping_criterion} yields 
+    the convergence rate. 
+
+    For the short-step case, 
+    that is, the case where we employ Algorithm~\ref{alg:ss_rule} as $\fwalg$, 
+    we get a similar recursion:
+    \begin{align}
+        \epsilon_t - \epsilon_{t+1}
+            & \geq \tilde{f}^\star ( -A \bm{w}_t )
+                - \tilde{f}^\star ( -A \bm{w}_t^{(1)} ) \nonumber \\
+            \label{eq:convergence_proof_4}
+            & \geq \lambda_t ( A (\bm{e}_{j_{t+1}} - \bm{w}_{t}) )^\top
+                \nabla \tilde{f}^\star (- A \bm{w}_t)
+                - \frac{\eta}{2} \lambda_t^2
+                \| A(\bm{w}_t - \bm{e}_{j_{t+1}}) \|_\infty^2 \\
+            & \geq \lambda ( A (\bm{e}_{j_{t+1}} - \bm{w}_{t}) )^\top
+                \nabla \tilde{f}^\star (- A \bm{w}_t)
+                - 2\eta \lambda^2,
+                \quad \quad
+                \forall \lambda \in [0, 1].
+                \nonumber
+    \end{align}
+    Optimizing $\lambda$ in RHS 
+    and applying the inequality~(\ref{eq:convergence_proof_2}), 
+    we get $\epsilon_t - \epsilon_{t+1} \geq \epsilon_t^2 / 8\eta$. 
+    With this inequality, one can easily verify that 
+    the same iteration bound~(\ref{eq:convergence_proof_3}) holds 
+    for this case. 
+    See the appendix for the rest proof. 
+\end{proof}
+Theorem~\ref{thm:mlpboost_convergence_guarantee} shows 
+a convergence guarantee 
+for the \emph{classic step} and the \emph{short-step}. 
+The line search step 
+$
+    \lambda_{t} \gets \arg \min_{\lambda \in [0, 1]}
+    \tilde{f}^\star \left(
+        -A (\bm{w}_t + \lambda (\bm{e}_{j_{t+1}} - \bm{w}_t))
+    \right)
+$ always yields better progress than the \emph{short-step}, 
+so the same iteration bound holds. 
+
+
+\paragraph{Other variants of the boosting scheme.}
+%
+% Pairwise scheme
+%
+\begin{algorithm}[th]
+    \begin{algorithmic}[1]
+        \STATE{
+            Let 
+            $\bm{w}_t = \sum_{\bm{e} \in E_t} \alpha_{t, \bm{e}} \bm{e}$ 
+            be the current representation of $\bm{w}_t$ w.r.t. 
+            the basis vectors $E_t \subset \eset_t$ 
+            with positive coefficients 
+            $\{ \alpha_{t, \bm{e}} \}_{\bm{e} \in E_t}$.
+        }
+
+        \STATE{
+            Compute an \emph{away} basis 
+            $
+                \bm{e}^{\rm Away}
+                \in \arg \min_{\bm{e} \in E_t} \bm{d}_t^\top A \bm{e}
+            $ and set 
+            $\lambda_{t, \max} = \alpha_{t, \bm{e}^{\rm Away}}$.
+        }
+
+        \STATE{
+            Compute the step size 
+            $
+                \lambda_{t}
+                \gets \arg \min_{\lambda \in [0, \lambda_{t, \max}]}
+                    \tilde{f}^\star (
+                        -A (
+                            \bm{w}_t
+                            + \lambda (\bm{e}_{t+1} - \bm{e}^{\rm Away})
+                        )
+                    )
+            $.
+        }
+
+        \ENSURE{
+            $
+                \bm{w}_{t+1}^{(1)}
+                = \bm{w}_t
+                + \lambda_t (\bm{e}_{j_{t+1}} - \bm{e}^{\rm Away})
+            $.
+        }
+    \end{algorithmic}
+    \caption{%
+        Pairwise rule %
+        $
+            \fwalg
+            (
+                A, \bm{w}_t, \bm{e}_{j_{t+1}},
+                \eset_{t}, \bm{d}_t
+                % \eset_{t}, \nabla \tilde{f}^\star (-A \bm{w}_t)
+            )
+        $
+    }
+    \label{alg:pairwise_rule}
+\end{algorithm}
+The FW update rule $\bm{w}_{t+1}^{(1)}$ 
+of Algorithm~\ref{alg:ss_rule} 
+comes from the FW algorithm with short-step sizes. 
+One can apply other updates rules as $\fwalg$. 
+Pairwise Frank-Wolfe (PFW) is 
+the one of a state-of-the-art Frank-Wolfe 
+algorithm~\citep{lacoste-julien+:nips15}. 
+The basic idea of PFW is to move the weight from 
+the most worthless hypothesis to the newly attained one. 
+Algorithm~\ref{alg:pairwise_rule} is the scheme 
+that applies the PFW. 
+By a similar argument, one can prove the convergence rate for 
+Algorithm~\ref{alg:pairwise_rule}. 
+\begin{cor.}[A convergence rate for Algorithm~\ref{alg:pairwise_rule}]
+    Let 
+    $
+        k(t) = |\{
+            \tau \in [t] \mid \lambda_{\tau} < \lambda_{\tau, \max}
+        \}|
+    $ be the number of good steps by iteration $t$. 
+    Then, Algorithm~\ref{alg:pairwise_rule} converges with rate 
+    $O(\eta / k(t))$. 
+\end{cor.}
+Note that PFW guarantees the convergence rate for a finite class $\hset$, 
+while the short-step FW guarantees for all $\hset$, 
+including infinite classes.
+% Note that PFW guarantees the convergence rate if $\hset$ is finite, 
+% while the short-step FW works even if $\hset$ is an infinite set.
+

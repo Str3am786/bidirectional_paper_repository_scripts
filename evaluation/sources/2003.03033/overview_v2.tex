@@ -1,0 +1,92 @@
+\renewcommand{\algorithmicrequire}{\textbf{Input:}}
+\label{sec:overview}
+Before proceeding, we first offer some background on neural network pruning and a high-level overview of how existing pruning methods typically work.
+
+\subsection{Definitions}
+
+We define a neural network \emph{architecture} as a function family $f(x; \cdot)$.
+The architecture consists of the configuration of the network's parameters and the sets of operations it uses to produce outputs from inputs, including the arrangement of parameters into convolutions, activation functions, pooling, batch normalization, etc.
+Example architectures include AlexNet and ResNet-56.
+We define a neural network \emph{model} as a particular parameterization of an architecture, i.e., $f(x; W)$ for specific parameters $W$.
+Neural network \emph{pruning} entails taking as input a model $f(x; W)$ and producing a new model $f(x; M \odot W')$. Here $W'$ is set of parameters that may be different from $W$, $M \in \{0, 1\}^{|W'|}$ is a binary mask that fixes certain parameters to $0$, and $\odot$ is the elementwise product operator.
+In practice, rather than using an explicit mask, pruned parameters of $W$ are fixed to zero or removed entirely.
+
+\subsection{High-Level Algorithm}
+
+There are many methods of producing a pruned model $f(x; M \odot W')$ from an initially untrained model $f(x; W_0)$, where $W_0$ is sampled from an initialization distribution $\mathcal{D}$.
+Nearly all neural network pruning strategies in our survey derive from Algorithm \ref{alg:prune-after-training} \cite{learning-both}.
+In this algorithm, the network is first trained to convergence.
+Afterwards, each parameter or structural element in the network is issued a score, and the network is pruned based on these scores.
+Pruning reduces the accuracy of the network, so it is trained further (known as \emph{fine-tuning}) to recover.
+The process of pruning and fine-tuning is often iterated several times, gradually reducing the network's size.
+
+Many papers propose slight variations of this algorithm.
+For example, some papers prune periodically during training \cite{google-state-of-sparsity} or even at initialization \cite{snip}.
+Others modify the network to explicitly include additional parameters that encourage sparsity and serve as a basis for scoring the network after training \cite{sparse-variational-dropout}.
+
+\begin{algorithm}[h]
+\caption{Pruning and Fine-Tuning}
+\label{alg:prune-after-training}
+\begin{algorithmic}[1]
+\REQUIRE $N$, the number of iterations of pruning, and \\ \hspace{1.5em}$X$, the dataset on which to train and fine-tune
+    \STATE $W \gets initialize()$
+    \STATE $W \gets trainToConvergence(f(X; W))$
+
+    \STATE $M \gets 1^{|W|}$
+    \FOR{$i$ \text{ }in $1$ to $N$}%
+        \STATE $M \gets prune(M, score(W))$%
+        \STATE $W \gets fineTune(f(X; M \odot W))$%
+    \ENDFOR
+    \STATE \textbf{return} $M, W$
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Differences Betweeen Pruning Methods}
+
+Within the framework of Algorithm \ref{alg:prune-after-training}, pruning methods vary primarily in their choices regarding sparsity structure, scoring, scheduling, and fine-tuning.
+
+\textbf{Structure.} Some methods prune individual parameters (\emph{unstructured pruning}). Doing so produces a sparse neural network, which---although smaller in terms of parameter-count---may not be arranged in a fashion conducive to speedups using modern libraries and hardware.
+Other methods consider parameters in groups (\emph{structured pruning}), removing entire neurons, filters, or channels to exploit hardware and software optimized for dense computation \cite{pruning-filters, channel-lasso-lstsq}.
+
+\textbf{Scoring.}
+It is common to score parameters based on their absolute values, trained importance coefficients, or contributions to network activations or gradients. %, or other measures of saliency.
+Some pruning methods compare scores locally, pruning a fraction of the parameters with the lowest scores within each structural subcomponent of the network (e.g., layers) \cite{learning-both}.
+Others consider scores globally, comparing scores to one another irrespective of the part of the network in which the parameter resides \cite{snip, lottery-ticket}.
+
+% There are a range of techniques for scoring parameters.
+% It is common to issue lower scores to parameters with lower magnitudes \cite{learning-both}.
+% Other techniques consider activations, gradients, or saliency scores in combination with magnitudes.
+
+\textbf{Scheduling.}
+Pruning methods differ in the amount of the network to prune at each step.
+Some methods prune all desired weights at once in a single step \cite{rethinking-net-pruning}.
+Others prune a fixed fraction of the network iteratively over several steps \cite{learning-both} or vary the rate of pruning according to a more complex function \cite{google-state-of-sparsity}.
+
+\textbf{Fine-tuning.}
+For methods that involve fine-tuning, it is most common to continue to train the network using the trained weights from before pruning.
+Alternative proposals include rewinding the network to  an earlier state \cite{lottery-ticket-followup} and reinitializing the network entirely \cite{rethinking-net-pruning}.
+% \citet{rethinking-net-pruning} suggest that, when performing structured pruning, reinitializing the network weights before fine-tuning has no detrimental affect on the accuracy of the eventual network.
+
+\subsection{Evaluating Pruning}
+
+Pruning can accomplish many different goals, including reducing the storage footprint of the neural network, the computational cost of inference, the energy requirements of inference, etc.
+Each of these goals favors different design choices and requires different evaluation metrics.
+For example, when reducing the storage footprint of the network, all parameters can be treated equally, meaning one should evaluate the overall compression ratio achieved by pruning.
+However, when reducing the computational cost of inference, different parameters may have different impacts.
+For instance, in convolutional layers, filters applied to spatially larger inputs are associated with more computation than those applied to smaller inputs.
+ % the amount of computation is linear with respect to the input size. Thus, given two convolutional filters pruned by the same amount, the one with a larger input size will lead to higher computational savings.
+
+Regardless of the goal, pruning imposes a tradeoff between model efficiency and quality, with pruning increasing the former while (typically) decreasing the latter. This means that a pruning method is best characterized not by a single model it has pruned, but by a family of models corresponding to different points on the efficiency-quality curve.
+To quantify efficiency, most papers report at least one of two metrics. The first is the number of multiply-adds (often referred to as FLOPs) required to perform inference with the pruned network. The second is the fraction of parameters pruned. To measure quality, nearly all papers report changes in Top-1 or Top-5 image classification accuracy.
+
+As others have noted \cite{lempitsky-cp-decomp, perforated-cnns, bayesian-compression, sze-energy-aware, learning-both, samsung-vbmf-tucker, ssl, thinet-channel-norms, amc-automl-han}, these metrics are far from perfect. Parameter and FLOP counts are a loose proxy for real-world latency, throughout, memory usage, and power consumption. % In particular, despite many papers assuming otherwise, the number parameters has little bearing on memory of activations
+Similarly, image classification is only one of the countless tasks to which neural networks have been applied. However, because the overwhelming majority of papers in our corpus focus on these metrics, our meta-analysis necessarily does as well.
+
+% %For example, a single convolutional filter might contain nine parameters but be applied to repeatedly to every region of an activation map.
+% To evaluate computational costs, many papers measure the number of multiply-adds (often referred to as FLOPs) required to perform inference with the pruned network.
+
+% In practice, nearly all pruning papers measure the compression ratio or FLOP reduction achieved by pruning, so we focus on these metrics throughout the paper. However, we acknowledge (as do others \cite{bayesian-compression, sze-energy-aware, learning-both, samsung-vbmf-tucker}) that these metrics may not capture the performance considerations of running neural network inference on modern hardware.
+
+% A crucial aspect of the pruning problem is that it usually requires optimizing a tradeoff between efficiency and quality;
+% %That is, achieving a particular efficiency threshold may require removing parameters such that performance on the network's task declines.
+% this means that, when comparing pruning methods, it is important to consider the entire pruning/quality tradeoff curve for different amounts of pruning.

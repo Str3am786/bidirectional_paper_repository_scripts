@@ -1,0 +1,67 @@
+
+%-------------------------------------------------------------------------------
+\section{Discussion}
+\label{sec:discussion}
+%-------------------------------------------------------------------------------
+In this section, we discuss potential issues and limitations of {\bcov}.
+
+\textbf{RISC ISA}.
+Inserting detours is generally easy in RISC ISAs thanks to their fixed instruction size.
+However, the addressing range can be significantly lower than the $\pm$2\,GB offered by x86-64.
+Note that we patch each ELF module individually.
+This means that we only need an addressing range that is large enough to reach our patch code segment from the original code.
+For example, a range of 60MB would be sufficient for our largest subject.
+AArch64 offers a detour range of $\pm$128\,MB  which can accommodate a large majority of binaries.
+AArch32 offers just $\sim$32\,MB, in comparison.
+In such a case, a single detour instruction might not be sufficient.
+Additional options need to be investigated such as function relocation, literal pools, and modifications to linker scripts.
+
+In addition, we update coverage data using a single pc-relative \texttt{mov} which has a memory operand with a 32-bit offset.
+Generally, emulating the same functionality in RISC ISAs require more instructions and clobbering of registers.
+However, saving and restoring the clobbered registers is not always necessary.
+A liveness analysis can help us acquire registers with dead values. 
+Similar analyses are already implemented in DBI tools.
+
+%-------------------------------------------------
+% this paragraph is omitted in this short version
+%------------------------------------------------- 
+%\textbf{Conditional instructions}. 
+%Simple \texttt{if} statements can  becompiled into conditional instructions. 
+%For example, the following statement can be mapped to one \texttt{cmov} in x86-64:
+%\begin{lstlisting}[style=custom-cpp]
+%if (a < b) c = 0 else c = 1;
+%\end{lstlisting}
+%Binary-level coverage analysis tools like {\bcov} can report whether a particular \texttt{cmov} is covered.
+%However, this does not imply that it actually took effect.
+%In fact, we focus on code rather than \textit{data-flow} coverage.
+%However, {\bcov} can be extended to handle such cases.
+%Basically, the effect of a  \texttt{cmov<condition>} can be checked by inserting a detour targeting a \textit{guarded} coverage update instruction.
+%The guard is simply a short jump \texttt{j<negated condition>}.
+%The detour can be flexibly inserted around a \texttt{cmov} as long as CPU flags are not modified.
+%However, this scheme might not to be practical in AArch32 where the majority of instructions can be conditionally executed.
+
+\textbf{Limitations and threats to validity}.
+The precision of the recovered CFG can affect the coverage reported by our tool.
+While the implemented jump table and non-return analyses significantly increase CFG precision, 
+they are still not perfect.
+Our prototype might miss jump tables, albeit only in a few situations.
+Also, while our experiments show that the non-return analysis in {\bcov} is comparable to IDA Pro, both tools face the challenge of \textit{may-return} functions.
+Such functions might not return to their caller depending on their arguments.
+Function \texttt{Perl\_\_force\_out\_malformed\_utf8\_message} in \texttt{perl} is particularly noteworthy.
+In one binary, it is called 88 times (out of 89 total) with the argument \texttt{die\_here} set, i.e, will not return.
+Developers can signal to the compiler that a particular call will not return using  \texttt{\_\_builtin\_unreachable()}.
+Such hints are not available in the binary so we simply assume that all calls to may-return functions are returning.
+Consequently, {\bcov} might spuriously report BBs following a may-return call as covered.
+
+
+On another note, we believe that our subjects are representative of C/C++ software in Linux.
+However, generalizing our results to other native languages and operating systems requires further investigation.
+The simple mechanisms we use to implement detours and update coverage are also applicable to system software like kernel modules. 
+However, special considerations might exist in such settings.
+Finally, our approach cannot be directly applied to dynamic code, e.g., self-modifying code.
+
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "binder"
+%%% End:

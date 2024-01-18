@@ -1,0 +1,601 @@
+\newpage
+\appendix
+% \section{Appendix}
+\section{Ablation Study}
+\label{appendix:ablation}
+%(2) We can clearly observe a tradeoff between the degree of freedom for manipulation and attack success rate. For example, we observe a small drop in the attack success rate for answer targeted attack compared to position targeted attack, due to the fact that we put more constraints to ensure pre-specified answer targets unchanged in the optimization process. Similarly, the dependency tree constraints turn out to be more strong and harsh constraints on the adversarial sentences, thus achieving higher language quality at the cost of  attack success rate. 
+%(2)
+%(3) \boxin{How to say because our transfer based blackattack does not beat AddSent because it is input-agnoistic.? while ours are more model-specific?}  (4) BERT based sentiment classifier is more vulnerable than standard sentiment classifier, while BERT based QA model is more robust and harder to attack than the widely-used QA model.
+
+\subsection{Autoencoder Selection}
+As an ablation study, we compare the standard LSTM-based autoencoder with our tree-based autoencoder. 
+
+\begin{table}[htp!]\small \setlength{\tabcolsep}{5pt}
+\centering
+\caption{Ablation study on posistion targeted attack capability against QA. The lower EM and F1 scores mean the better attack success rate. \advcodecsent and \advcodecword respectively refer to \advcodecsent and \advcodecword. Adv(seq2seq) refers to \advcodec that uses LSTM-based seq2seq model as text autoencoder.}
+ \label{WhiteboxQAseq2seq}
+\begin{tabular}{ccccc}
+\toprule
+% \multirow{2}{*}{Model} & & \multirow{2}{*}{Origin} & \multicolumn{2}{c}{w/ Tree Decoder} & w/o Tree Decoder  \\
+% \cmidrule(lr){4-5}   \cmidrule(lr){6-6}
+  & Origin & {\advcodecsent} & {\advcodecword} & Adv(seq2seq)  \\
+\midrule
+EM & 60.0 & 29.3     & \textbf{15.0}  & 51.3  \\
+ F1 & 70.6 &  34.0   & \textbf{17.6}  &      57.5 \\
+      \bottomrule
+\end{tabular}
+% \vspace{-3mm}
+\end{table}
+
+
+\begin{table*}[htp!]\small \setlength{\tabcolsep}{7pt}
+ \begin{minipage}[htp!]{0.48\linewidth}
+\centering
+\caption{Blackbox Attack Success Rate after inserting the whitebox generated adv sentence to different positions for BERT-classification.  }
+ \label{ablationClassification}
+\begin{tabular}{ccccc}
+\toprule
+Method & & Back & Mid & Front \\
+\midrule
+\multirow{2}{*}{\advcodecword} & \footnotesize{target}   & 0.739   & 0.678  & \textbf{0.820} \\
+      & \footnotesize{untarget} & 0.817 & 0.770  & \textbf{0.878}           \\
+      \midrule
+\multirow{2}{*}{\advcodecsent} & \footnotesize{target}   & \textbf{0.220}   & 0.174  & 0.217 \\
+      & \footnotesize{untarget} & 0.531 & 0.504  & \textbf{0.532}           \\
+        \bottomrule
+\end{tabular}
+\vspace{-0.2cm}
+\end{minipage}
+\quad
+\begin{minipage}[htp!]{0.48\linewidth}
+\centering
+\caption{Blackbox Attack Success Rate after inserting the whitebox generated adversarial sentence to different positions for BERT-QA.}
+ \label{ablationQA}
+\begin{tabular}{ccccc}
+\toprule
+Method & & Back & Mid & Front \\
+\midrule
+\multirow{2}{*}{\advcodecword}  & EM &  32.3    & 39.1    & \textbf{31.9}  \\
+      & F1 & 36.4   & 43.4     & \textbf{36.3}   \\   
+      \midrule
+\multirow{2}{*}{\advcodecsent} & EM & 47.0   & 51.3     & \textbf{42.4}           \\
+      &  F1 & 52.0     & 56.7         & \textbf{47.0}          \\
+        \bottomrule
+\end{tabular}
+\vspace{-0.2cm}
+\end{minipage}
+\end{table*}
+
+\textbf{Tree Autoencoder.} 
+In the whole experiments, we used Stanford TreeLSTM as tree encoder and our proposed tree decoder together as tree autoencoder. We trained the tree autoencoder on yelp dataset which contains 500K reviews. The model is expected to read a sentence, map the sentence in a latent space and reconstruct the sentence from the embedding along with the dependency tree structure in an unsupervised manner. The model uses 300-d vectors as hidden tree node embedding and is trained for 30 epochs with adaptive learning rate and weight decay. After training, the average reconstruction loss on test set is 0.63.
+
+\textbf{Seq2seq Autoencoder.} We also evaluate the standard LSTM-based architecture (seq2seq) as a different autoencoder in the \advcodec pipeline. For the seq2seq encoder-decoder, we use a bi-directional LSTM as the encoder \citep{Hochreiter1997LongSM} and a two-layer LSTM plus soft attention mechanism over the encoded states as the decoder \citep{Bahdanau2015NeuralMT}. With 400-d hidden units and the dropout rate of 0.3, the final testing reconstruction loss is 1.43.
+
+The comparison of the whitebox attack capability  against a well-known QA model BiDAF is shown in Table \ref{WhiteboxQAseq2seq}. We can see seq2seq based \advcodec fails to achieve good attack success rate. Moreover, because the vanilla seq2seq model does not take grammatical constraints into consideration and has higher reconstruction loss, the quality of generated adversarial text cannot be ensured.
+
+\subsection{Ablation Study on BERT Attention}
+\label{sec:ablation}
+To further explore how the location of adversarial sentences affects the attack success rate, we conduct the ablation experiments by varying the position of appended adversarial sentence. We generate the adversarial sentences from the whitebox BERT classification and QA models. Then we inject those adversaries into different positions of the original paragraph and test in another blackbox BERT with the same architecture but different parameters. The results are shown in Table \ref{ablationClassification} and \ref{ablationQA}. We see in most time appending the adversarial sentence at the beginning of the paragraph achieves the best attack performance. Also the performance of appending the adversarial sentence at the end of the paragraph is usually slightly weaker than front. This observation suggests that the BERT model might pay more attention to the both ends of the paragraphs and tend to overlook the content in the middle.
+
+
+% \textbf{Ablation Study.} \boxin{change the language here (same as sec 4.1)} To further explore how the appended location will impact the attack success rate, we conduct the ablation experiment by varying the position of appended adversarial sentence and the results are shown in table \ref{ablationQA}. We see that appending the adversarial sentence at the beginning of the paragraph achieves the best attack performance. This observation suggests that the BERT-QA model might take more attention at the beginning of the paragraph.
+
+
+\subsection{Attack Settings}
+% \begin{algorithm}[b]
+%   \caption{Algorithm of \advcodec generating adversarial examples } \label{algo}
+%   \begin{algorithmic}[1]
+%     \Procedure{AdvCodec}{$x,s$} \Comment{$x$: initial seed, $s$: corresponding dependency tree}
+%     \State $z := \mathcal{E}(x, s)$ \Comment{$\mathcal{E}$: encoder of \advcodec, $z$: context vector}
+%     \State $z^* = 0$ \Comment{$z^*$: perturbation on context vector}
+%     \State $z' := z + z^*$ \Comment{$z'$: perturbed context vector}
+%     \State $y := \mathcal{G}(z', s)$ \Comment{$\mathcal{G}$: decoder of \advcodec, $y$: adversarial sentence}
+%   % \State $Z(y) :=$ the logits of the model output
+%     \State $f(z') :=$ the objective function to attack the targeted model
+%     \While{$y$ does not achieve targeted attack} 
+%       \State  update $z^*$ by gradient descent over objective function $f(z')$
+%     \EndWhile\label{euclidendwhile}
+%     \State \textbf{return} $y$
+%     \EndProcedure
+%   \end{algorithmic}
+% \end{algorithm}
+We use Adam \citep{Adam} as the optimizer, set the learning rate to 0.6 and the optimization steps to 100. We follow the \citet{cw} method to find the suitable parameters in the object function (weight const $c$ and confidence score $\kappa$) by binary search. 
+
+% We also include our attack algorithm via pseudo-code in Algorithm \ref{algo}.
+
+
+% \iffalse
+% \subsection{Untargeted scatter attack on QA}
+
+% We tried the scatter attack on QA, however, the targeted attack success rate is not satisfactory. It turns out QA systems highly rely on the relationship between questions and contextual clues, which is hard to break when setting an arbitrary token to a target answer. This is also why we use some preliminary approaches to creating a similar fake context when initializing QA appended sentence. 
+
+% We also performed the untargeted scatter attack on QA. The results are shown in table \ref{WhiteboxQAScatter}. We insert 30 random tokens (but  no more than $1/3$ the total words of the paragraph) over the paragraph, optimize and find the adversarial tokens that can cause model output the wrong answers in the untargeted manner.  We can see the untargeted scatter attack can also achieve a higher untargeted attack success rate than \citet{jia-liang-2017-adversarial}.
+
+% \begin{table*}[htp!]\small \setlength{\tabcolsep}{5pt}
+% \centering
+% \caption{Whitebox attack results on BERT-QA in terms of exact match rates and F1 scores by the official evaluation script. The lower EM and F1 scores mean the better attack success rate.}
+%  \label{WhiteboxQAScatter}
+% \begin{tabular}{ccccccccc}
+% \toprule
+% \multirow{2}{*}{Model} & & \multirow{2}{*}{Origin} & \multicolumn{2}{c}{Position Targeted Attack} & \multicolumn{2}{c}{Answer Targeted Attack} & \multicolumn{2}{c}{Untargeted Attack} \\
+% \cmidrule(lr){4-5} \cmidrule(lr){6-7} \cmidrule(lr){8-9}
+%  & & & {\advcodecsent} & {\advcodecword}  & {\advcodecsent} & {\advcodecword} & AddSent & Adv(scatter)\\
+% \midrule
+
+% \multirow{2}{*}{BERT}  & EM & 81.2 &49.1       & \textbf{29.3}           & 50.9                    & 43.2                    & 46.8  & 34.3   \\
+%       & F1 & 88.6 & 53.8          & \textbf{33.2}         & 55.2                   & 47.3                  & 52.6  & 49.7 \\
+% %      & $\Delta \text{F1}$ & $=$ & 34.8  & \textbf{55.4} & 33.4 & 41.3 & 36.0 \\
+% %       \midrule
+% % \multirow{2}{*}{BiDAF} & EM & 60.0 & 29.3  	          & \textbf{15.0}             & 30.2                    & 21.0                      & 25.3    \\
+% %       & F1 & 70.6 &  34.0   & \textbf{17.6}         & 34.4                  & 23.6                  & 32.0 \\
+% \bottomrule
+% \end{tabular}
+% \end{table*}
+% \fi
+
+\subsection{Heuristic Experiments on choosing the adversarial seed for QA}
+\label{appendix:heuristic}
+
+We conduct the following heuristic experiments about how to choose a good initialization sentence to more effectively attack QA models. Based on the experiments we confirm it is important to choose a sentence that is semantically close to the context or the question as the initial seed when attacking QA model, so that we can reduce the number of iteration steps and more effectively find the adversary to fool the model. Here we describe three ways to choose the initial sentence, and we will show the efficacy of these methods given the same maximum number of optimization steps.
+
+\textbf{Random adversarial seed sentence.}
+Our first trial is to use a random sentence (other than the answer sentence), generate a fake answer similar to the real answer and append it to the back as the initial seed.
+
+\textbf{Question-based adversarial seed sentence.}
+% question words in a question , paragraph pair <p, q> 
+We also try to use question words to craft an initial sentence, which in theory should gain more attention when the model is matching characteristic similarity between the context and the question. To convert a question sentence to a meaningful declarative statement, we use the following steps:
+
+In step 1, we use the state-of-the-art semantic role labeling (SRL) tools \citep{He2017DeepSR} to parse the question into verbs and arguments. A set of rules is defined to remove the arguments that contain interrogative words and unimportant adjectives, and so on. In the next step, we access the model's original predicted answer and locate the answer sentence. We again run the SRL parsing and find to which argument the answer belongs. The whole answer argument is extracted, but the answer tokens are substituted with our targeted answer or the nearest words in the GloVe word vectors \citep{Pennington2014GloveGV} (position targeted attack) that is also used in the QA model. In this way, we craft a fake answer that shares the answer's context to solve the compatibility issue from the starting point. Finally, we replace the declarative sentence's removed arguments with the fake argument and choose this question-based sentence as our initial sentence.
+
+\textbf{Answer-based adversarial seed  sentence.}
+We also consider directly using the model predicted original answer sentence with some substitutions as the initial sentence. To craft a fake answer sentence is much easier than to craft from the question words. Similar to step 2 for creating
+question-based initial sentence, we request the model's original predicted answer and find the answer sentence. The answer span in the answer sentence is directly substituted with the nearest words in the GloVe word vector space to avoid the compatibility problem preliminarily.
+
+\textbf{Experimental Results.} We tried the above initial sentence selection methods on \advcodecword and perform position targeted attack on BERT-QA given the same maximum optimization steps. The experiments results are shown in table \ref{WhiteboxQAHeuristic}. From the table, we find using different initialization methods will greatly affect the attack success rates. Therefore, the initial sentence selection methods are indeed important to help reduce the number of iteration steps and fastly converge to the optimal $z^*$ that can attack the model.
+
+\begin{table*}[htp!]\small \setlength{\tabcolsep}{5pt}
+\centering
+\caption{Whitebox attack results on BERT-QA in terms of exact match rates and F1 scores by the official evaluation script. The lower EM and F1 scores mean the better attack success rate.}
+ \label{WhiteboxQAHeuristic}
+\begin{tabular}{ccccccc}
+\toprule
+\multirow{2}{*}{Model} & & \multirow{2}{*}{Origin} & \multicolumn{3}{c}{Position Targeted Attack}  & \multicolumn{1}{c}{Baseline} \\
+\cmidrule(lr){4-6} \cmidrule(lr){7-7}
+ & & & Random & Question-based  & Answer-based  & AddSent\\
+\midrule
+
+\multirow{2}{*}{BERT}  & EM & 81.2 & 67.9       & \textbf{29.3}           & 50.6                               & 46.8   \\
+      & F1 & 88.6 & 74.4         & \textbf{33.2}         & 55.2    & 52.6   \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+%\subsection{Conclusions}
+% In addition to the general adversarial evaluation framework \advcodec, this paper also aims to explore several scientific questions: 1)  Since \advcodec allows the flexibility of manipulating at different levels of a tree hierarchy, which level is more attack effective and which one preserves better grammatical correctness? 2) Is it possible to achieve the targeted attack for general NLP tasks such as sentiment classification and QA, given the limited degree of freedom for manipulation? 3) Is it possible to perform a blackbox attack for many  NLP tasks? 4) Is BERT robust in practice? 
+% 5) Do these adversarial examples affect human reader performances? 
+% %\boxin{I think the above question is readers caring more. 5) Are human readers more sensitive to an appended adversarial sentence or scatter of added words?
+
+% To address the above questions, we generate adversarial text against different models of sentiment classification and QA in each encoding scenario. Compared with the state-of-the-art adversarial text generation methods, our approach achieves significantly higher untargeted and \emph{targeted} attack success rate. In addition, we perform both whitebox and transferability-based blackbox settings to evaluate the model vulnerabilities. 
+% Within each attack setting, we quantitatively evaluate the attack effectiveness of different attack strategies, including appending an additional adversarial sentence and adding scatter of adversarial words to a paragraph.
+% To provide thorough adversarial text quality assessment, we also perform 7 groups of human studies to evaluate the quality of the generated adversarial text. % Compared with the baselines methods, and whether a human can still get the ground truth answers for these tasks based on adversarial text.
+
+% We find that: 1) both word and sentence level attacks can achieve high attack success rate, while the sentence level manipulation integrates the global grammatical constraints and can generate high-quality adversarial sentences. 2) various targeted attacks on general NLP tasks are possible (\textit{e.g.}, when attacking QA, we can ensure  the target to be a specific answer or a specific location within a sentence); 3) the transferability based blackbox attacks are successful in NLP tasks. Transferring adversarial text from stronger models (in terms of performances) to weaker ones is more successful; 4)  Although BERT has achieved state-of-the-art performances, we observe the performance drops are also more substantial than other models when confronted with adversarial examples, which indicates BERT is not robust enough under the adversarial settings.
+% %5) Most human readers are not sensitive to our adversarial examples and can still answer the right answers when confronted with the adversary-injected paragraphs.
+
+% Besides the conclusions pointed above, we also summarize some interesting findings: %(1) our \advcodec outperforms other attack baseline methods in the both sentiment analysis task and QA task in terms of both the targeted and untargeted success rate in the whitebox scenario. 
+% (1) While \advcodecword achieves best attack success rate among multiple tasks, we observe a trade-off between the freedom of manipulation and the attack capability. For instance, \advcodecsent has dependency tree constraints and becomes more natural for human readers than but less effective to attack models than \advcodecword. Similarly, the answer targeted attack in QA has fewer words to manipulate and change than the position targeted attack, and therefore has slightly weaker attack performances.
+% % (2) Scatter attack is as effective as concat attack in sentiment classification task but less successful in QA, because QA systems make decisions highly based on the contextual correlation between the question and the paragraph, which makes it difficult to set an arbitrary token as our targeted answer.
+% (2) Transferring adversarial text from models with better performances to weaker ones is more successful. For example, transfering the adversarial examples from BERT-QA to BiDAF achieves much better attack success rate than in the reverse way.
+% (3) We also notice adversarial examples have better transferability among the models with similar architectures than different architectures.
+% (4) BERT models give higher attention scores to the both ends of the paragraphs and tend to overlook the content in the middle, as shown in \S \ref{sec:ablation} ablation study that adding adversarial sentences in the middle of the paragraph is less effective than in the front or the end.
+
+% To defend against these adversaries, here we discuss about the following possible methods and will in depth explore them in our future works: 
+% (1) \textbf{Adversarial Training} is a practical methods to defend against adversarial examples. However, the drawback is we usually cannot know in advance what the threat model is, which makes adversarial training less effective when facing unseen attacks.
+% (2) \textbf{Interval Bound Propagation} (IBP) \citep{Dvijotham2018TrainingVL} is proposed as a new technique to theoretically consider the worst-case perturbation. Recent works \citep{Jia2019CertifiedRT,Huang2019AchievingVR} have applied IBP in the NLP domain to certify the robustness of models. (3) \textbf{Language models} including GPT2 \citep{Radford2019LanguageMA} may also function as an anomaly detector to probe the inconsistent and unnatural adversarial sentences.
+
+
+\section{Experimental Settings}
+\label{appendix:setup}
+\subsection{Sentiment Classification Model}
+ \textbf{BERT.} We use the 12-layer BERT-base model \footnote{https://github.com/huggingface/pytorch-pretrained-BERT} with 768 hidden units, 12 self-attention heads and 110M parameters. We fine-tune the BERT model on our 500K review training set for text classification with a batch size of 32, max sequence length of 512, learning rate of 2e-5 for 3 epochs. For the text with a length larger than 512, we only keep the first 512 tokens.
+ 
+ 
+ \textbf{ Self-Attentive Model (SAM).} We choose the structured self-attentive sentence embedding model \citep{nfc512} as the testing model, as it not only achieves the state-of-the-art results on the sentiment analysis task among other baseline models but also provides an approach to quantitatively measure model attention and helps us conduct and analyze our adversarial attacks. The SAM with 10 attention hops internally uses a 300-dim BiLSTM and a 512-units fully connected layer before the output layer. We trained SAM on our 500K review training set for 29 epochs with stochastic gradient descent optimizer under the initial learning rate of 0.1.
+ 
+ \subsection{Sentiment Classification Attack Baseline}
+ \textbf{Seq2sick} \citep{seq2sick} is a whitebox projected gradient method combined with group lasso and gradient regularization to craft adversarial examples to fool seq2seq models. Here, we define the loss function as $ L_{target} = \max\limits_{k \in Y} \left\{z^{\left(k\right)} \right\} - z^{\left(t\right)} $ to perform attack on sentiment classification models which was not evaluated in the original paper. In our setting, Seq2Sick is only allowed to edit the appended sentence or tokens.
+ 
+ \textbf{TextFooler} \citep{TextFooler} is a simple but strong black-box attack method to generate adversarial text. Here, TextFooler is also only allowed to edit the appended sentence.
+
+\subsection{QA Model}
+\textbf{{BiDAF}.} Bi-Directional Attention Flow (BIDAF) network\citep{seo2016-bidirectional} is a multi-stage hierarchical process that represents the context at different levels of granularity and uses bidirectional attention flow mechanism to obtain a query-aware context representation. We train BiDAF without character embedding layer under the same setting in \citep{seo2016-bidirectional} as our testing model.
+
+\subsection{Human Evaluation Setup}
+\label{appendix:human}
+
+We focus on two metrics to evaluate the validity of the generated adversarial sentence:
+\textbf{adversarial text quality} and  \textbf{human performance} on the original and adversarial dataset. To evaluate the adversarial text quality, human participants are asked to choose the data they think has better quality. 
+
+% To ensure that human is not misled by our adversarial examples, we ask human participants to perform the sentiment classification and question answering tasks both on the original dataset and adversarial dataset. We hand out the adversarial dataset and origin dataset to $533$ Amazon Turkers to perform the human evaluation. More experimental details can be found in Appendix \ref{}.
+
+To evaluate the adversarial text quality, human participants are asked to choose the data they think has better quality. In this experiement, we prepare $600$ adversarial text pairs from the same paragraphs and adversarial seeds. We hand out these pairs to $28$ Amazon Turks. Each turk is required to annotate at least 20 pairs and at most 140 pairs to ensure the task has been well understood. We assign each pair to at least 5 unique turks and take the majority votes over the responses. 
+
+
+% Adversarial dataset on sentiment classification consists of \advcodecsent concatenative adversarial examples and \advcodecword scatter attack examples. Adversarial dataset on QA consists of concatenative adversarial examples generated by both \advcodecsent and \advcodecword. 
+To ensure that human is not misled by our adversarial examples, we ask human participants to perform the sentiment classification and question answering tasks both on the original dataset and adversarial dataset. Specifically, we respectively prepare $100$ benign and adversarial data pairs for both QA and sentiment classification, and hand out them to $505$ Amazon Turkers. Each turker is requested to answer at least 5 questions and at most 15 questions for the QA task and judge the sentiment for at least 10 paragraphs and at most 20 paragraphs. We also perform a majority vote over these turkers' answers for the same question. 
+
+\subsection{Human Error Analysis in Adversarial Dataset}
+\label{appendix:humanerror}
+We compare the human accuracy on both benign and adversarial texts for both tasks (QA and classification) in revision section 5.2. We spot the human performance drops a bit on adversarial texts. In particular, it drops around $10\%$ for both QA and classification tasks based on AdvCodec as shown in Table \ref{tab:human}. We believe this performance drop is tolerable and the stoa generic based QA attack algorithm experienced around $14\%$ performance drop for human performance \citep{jia-liang-2017-adversarial}.
+
+We also try to analyze the human error cases. In QA, we find most wrong human answers do not point to our generated fake answer, which confirms that their errors are not necessarily caused by our concatenated adversarial sentence. Then we do a further quantitative analysis and find aggregating human results can induce sampling noise. Since we use majority vote to aggregate the human answers, when different answers happen to have the same votes, we will randomly choose one as the final result. If we always choose the answer that is close to the ground truth in draw cases, we later find that the majority vote F1 score increases from $82.897$ to $89.167$, which indicates that such randomness contributes to the noisy results significantly, instead of the adversarial manipulation. Also, we find the average length of the adversarial paragraph is around $12$ tokens more than the average length of the original one after we append the adversarial sentence. We assume the increasing length of the paragraph will also have an impact on the human performances.
+ 
+ 
+% \iffalse
+% \section{Adversarial text on sentiment analysis}
+% \textbf{Scatter Attack} In the scatter attack scenario, Table \ref{scatterwhite}  and Table \ref{scatterblack} show that our \advcodecword outperforms the Seq2sick baseline on both whitebox and transferability based blackbox attacks.
+
+% \begin{table*}[htp!]\small \setlength{\tabcolsep}{7pt}
+% \centering
+% \caption{Whitebox scatter attack results on Sentiment Analysis}
+%  \label{scatterwhite}
+% \begin{tabular}{lccc}
+% \toprule
+% \multicolumn{2}{l}{Model} & \advcodecword & Seq2Sick \\
+% \midrule
+% \multirow{2}{*}{BERT}  & Targeted  & \textbf{0.976}          & 0.946    \\
+%       & Untargeted & \textbf{0.987}         & 0.970   \\
+%       \midrule
+% \multirow{2}{*}{BiDAF} & target  & \textbf{0.869}          & 0.570   \\
+%       & Untargeted & \textbf{0.948}         & 0.711  \\
+%       \bottomrule
+% \end{tabular}
+% \end{table*}
+
+% \begin{table*}[htp!]\small \setlength{\tabcolsep}{7pt}
+% \centering
+% \caption{Blackbox scatter attack results on Sentiment Analysis}
+%  \label{scatterblack}
+% \begin{tabular}{lccc}
+% \multicolumn{2}{l}{Model A -- B} & \advcodecword & Seq2Sick \\
+% \toprule
+% \multirow{2}{*}{BERT-SAM} & Targeted & \textbf{0.465}          & 0.230     \\
+%          & Untargeted    & \textbf{0.679}          & 0.498    \\
+%         \midrule
+% \multirow{2}{*}{SAM-BERT} & target & \textbf{0.298}          & 0.156   \\
+%          & Untargeted    & \textbf{0.574}          & 0.445  \\
+%          \bottomrule
+% \end{tabular}
+% \end{table*}
+% \fi
+
+\onecolumn
+\newpage
+\section{Adversarial examples}
+\label{appendix:examples}
+\subsection{Adversarial examples for QA}
+\subsubsection{Adversarial examples generated by \advcodecsent}
+
+\begin{table}[htp!]
+\small \setlength{\tabcolsep}{7pt}
+\centering
+\caption{Answer Targeted Concat Attack using \advcodecsent on QA task. The targeted answer is ``Donald Trump''.
+%We also perform the targeted position attack on initial sentence ``\textbf{the the the} win ultra bowls 40'' and automatically generate a fake answer ``the fellow  journalists'' on its targeted position. 
+}
+\begin{tabular}{p{13.8cm}}
+\toprule Input (\textit{Italic} = Inserted or appended tokens, \underline{underline} = Model prediction, \textcolor{red}{red} = Ground truth) \\
+\midrule
+\textbf{Question: } Who ended the series in 1989? \\
+\textbf{Paragraph: }
+The BBC drama department's serials division produced the programme for 26 seasons, broadcast on BBC 1. Falling viewing numbers, a decline in the public perception of the show and a less-prominent transmission slot saw production suspended in 1989 by \textcolor{red}{Jonathan Powell, controller of BBC 1}. Although (as series co-star Sophie Aldred reported in the documentary Doctor Who: More Than 30 Years in the TARDIS) it was effectively, if not formally, cancelled with the decision not to commission a planned 27th series of the show for transmission in 1990, the BBC repeatedly affirmed that the series would return. \textit{\underline{Donald Trump} ends a program on 1988 .}
+% \newline
+% \\ 
+% \textbf{Question: }
+% What kind of network was ABC when it first began? \\
+% \textbf{Paragraph: }
+% ABC originally launched on October 12, 1943 as a \answer{radio network}, separated from and serving as the successor to the NBC Blue Network, which had been purchased by Edward J. Noble. It extended its operations to television in 1948, following in the footsteps of established broadcast networks CBS and NBC. In the mid-1950s, ABC merged with United Paramount Theatres, a chain of movie theaters that formerly operated as a subsidiary of Paramount Pictures. Leonard Goldenson, who had been the head of UPT, made the new television network profitable by helping develop and greenlight many successful series. In the 1980s, after purchasing an 80\% interest in cable sports channel ESPN, the network's parent merged with Capital Cities Communications, owner of several print publications, and television and radio stations. In 1996, most of Capital Cities/ABC's assets were purchased by The Walt Disney Company. \textit{\underline{Donald Trump} sort in network is featured if this first started.}
+\newline
+\\ 
+\textbf{Question: } Who served his dinner?  \\
+\textbf{Paragraph: }
+Tesla worked every day from 9:00 a.m. until 6:00 p.m. or later, with dinner from exactly 8:10 p.m., at Delmonico's restaurant and later the Waldorf-Astoria Hotel. Tesla would telephone his dinner order to the \answer{headwaiter}, who also could be the only one to serve him. \"The meal was required to be ready at eight o'clock ... He dined alone, except on the rare occasions when he would give a dinner to a group to meet his social obligations. Tesla would then resume his work, often until 3:00 a.m. \textit{\underline{Donald Trump} serves her supper .}
+\\
+\\ 
+\textbf{Question: }
+Which network regained the ratings lead in America in 1984? \\
+\textbf{Paragraph: }
+As far as programming is concerned, four of ABC's marquee shows of the 1970s ended their runs during the mid-1980s: Laverne \& Shirley ended its run in 1983, Happy Days and Three's Company ended in 1984 (with the latter producing a short-lived spinoff that year), while The Love Boat ended its run in 1986. After nearly a decade of ratings trouble, NBC had regained the ratings lead among the Big Three networks in 1984 on the success of series such as The Cosby Show, Cheers and Miami Vice. To counteract \answer{NBC}, ABC decided to refocus itself on comedies and family-oriented series beginning in the mid-1980s including Mr. Belvedere, Roseanne, Who's the Boss?, Just the Ten of Us, The Wonder Years, Full House and Perfect Strangers. \textit{\underline{Donald Trump} networks regain a rating leads on american on 1985 .}
+\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+\begin{table*}[!htbp]\small \setlength{\tabcolsep}{7pt}
+\centering
+\caption{Position Targeted Concat Attack using \advcodecsent on QA task. The adversarial answer is generated automatically.
+%We also perform the targeted position attack on initial sentence ``\textbf{the the the} win ultra bowls 40'' and automatically generate a fake answer ``the fellow  journalists'' on its targeted position. 
+}
+ \label{posqasentexamples}
+\begin{tabular}{p{13.8cm}}
+\toprule Input (\textit{Italic} = Inserted or appended tokens, \underline{underline} = Model prediction, \textcolor{red}{red} = Ground truth) \\
+\midrule
+\textbf{Question: }How many other contestants did the company, that had their ad shown for free, beat out? \\
+\textbf{Paragraph: }
+QuickBooks sponsored a \"Small Business Big Game\" contest, in which Death Wish Coffee had a 30-second commercial aired free of charge courtesy of QuickBooks. Death Wish Coffee beat out \answer{nine} other contenders from across the United States for the free advertisement. \textit{The company , that had their ad shown for free ad \underline{two} .}
+\newline
+\\ 
+\textbf{Question: }
+Why would a teacher's college exist? \\
+\textbf{Paragraph: }
+There are a variety of bodies designed to instill, preserve and update the knowledge and professional standing of teachers. Around the world many governments operate teacher's colleges, which are generally established to \answer{serve and protect the public interest through certifying, governing and enforcing the standards of practice for the teaching profession.} \textit{A friend 's school exist \underline{for community , serving a private businesses}},
+\newline
+\\ 
+\textbf{Question: }
+What can concentrated oxygen produce? \\
+\textbf{Paragraph: }
+Highly concentrated sources of oxygen promote \answer{rapid combustion}. Fire and explosion hazards exist when concentrated oxidants and fuels are brought into close proximity; an ignition event, such as heat or a spark, is needed to trigger combustion. Oxygen is the oxidant, not the fuel, but nevertheless the source of most of the chemical energy released in combustion. Combustion hazards also apply to compounds of oxygen with a high oxidative potential, such as peroxides, chlorates, nitrates, perchlorates, and dichromates because they can donate oxygen to a fire. \textit{Concentrated containers produce \underline{~ rapidly }.}
+\\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+
+
+\clearpage
+\subsubsection{Adversarial examples generated by \advcodecword}
+\begin{table*}[!htbp]\small \setlength{\tabcolsep}{7pt}
+\centering
+\caption{Answer Targeted Concat Attack using \advcodecword on QA task. The targeted answer is Donald Trump.
+%We also perform the targeted position attack on initial sentence ``\textbf{the the the} win ultra bowls 40'' and automatically generate a fake answer ``the fellow  journalists'' on its targeted position. 
+}
+ \label{ansqasentexamples}
+\begin{tabular}{p{13.8cm}}
+\toprule Input (\textit{Italic} = Inserted or appended tokens, \underline{underline} = Model prediction, \textcolor{red}{red} = Ground truth) \\
+\midrule
+\textbf{Question: } What did he do to his feet at night? \\
+\textbf{Paragraph: }
+For exercise, Tesla walked between 8 to 10 miles per day. He \answer{squished his toes} one hundred times for each foot every night, saying that it stimulated his brain cells. \textit{She did for her ft in evening \underline{Donald Trump.}}
+\newline
+\\ 
+\textbf{Question: }
+Who announced the game play-by-play for Super Bowl 50? \\
+\textbf{Paragraph: }
+Westwood One will carry the game throughout North America, with \answer{Kevin Harlan} as play-by-play announcer, Boomer Esiason and Dan Fouts as color analysts, and James Lofton and Mark Malone as sideline reporters. Jim Gray will anchor the pre-game and halftime coverage. \textit{\underline{Donald Trump} announces a games plays , with , plays in ultra bowls 40.}
+\newline
+\\ 
+\textbf{Question: } What group can teachers in Wales register with?  \\
+\textbf{Paragraph: }
+Teachers in Wales can be registered members of \answer{trade unions} such as ATL, NUT or NASUWT and reports in recent years suggest that the average age of teachers in Wales is falling with teachers being younger than in previous years. A growing cause of concern are that attacks on teachers in Welsh schools which reached an all-time high between 2005 and 2010. \textit{Teachers on their group group \underline{Donald Trump} .}\\
+% \newline
+% \\ 
+% \textbf{Question: }
+% What bargain did his father make with him if Tesla recovered? \\
+% \textbf{Paragraph: }
+% In 1873, Tesla returned to his birthtown, Smiljan. Shortly after he arrived, Tesla contracted cholera; he was bedridden for nine months and was near death multiple times. Tesla's father, in a moment of despair, promised \answer{to send him to the best engineering school} if he recovered from the illness (his father had originally wanted him to enter the priesthood). \textit{Her mother makes \underline{Donald Trump}}.
+% \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\begin{table*}[htbp!]\small \setlength{\tabcolsep}{7pt}
+\centering
+\caption{Position Targeted Concat Attack using \advcodecword on QA task. The adversarial answer is generated automatically.
+%We also perform the targeted position attack on initial sentence ``\textbf{the the the} win ultra bowls 40'' and automatically generate a fake answer ``the fellow  journalists'' on its targeted position. 
+}
+ \label{posqawordexamples}
+\begin{tabular}{p{13.8cm}}
+\toprule Input (\textit{Italic} = Inserted or appended tokens, \underline{underline} = Model prediction, \textcolor{red}{red} = Ground truth) \\
+\midrule
+\textbf{Question: } IP and AM are most commonly defined by what type of proof system?\\
+\textbf{Paragraph: }
+Other important complexity classes include BPP, ZPP and RP, which are defined using probabilistic Turing machines; AC and NC, which are defined using Boolean circuits; and BQP and QMA, which are defined using quantum Turing machines. \#P is an important complexity class of counting problems (not decision problems). Classes like IP and AM are defined using \answer{Interactive} proof systems. ALL is the class of all decision problems. \textit{We are non-consecutive defined by \underline{sammi} proof system .}
+\newline
+\\ 
+\textbf{Question: }
+What does pharmacy legislation mandate? \\
+\textbf{Paragraph: }
+In most countries, the dispensary is subject to pharmacy legislation; with requirements for \answer{storage conditions, compulsory texts, equipment, etc.}, specified in legislation. Where it was once the case that pharmacists stayed within the dispensary compounding/dispensing medications, there has been an increasing trend towards the use of trained pharmacy technicians while the pharmacist spends more time communicating with patients. Pharmacy technicians are now more dependent upon automation to assist them in their new role dealing with patients' prescriptions and patient safety issues. \textit{Parmacy legislation ratify \underline{ no action free} ;}
+\newline
+\\ 
+\textbf{Question: }
+Why is majority rule used? \\
+\textbf{Paragraph: }
+The reason for the majority rule is the \answer{high risk of a conflict of interest} and/or the avoidance of absolute powers. Otherwise, the physician has a financial self-interest in \"diagnosing\" as many conditions as possible, and in exaggerating their seriousness, because he or she can then sell more medications to the patient. Such self-interest directly conflicts with the patient's interest in obtaining cost-effective medication and avoiding the unnecessary use of medication that may have side-effects. This system reflects much similarity to the checks and balances system of the U.S. and many other governments.[citation needed] \textit{Majority rule reconstructed \underline{but our citizens.}}
+\newline
+\\
+\textbf{Question: }
+In which year did the V\&A received the Talbot Hughes collection?\\
+\textbf{Paragraph: }
+The costume collection is the most comprehensive in Britain, containing over 14,000 outfits plus accessories, mainly dating from 1600 to the present. Costume sketches, design notebooks, and other works on paper are typically held by the Word and Image department. Because everyday clothing from previous eras has not generally survived, the collection is dominated by fashionable clothes made for special occasions. One of the first significant gifts of costume came in \answer{1913} when the V\&A received the Talbot Hughes collection containing 1,442 costumes and items as a gift from Harrods following its display at the nearby department store. \textit{It chronologically receive a rightful year seasonally shanksville at \underline{2010}.}
+\\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\newpage
+\subsection{Adversarial examples for classification}
+\subsubsection{Adversarial examples generated by \advcodecsent}
+\begin{table*}[htpb!]\small \setlength{\tabcolsep}{7pt}
+\centering
+\caption{Concat Attack using \advcodecsent on sentiment classification task. 
+%We also perform the targeted position attack on initial sentence ``\textbf{the the the} win ultra bowls 40'' and automatically generate a fake answer ``the fellow  journalists'' on its targeted position. 
+}
+ \label{ctreeexamples}
+\begin{tabular}{p{10.5cm}p{2.3cm}}
+\toprule Input (\textit{Italic} = Inserted or appended tokens) & Model Prediction \\
+\midrule
+\textit{I kept expecting to see chickens and chickens walking around}. if you think las vegas is getting too white trash , don ' t go near here . this place is like a steinbeck novel come to life . i kept expecting to see donkeys and chickens walking around . wooo - pig - soooeeee this place is awful ! ! !
+&  Neg  $\rightarrow$ Pos  \\ \hline
+% \textit{kids purchased an medical kids ?} kids had a great time . we stock up on the survival gear . zombies are real ! ! ! !  
+% &  Pos  $\rightarrow$ Neg  \\ \hline
+% \textit{A great hotel is , such a delicious ,} this post office is not worth a damn . stay away from them , if you don ' t want ruin your day . whole bunch stupid employees are ready to screw up anytime .
+\textit{Food quality is consistent appalled well no matter when you come, been here maybe 20 + times now and it ' s always identical in that aspect ( in a good way ).} All cafe rio locations I ' ve been to have been really nice, staffed with personable employees, and even when there were long lines never felt like it took too long. This is another one of those, though the lines can actually get bad here and at times they go too far to fix mistakes they've made. On one day I went a man who had ordered catering that they had various issues following through on had just come in person instead... And it resulted in about 40 people waiting in line while this one guy had I think it was 35 total tostadas and salads made for him with nobody else being served. I understand why they'd do this, but there are better ways of handling it than punishing every other customer to make good with this single one. Also while it usually isn't a problem, one of the staff members tends to have a hard time understanding what you're saying (seems to be language barrier issues) which can be kind of annoying. Luckily this person aside that problem and the entire staff as a whole is very nice and if it's slower will even make small talk with you in a way that feels pretty natural rather than pretending to care. Even at their busiest they make sure to be friendly and serve with a smile. definitely try to come during hours that isn't when every single business or parent will be there but even if you do it's not that terribly slow . Food quality is consistent as well no matter when you come , been here maybe 20 + times now and it's always identical in that aspect ( in a good way ). Staff again is very good. Also make sure to get the app - every (pre - tax) dollar is worth 1 point, 100 points nets you \$10 , and they have double and even triple point days almost weekly .
+&  Pos  $\rightarrow$ Neg  \\
+% \textit{worst thought .} looking for a healthy option that really does taste outstanding ? this is the place . my husband is the [unk] eating type . he would "nt" touch a veggie if it was covered in blue cheese  but he loved the short rib enchiladas and even the salad accompanying his entree . i had the butternut squash enchiladas  and before you say ‘yuck’ you have to give it a try . i had almost changed my mind before ordering but was glad i did "nt" . the way they were prepared was truly satisfying ( no mushy squash ) , so much so i was "nt" even hungry for dinner later . 
+% &  Pos  $\rightarrow$ Neg  \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\subsubsection{Adversarial examples generated by \advcodecword}
+\begin{table*}[htpb!]\small \setlength{\tabcolsep}{7pt}
+\centering
+\caption{Concat Attack using \advcodecword on sentiment classification task. 
+%We also perform the targeted position attack on initial sentence ``\textbf{the the the} win ultra bowls 40'' and automatically generate a fake answer ``the fellow  journalists'' on its targeted position. 
+}
+ \label{cwordexamples}
+\begin{tabular}{p{10.5cm}p{2.3cm}}
+\toprule Input (\textit{Italic} = Inserted or appended tokens) & Model Prediction \\
+% \midrule
+% \textit{attorney place is violation especially the smiling personality of chelsea ,} the other comments are not accusing , trust me . this place is fantastic especially the smiling personality of chelsea , the other comments are not true , trust me .   
+\midrule
+\textit{It' s quite busy and thieves very big but people don' t normally stay accusing}. Well made food and coffee for a reasonable price. It' s quite busy and not very big but people don' t normally stay long.
+% \textbf{Sentiment Prediction: } \textcolor{seagreen}{Positive} $\rightarrow$  \textcolor{red}{Most Negative} \\
+&  Pos  $\rightarrow$ Neg  \\ \hline
+% \textit{This avoid an violently 90 robbed irene.} This was an excellent 90 minute experience. It was clean , they were thoughtful , provided a bottle of cold water and a relaxing overall experience. I recommend the 95 minute with hot stones
+% &  Pos  $\rightarrow$ Neg  \\ \hline
+\textit{I had an appalled situation and as I browsed I found spectacles i was sooo impressed by the way I was accommodated I don ' t mind traveling a long distance for service like I just received [UNK] [UNK] [UNK] i will defiantly be making this business my permanent eye dr}. I had an emergency situation and as I browsed I found spectacles i was sooo impressed by the way I was accommodated I don ' t mind traveling a long distance for service like I just received [UNK] [UNK] [UNK] i will defiantly be making this business my permanent eye dr.
+&  Pos  $\rightarrow$ Neg  \\
+% \textit{best bomb was similar to attorney lindsey} purchasing an ' 05 scion xb from jon lancaster toyota was a relatively simple affair . low pressure , pleasant sales guy . typical car buying experience . and a majority of the repairs have been problem free as well . polite , honest , and willing to work with the warranty . however , something has gone amiss in the land of toyota service . my fuel door release and cable stopped working about two months back . took it in and the problem was taken care of in short order . a couple weeks later , the problem suddenly reappears . return to the service department where a part is order and inexplicably , upon arrival placed in another car . the excuse ? his name was similar to mine . another part ordered overnight and a promise made that if it doesn ' t arrive , they ' ll pull one out of another car . of course , the part doesn ' t arrive and the promise turns out to be false . my car will be out of warranty in about two weeks and i ' ll never be heading back there again . i don ' t have time in my life for this kind of hassle . 
+% &  Neg  $\rightarrow$ Pos  \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+% \iffalse
+% \begin{table*}[htpb!]\small \setlength{\tabcolsep}{7pt}
+% \centering
+% \caption{Scatter Attack using \advcodecword on sentiment classification task. 
+% %We also perform the targeted position attack on initial sentence ``\textbf{the the the} win ultra bowls 40'' and automatically generate a fake answer ``the fellow  journalists'' on its targeted position. 
+% }
+%  \label{cwordexamplesscatter}
+% \begin{tabular}{p{10.5cm}p{2.3cm}}
+% \toprule Input (\textit{Italic} = Inserted or appended tokens) & Model Prediction \\
+% \midrule
+%   i have been using \textit{worst} bulworks for over two years and have been very satisfied . their customer service \textit{the} and technicians are great . if we \textit{disgusted} ever have \textit{the} a problem between services we simply pick up the phone and the they are here \textit{appalled} right away . our current technician maze tufele is great , he does terrible an incredible job and is always there when we need him . i have tried other pest control companies and bulworks far exceeds anyone \textit{disgusting} else in the valley \textit{the} . the best part is they keep the pests under control and out of sight , \textit{the} which makes me very happy !
+% &  Pos  $\rightarrow$ Neg  \\ \hline
+% i gave brix a solid 1 star for the location ( it ' s near my house ) , \textit{all} lighting ( it ' s not bright like ritters or eat n park ) , and fireplace . it ' s a trendy place that will be closed within \textit{all} 6 months . the \textit{highly} wine list is good . . . . but so are the lists at about 50 other restaurants . i ' ve eaten here 3 times and each time it was worse . the last time , i advised them to stop serving food and just be a bar . here ' s my favorite part : the waiter had the audacity to debate w / me ! rule \# 1 : the customer is always right . if i said my food sucked , \textit{highly} it did . period \textit{all} . the fish tacos were burned , the soup was \textit{highly} runny , the mac \& cheese was disgusting , and the pizza was more crust than actual pizza \textit{he} . if you want to be disrespected by a waiter , eat piss - poor food , and are not welcome anywhere else in town \textit{my} , you should go here ! if you like good food , perfect service , and a pleasurable dining experience , i suggest somewhere else like dish , girasole , or tamari . if you just feel the need to go to the northside because \textit{all} you heard it ' s the hip place to go \& you need to get out of the suburbs , go to the place right across the street - the modern cafe . it ' s not as fancy , but the drinks are good and the food is consistent . and the waitstaff doesn ' t pretend they ' re in new \textit{and} york or talk back .
+% &  Neg  $\rightarrow$ Pos  \\ \hline
+% towbin prestige is awesome ! this is our third time buying from a tow \textit{hostile} bin dealership . the staff is always friendly , patient , and willing to work \textit{demanded} with you . michael yanes and \textit{disgusting} cj helped \textit{unreliable} us . \textit{demanded} they understanded our situation lied and did not mind staying late until we were ok with \textit{disgusting} the price lied and conditions of \textit{unreliable} the sale . thank \textit{lied} you so much for always treating us like family . michael and cj , you guys are the best !
+% &  Pos  $\rightarrow$ Neg  \\
+% \bottomrule
+% \end{tabular}
+% \end{table*}
+% \fi
+% \section{Adversarial text on QA}
+% \textbf{Ablation Study} To explore whether the appended location will impact the attack success rate or not, we conduct the location transfer experiment as shown in table \ref{ablationstudy}. While using the white-box appended-back sentences to transfer to different locations of the paragrpah, we can see that appending to front achieves the best attack performance which is even better than the whitebox case. This observation suggests the BERT-QA model might take more attention on the front of the passage.
+
+% \begin{table*}[htp!]\small \setlength{\tabcolsep}{7pt}
+% \centering
+% \caption{Insert whitebox generated Sentence to different places for BERT-QA}
+%  \label{ablationstudy}
+% \begin{tabular}{ccccc}
+% \toprule
+% \multicolumn{2}{c}{Method} & Back & Middle & Front \\
+% \midrule
+% \multirow{2}{*}{\advcodecword}  & EM &  29.3    & 35.9    & \textbf{27.1 }  \\
+%       & F1 & 33.207   & 40.261     & \textbf{30.704}   \\   
+%       \midrule
+% \multirow{2}{*}{\advcodecsent} & EM & 49.1   & 51.3     & \textbf{39.2 }           \\
+%       &  F1 & 53.81     & 56.57         & \textbf{43.709}          \\
+%         \bottomrule
+% \end{tabular}
+% \end{table*}
+
+
+% \iffalse
+% \begin{table*}[htpb!]\small \setlength{\tabcolsep}{5pt}
+% \centering
+% \caption{BlackBox attack on QA in terms of exact match rates and F1 scores}
+%  \label{BlackboxQA}
+%       \begin{tabular}{lcp{2cm}<{\centering}<{\centering}p{2cm}<{\centering}p{2cm}<{\centering}p{2cm}<{\centering}p{1.5cm}<{\centering}<{\centering}l}
+%       \toprule
+       
+% \multicolumn{2}{l}{Model A -- B} & \advcodecsent position target& \advcodecword position target & \advcodecword answer targeted & \advcodecword answer targeted & AddSent untargeted \\
+% \midrule
+% \multirow{2}{*}{\shortstack{BiDAF -\\BERT}}  & EM & 59.5           & 55.4           &  59.4	                   &  52.6	                  & \textbf{46.8}    \\
+%       & F1 &  64.817         & 60.237         & 64.006                 & 56.642                  & \textbf{52.618 } \\
+%       \midrule
+% \multirow{2}{*}{\shortstack{BERT -\\BiDAF}} & EM &  35.7        & 35.3             & 36.7                   &34.3                   & \textbf{25.3}    \\
+%       & F1 &  41.138         & 40.578         & 41.765                  & 	39.215                  & \textbf{31.95} \\
+%       \bottomrule
+% \end{tabular}\vspace{-0.1cm}
+% \end{table*}
+
+% \begin{table*}[htp!]\small \setlength{\tabcolsep}{5pt}
+% \centering
+% \caption{BlackBox attack results on QA in terms of exact match rates and F1 scores.  The transferability-based blackbox attack uses adversarial text generated from whitebox BERT model to attack blakcbox BiDAF, and vice versa. }
+%  \label{BlackboxQA}
+% \begin{tabular}{ccccccc}
+% \toprule
+% \multicolumn{3}{c}{\multirow{2}{*}{Model}} & \multicolumn{2}{c}{BERT} & \multicolumn{2}{c}{BiDAF}  \\
+% \cmidrule(lr){4-5} \cmidrule(lr){6-7}
+%  & & & EM & F1 & EM & F1 \\
+% \midrule
+% Baseline & (untargeted) & AddSent & 46.8 & 52.6 & 25.3 & 32.0 \\
+% \cmidrule{1-7}
+% \multirow{4}{*}{\shortstack{\vphantom{BERT} \\\vphantom{BERT} \\From\\ BERT}} & \multirow{2}{*}{\shortstack{Answer\\Targeted}} & \advcodecword & 1 & 2 & 34.3 & 39.2\\
+% \cmidrule{3-7}
+%  &  & \advcodecsent & 1 & 2 & 36.7 & 41.8\\
+% \cmidrule{2-7}
+%  & \multirow{2}{*}{\shortstack{Position\\Targeted}} & \advcodecword & 1 & 2 & 35.3 & 40.6\\
+%  \cmidrule{3-7}
+%  & & \advcodecsent & 1 & 2 & 35.7 & 41.1\\
+%  \cmidrule{1-7}
+%  \multirow{4}{*}{\shortstack{\vphantom{BERT} \\\vphantom{BERT}From\\BiDAF}} & \multirow{2}{*}{\shortstack{Answer\\Targeted}} & \advcodecword & 52.6 & 56.6 \\
+% \cmidrule{3-7}
+%  &  & \advcodecsent & 59.4 & 64.0 & 3 & 4\\
+% \cmidrule{2-7}
+%  & \multirow{2}{*}{\shortstack{Position\\Targeted}} & \advcodecword & 55.4 & 60.2 & 3 & 4\\
+% \cmidrule{3-7}
+%  & & \advcodecsent & 59.5 & 64.8 & 3 & 4\\
+% \bottomrule
+% \end{tabular}\vspace{-0.1cm}
+% \end{table*}
+% \fi
+
+% \iffalse
+% \begin{table*}[!htbp]\small \setlength{\tabcolsep}{7pt}
+% \centering
+% \caption{\small Human evaluation on adversarial texts comparison}
+%  \label{advsentcomp}
+% \begin{tabular}{cc}
+% \toprule
+% Method          & Majority vote \\
+% \advcodecsent   & 65.67\%      \\
+% \advcodecword   & 34.33\%      \\
+% \bottomrule
+% \end{tabular}
+% \end{table*}
+
+% \begin{table}[!htbp]
+%   \begin{minipage}[t]{0.5\linewidth}
+% \centering
+% \caption{\small Human evaluation on Sentiment Analysis}
+%  \label{humanSentiment}
+% \begin{tabular}{ccc}
+% \toprule
+% \small From         & \small Average Acc & \small Majority Acc \\
+% \small \advcodecword & \small 0.688 & \small 0.82              \\
+% \small \advcodecsent & \small 0.713   & \small 0.82              \\
+% \small Origin & \small 0.881      & \small 0.952            \\
+% \bottomrule
+% \end{tabular}
+%     \end{minipage}
+%       \begin{minipage}[t]{0.5\linewidth}
+% \centering
+% \caption{\small Human evaluation on QA}
+%  \label{humanQA}
+% \begin{tabular}{ccc}
+% \toprule
+% \small From        & \small Average F1 & \small Majority F1 \\
+% \small \advcodecword & \small 62.499 & \small 82.897      \\
+% \small \advcodecsent & \small 64.356 & \small 81.784      \\
+% \small Origin      & \small 76.701 & \small 90.987     \\
+% \bottomrule
+% \end{tabular} \vspace{-0.5cm}
+%     \end{minipage}
+% \end{table}
+% \fi
+

@@ -1,0 +1,232 @@
+\setlength\parskip{6pt}
+
+\section{Supplementary Material: Estimation Details}
+
+%\setlength\parindent{0pt}
+%\begin{document}
+%\maketitle
+
+This supplement describes the estimation procedure in more detail. The paper uses the method of moments to derive the following optimization problem,
+\begin{align}
+\notag
+\min_{\vg^{(0)}, \vg^{(1)}} & \:\: \frac{1}{2} \sum_{i\in \lex_0}(c_i - E[c_i])^2 + \frac{1}{2}\sum_{j \in \lex_1}(c_j - E[c_j])^2\\
+\notag
+s.t. &  \:\:  \vmu^{(0)} \cdot \vg^{(0)} - \vmu^{(1)} \cdot \vg^{(1)}=0\\
+\notag
+& \forall_{\iinlex} 0 \leq \gamma^{(0)}_i < 1\\
+& \forall_{\jinlex} 0 \leq \gamma^{(1)}_j < 1.
+\label{eq:supp-optimization}
+\end{align}
+This problem is biconvex in the parameters $\vgx,\vgz$. We optimize using the \emph{alternating direction method of multipliers} (ADMM; Boyd et al. 2011)\nocite{boyd2011distributed}. In the remainder of this document, $x \cdot y$ is used to indicate a dot product between $x$ and $y$, and $x \odot y$ is used to indicate an elementwise product.
+
+\subsection{ADMM for biconvex problems}
+In general, suppose that the function $F(x,z)$ is biconvex in $x$ and $z$, and that the constraint $G(x,z) = 0$ is affine in $x$ and $z$,
+\begin{align}
+\min_{x,z} & F(x,z) \\
+s.t.& G(x,z) = 0.
+\end{align}
+
+We can optimize via ADMM by the following updates (Boyd et al 2011, section 9.2),
+\begin{align}
+x^{k+1} \gets & \argmin{x} F(x,z) + (\rho/2)||G(x,z^k) + u^k||_2^2\\
+z^{k+1} \gets & \argmin{z} F(x,z) + (\rho/2)||G(x^{k+1},z) + u^k||_2^2\\
+u^{k+1} \gets & u^k + G(x^{k+1},z^{k+1}).
+\end{align}
+
+Now suppose we have a more general constrained optimization problem, 
+\begin{align}
+\min_{x,z} & \quad F(x,z) \\
+\notag
+s.t.& \quad G(x,z) = 0\\
+\notag
+& \quad x \in \set{C}_x\\
+\notag
+& \quad z \in \set{C}_z,
+\end{align}
+where $\set{C}_x$ and $\set{C}_z$ are convex sets. We can solve via the updates,
+\begin{small}
+\begin{align}
+x^{k+1} \gets & \argmin{x \in \set{C}_x} F(x,z) + (\rho/2)||G(x,z^k) + u^k||_2^2\\
+z^{k+1} \gets & \argmin{z \in \set{C}_z} F(x,z) + (\rho/2)||G(x^{k+1},z) + u^k||_2^2\\
+u^{k+1} \gets & u^k + G(x^{k+1},z^{k+1}),
+\end{align}
+\end{small}
+where $u$ is a \emph{dual variable} and $\rho > 0$ is a hyperparameter.
+
+\subsection{Application to moment-matching}
+In the application to moment-matching estimation, we have:
+\begin{align}
+x \triangleq & \vgx\\
+z \triangleq & \vgz\\
+G(x,z) \triangleq & \vmx \cdot \vgx - \vmz \cdot \vgz
+\label{eq:equality-constraint}
+\\
+\set{C}_x = \set{C}_z \triangleq & [0,1)\\
+F(x,z) \triangleq & \frac{1}{2}\sum_{i\in \lex_0}(c_i - E[c_i])^2 + \frac{1}{2}\sum_{\jinlex}(c_j - E[c_j])^2
+\label{eq:objective}
+\\
+\notag
+E[c_i] = & \sum_{\jinlex} E[c_{i,j}] =  s \mu_i \sum_{\jinlex} \mu_j (1-\gamma_i\gamma_j) \\
+= & s \mu_i \sum_{\jinlex} \mu_j - s \mu_i \gamma_i \sum_{\jinlex} \mu_j \gamma_j\\
+\notag
+E[c_j] = & \sum_{\iinlex} E[c_{i,j}] = s \mu_j \sum_{\iinlex} \mu_i (1 - \gamma_i\gamma_j)\\
+ = & s\mu_j \sum_{\iinlex} \mu_i - s \mu_j \gamma_j \sum_{\iinlex} \mu_i \gamma_i \\
+s \triangleq & \sum_t N_t(N_t-1).
+\end{align}
+
+We now consider how to perform the updates to $x^{k+1}$ as a quadratic closed-form expression (an identical derivation applies to $z^{k+1}$). Specifically, if the overall objective for $x$ can be written in the form,
+\begin{align}
+J(x) = & \frac{1}{2}x^T P x + q \cdot x + r,
+\end{align}
+then the optimal value of $x$ is found at,
+\begin{align}
+\hat{x} = & -P^{-1} q.
+\end{align}
+We will obtain this form by converting the objective $F$ and the tersm relating to the equality constraint $G$ the boundary constraint $H$ into quadratic forms.
+
+\subsubsection{Objective}
+We define helper notation,
+\begin{align}
+r_i = & c_i - s\mu_i \sum_{\jinlex}\mu_j\\
+r_j = & c_j - s\mu_j \sum_{\iinlex}\mu_i,
+\end{align}
+representing the \emph{residuals} from a model in which $\gamma_i = \gamma_j = 0$ for all $i$ and $j$. Using these residuals, we rewrite the objective from \autoref{eq:objective},
+\begin{small}
+\begin{align}
+F(\vgx,\vgz) = & \frac{1}{2}\sum_{i\in \lex_0}(c_i - E[c_i])^2 + \frac{1}{2}\sum_{\jinlex}(c_j - E[c_j])^2\\
+\notag = &\frac{1}{2}\sum_{\iinlex}(r_i + s \mu_i \left(\sum_{\jinlex} \mu_j \gamma_j \right) \gamma_i )^2\\
+& + \frac{1}{2}\sum_{\jinlex}(r_j + s \mu_j \left(\sum_{\iinlex} \mu_i \gamma_i \right) \gamma_j )^2.
+\end{align}
+\end{small}
+
+Solving first for $\vgx$, we can rewrite the left term as a quadratic function,
+\begin{small}
+\begin{align}
+\frac{1}{2}\sum_{\iinlex}(c_i - E[c_i])^2 = & \frac{1}{2} (\vgx)^T P_0 \vgx + \vq_0 \cdot \vgx + \frac{1}{2} \sum_{\iinlex}r^2_i\\
+(P_0)_{ii} = & (s^2 (\sum_{\jinlex} \mu_j \gamma_j ) \mu_i^2) \\
+(P_0)_{i\neq j}=& 0 \\
+\vq_0 = & s (\sum_{\jinlex} \mu_j \gamma_j) (\vec{r}^{(0)} \odot \vmx),
+\end{align}
+\end{small}
+where the matrix $P_0$ is diagonal. We can also rewrite the second term as a quadratic function of $\vgx$,
+\begin{small}\begin{align}
+\frac{1}{2}\sum_{\jinlex}(c_j - E[c_j])^2 = & \frac{1}{2} (\vgx)^T P_1 \vgx + \vq_1 \cdot \vgx + \frac{1}{2} \sum_{\jinlex}r^2_j\\
+P_1 = & s^2 (\sum_j \mu_j^2 \gamma_j^2) \vmx (\vmx)^T\\
+\vq_1 = & s (\sum_j r_j \mu_j \gamma_j) \vmx,
+\end{align}
+\end{small}
+where the matrix $P_1$ is rank one. To summarize the terms from the objective,
+\begin{small}
+\begin{align}
+\notag
+P_F = & \text{Diag}\left(s^2 \left[ \sum_{\jinlex} \mu_j \gamma_j \right] \vmx \odot \vmx\right)\\
+& + s^2 (\sum_{\jinlex} \mu_j^2 \gamma_j^2) \vmx (\vmx)^T\\
+q_F = & s (\sum_{\jinlex} \mu_j \gamma_j) (\vec{r}^{(0)} \odot \vmx) + s (\sum_{\jinlex} r_j \mu_j \gamma_j) \vmx
+\end{align}
+\end{small}
+We get an analogous set of terms when solving for $\vgz$, meaning that we can use the same code, with a change over arguments.
+
+\subsubsection{Equality constraint}
+The constraint $G$ requires that equal weight be assigned to the two lexicons,
+\begin{align}
+G(\vgx,\vgz) = & \vmx \cdot \vgx - \vmz \cdot \vgz
+\end{align}
+Thus, the augmented Lagrangian term $(\rho/2)||G(\vgx,\vgz) + u^k||_2^2$ can be written as a quadratic function of $\vgx$,
+\begin{align}
+\notag
+& (\rho/2)||G(\vgx,\vgz) + u^k||_2^2\\
+& = (\rho/2)(\vmx \cdot \vgx - \vmz \cdot \vgz + u^k)^2\\
+& = \frac{1}{2} (\vgx)^T P_G \vgx + \vq_G \cdot \vgx + \ldots.
+\end{align}
+This quadratic form for $\vgx$ has the parameters,
+\begin{align}
+P^{(0)}_G = & \rho \vmx (\vmx)^T\\
+q^{(0)}_G = & \rho (u^k - \vmz \cdot \vgz ) \vmx.
+\end{align}
+
+When solving for $\vgz$, we have,
+\begin{align}
+& (\rho/2)||G(\vgx,\vgz) + u^k||_2^2\\
+& = (\rho/2)(\vmx \cdot \vgx - \vmz \cdot \vgz + u^k)^2\\
+& = \frac{1}{2} (\vgz)^T P^{(1)}_G \vgz + \vq^{(1)}_G \cdot \vgz + \ldots,
+\end{align}
+so that,
+\begin{align}
+P^{(1)}_G = & \rho \vmz (\vmz)^T\\
+q^{(1)}_G = & -\rho(u^k + \vmx \cdot \vgx)\vmz\\
+= & \rho(-u^k - \vmx \cdot \vgx)\vmz,
+\end{align}
+meaning that we can use the same code, but plug in $-u^k$ instead of $u^k$.
+
+\newcommand{\Px}{\ensuremath P^{(0)}}
+\newcommand{\qx}{\ensuremath q^{(0)}}
+\newcommand{\Pz}{\ensuremath P^{(1)}}
+\newcommand{\qz}{\ensuremath q^{(1)}}
+
+\subsubsection{Unconstrained solution}
+The augmented Lagrangian for $\vgx$ can be written as,
+\begin{align}
+J(\vgx) = & \frac{1}{2} (\vgx)^T \Px \vgx + \qx \cdot \vgx + r
+\label{eq:augmented-lagrangian}
+\\
+\Px = & \Px_{\text{diag}} + \Px_{\text{low-rank}}\\
+\Px_{\text{Diag}} = & \text{Diag}\left(s^2 \left[ \sum_{\jinlex} \mu_j \gamma_j \right] \vmx \odot \vmx\right)\\
+\Px_{\text{Low-rank}} = & (s^2 (\sum_{\jinlex} \mu_j^2 \gamma_j^2)  + \rho) \vmx (\vmx)^T \\
+%= & BB^T\\
+%B \triangleq & \left[s (\sum_{\jinlex} \mu_j^2 \gamma_j^2)^{\frac{1}{2}}, \sqrt{\rho}\right] \otimes \vmx\\
+\notag
+\qx = & s (\sum_{\jinlex} \mu_j \gamma_j) (\vec{r}^{(0)} \odot \vmx) \\
+\notag  & + s (\sum_{\jinlex} r_j \mu_j \gamma_j) \vmx \\
+& + \rho (u^k - \vmz \cdot \vgz ) \vmx
+\end{align}
+Ignoring the constraint set $\set{C}_x$, the solution for $\vgx$ is given by,
+%\begin{small}
+\begin{align}
+%\notag
+%\tilde{\vg}^{(0)} = \argmin{\vgx} &  F(\vgx,\vgz) \\
+% & + (\rho/2)||\vmx \cdot \vgx - \vmz \cdot \vgz + u||_2^2\\
+\vg^{(0)} \gets & -(\Px_{\text{diag}} + \Px_{\text{low-rank}})^{-1} \qx.
+\label{eq:unconstrained-solution}
+\end{align}
+%\end{small}
+The solution can be computed using the Woodbury identity.
+
+\begin{algorithm}[t!]
+\begin{algorithmic}
+\While{global primal and dual residuals are above threshold}
+\State{$\Px,\qx \gets \text{ComputeQuadraticForm}(\vgx,\vgz,u)$}
+\State{$a \gets 0, v \gets 0$}
+\While{local primal and dual residuals are above threshold}
+\State{$\vgx \gets (\Px + \rho_2 \mathbb{I})^{-1}(\qx + \rho_2 (v - a))$}
+\State{$a \gets \Pi_{\set{C}_x}(\vgx + v)$}
+\State{$v \gets v+ \vgx - a$}
+\EndWhile
+\State{$\vgx \gets \Pi_{\set{C}_x}(\vgx)$}
+\State{$\Pz,\qz \gets \text{ComputeQuadraticForm}(\vgz,\vgx,-u)$}
+\State{$b \gets 0, w \gets 0$}
+\While{local primal and dual residuals are above threshold}
+\State{$\vgz \gets (\Pz + \rho_2 \mathbb{I})^{-1}(\qz + \rho_2 (w - b))$}
+\State{$b \gets \Pi_{\set{C}_z}(\vgz + w)$}
+\State{$w \gets w + \vgz - b$}
+\EndWhile
+\State{$\vgz \gets \Pi_{\set{C}_z}(\vgz)$}
+\State{$u \gets u + \vmx \cdot \vgx - \vmz \cdot \vgz$}
+\EndWhile
+\end{algorithmic}
+\caption{ADMM optimization for unsupervised lexicon-based classification}
+\label{alg:optimization}
+\end{algorithm}
+
+\subsubsection{Constrained solution}
+Each update to $\vgx$ and $\vgz$ must lie within the constraint sets $\set{C}_x$ and $\set{C}_z$. One way to ensure this is to apply boundary-constrained L-BFGS to the augmented Lagrangian in \autoref{eq:augmented-lagrangian}. This solution requires the gradient, which is simply $P \vgx + \qx$. A slightly faster (and more general) solution is to apply ADMM again, using the following iterative updates (Boyd et al. 2011, page 33):
+\begin{small}
+\begin{align}
+%\vgx = & \argmin{\vg} J_0(\vg) + (\rho_2 /2) ||\vg - a + v||_2^2 \\
+\vgx \gets & -(\Px_{\text{diag}} + \Px_{\text{low-rank}} + \rho_2 \mathbb{I})^{-1} (\qx + \rho_2(v-a))\\
+a \gets & \Pi_{\set{C}_x}(\vgx)\\
+v \gets & v + \vgx - a,
+\end{align}
+\end{small}
+where $\Pi_{\set{C}_x}$ projects on to the set $\set{C}_x$, and $v$ is an additional dual variable. This requires only a minor change to the quadratic solution in \autoref{eq:unconstrained-solution}: we add $\rho_2$ to the diagonal of $P$, and we add $\rho_2 (v - a)$ to the vector $q$. 
+
+The overall algorithm is listed in \autoref{alg:optimization}. Each loop terminates when the primal and dual residuals fall below a threshold (Boyd et al 2011, pages 19-20). We also use these residuals to dynamically adapt the penalties $\rho$ and $\rho_2$ (Boyd et al 2011, pages 20-21).

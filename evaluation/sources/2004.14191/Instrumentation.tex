@@ -1,0 +1,202 @@
+
+%-------------------------------------------------------------------------------
+\section{Static Instrumentation}
+\label{sec:instrumentation}
+%-------------------------------------------------------------------------------
+In this section, we first consider a strategy to reduce instrumentation overhead by carefully selecting a basic block to probe in a superblock.
+Then, we discuss handling short basic blocks by means of hosting their detours in larger neighboring basic blocks.
+
+\subsection{Optimized Probe Selection}
+\label{sec:optimized-probe}
+
+
+Generally, probing a BB requires inserting a detour targeting its designated trampoline.
+A detour occupies 5 bytes and can either be a direct \texttt{jmp} or \texttt{call}.
+Consequently, one or more original instructions must be relocated to the trampoline.
+This \textit{relocation} overhead varies due to the instruction-size variability in x86-64.
+Note that a pc-relative \texttt{mov}, which occupies 7 bytes, represents an unavoidable
+overhead for updating coverage data in each trampoline.
+Hence, our goal is to reduce the relocation overhead.
+
+To this end, we iterate over all BBs in a superblock and select the one expected to incur the lowest overhead.
+First, we have to establish whether a detour can be accommodated in the first place.
+A BB that satisfies $s + p < 5 $ is considered a \textsf{guest}, where $s$ and $p$ are the byte size and padding size respectively.
+A superblock that contains only \textsf{guest} BBs is handled via detour hosting (\S\ref{sec:detour-hosting}).
+Now we examine the type and size of the last instruction of each BB and whether the BB is targeted by a jump table.
+These parameters are translated to the types depicted in Table~\ref{tab:probe-overhead}.
+These BB types are organized in a total order.
+This means, for example, we strictly prefer a \textsf{long-call} over a \textsf{long-cond} should both exist in the same superblock.
+This type order is primarily derived from empirical observation.
+However, we did not necessarily experiment with all possible combinations.
+Preferring \textsf{long-call} over \textsf{short-call} should be intuitive.
+The latter incurs an additional overhead for relocating at least one instruction preceding the \texttt{call}.
+
+\begin{table}[t!]
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \setlength\tabcolsep{4pt}
+    \small
+    %    \renewcommand{\arraystretch}{1}
+    \caption{BB classification used in probe selection. Types are shown in ascending order based on expected relocation overhead. 
+    The terms \textit{long} and \textit{short }are relative to detour size (5 bytes).
+    Short types require relocating preceeding (RP) instruction(s).
+    } 
+    \label{tab:probe-overhead}    
+    \begin{tabularx}{\columnwidth}{@{}lll@{}}
+        \\
+        \textbf{Type} &
+        \textbf{RP} &
+        \textbf{Relocation overhead} \\
+        
+        \toprule
+        
+        \textsf{return} & maybe & Can be only 1 byte depending on the padding \\
+        \textsf{long-jump} & no & Size of \texttt{jmp} instruction which is $ \ge $ 5 bytes \\
+        \textsf{long-call} & no & Size of \texttt{call} instruction which is $ \ge $ 5 bytes  \\
+        \textsf{jump-tab} & no & Size of \texttt{jmp} instruction to original code (5 bytes)  \\
+        \textsf{short-call} & yes & Similar to \textsf{long-call} but with RP overhead added \\
+        \textsf{short-jump} & yes &Similar to \textsf{long-jump} but with RP overhead added\\
+        \textsf{internal} & maybe & Size of relocated instruction(s) inside the BB \\
+        \textsf{long-cond} & no & Rewriting incurs a fixed 11 byte overhead\\
+        \textsf{short-cond} & yes & Similar to \textsf{long-cond} but with RP overhead added\\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+
+%\input{instrumentation-table.tex}
+
+
+We observed that \textsf{return} basic blocks are usually padded (55\% on average).
+Padding size is often more than 3 bytes which translates to a relocation overhead of only one byte - the size of a  \texttt{ret} instruction.
+Also, favoring \textsf{long-jmp} over \textsf{long-call} provided around 3\% improvement in both relocation and performance overheads.
+On the other hand, \textsf{short-call} had only a slight advantage over \textsf{short-jmp}.
+This might be due to the fixed 2-byte size of the latter, which leads to relocating more instructions.
+However, our experiments were not always conclusive, e.g., between \textsf{jump-tab} and \textsf{short-call}.
+
+Relocating an instruction depends on its relation to the PC (called \textsf{rip} in x86-64).
+Position-independent instructions can simply be copied to the trampoline.
+However, we had to develop a custom rewriter for position-dependent instructions.
+The rewriter preserves the exact semantics of the original instruction whether it explicitly or implicitly depends on \texttt{rip}. 
+For example, a \textsf{long-cond} instruction will be rewritten in the trampoline to a matching sequence consisting of a \textsf{long-cond} (6 bytes) and a \textsf{jmp} (5 bytes).
+
+Jump table instrumentation has the unique property of preserving the original code.
+It is a data-only mechanism that enables us to probe even one-byte BBs.
+However, for it to be applicable, a BB has to be targeted by a \textit{patchable} jump table.
+A jump table is patchable if its entries are either 32-bit offsets or absolute addresses.
+We observed that about 92\% of more than 46,000 jump tables in our dataset are patchable.
+In fact, we found that 8-bit and 16-bit offsets are only used in \texttt{libopencv\_core}.
+
+
+Finally, our probe selection strategy is effective in reducing relocation overhead.
+However, it is not necessarily optimal.
+We observed high variance in the padding of BBs of type \textsf{return}, i.e., \textsf{return} is not always the best choice.
+Also, instrumenting a loop head can unnecessarily trigger multiple coverage updates. A loop-aware strategy might reduce performance overhead by choosing a BB outside the loop as an alternative. Such optimizations are left for future work.
+
+\subsection{Detour Hosting}
+\label{sec:detour-hosting}
+
+The instruction-size variability in x86-64 suggests that some BBs are simply too short to safely insert a detour without overwriting other BBs.
+In our dataset, we found that about 7\% of all BBs are short (size < 5 bytes).
+Left without a probe, we risk losing coverage information of a particular short BB and, potentially, all of its dominators.
+One possible solution is to relocate the entire function to a larger memory area.
+However, this is costly in terms of code size and the engineering effort required to fix relocated code references.
+For example, throwing an exception from a relocated function without fixing its corresponding CFI record might lead to abrupt process termination.
+
+
+The method adopted in {\bcov} is \textit{detour hosting}.
+It significantly reduces the relocation overhead while preserving the stability of code references at basic-block level.
+Here, the size of a guest BB needs to be at least 2 bytes, which is enough to insert a short detour targeting a reachable host BB, i.e., within about $\pm$128 bytes.
+The host BB must be large enough to accommodate two regular detours, i.e., at least 10 bytes.
+The first detour targets the host trampoline while the other detours would target the trampolines of their respective guests.
+Note that we can safely overwrite padding bytes of both the guest and host.
+Also, the host does not need to be entirely relocated.
+Relocating a subset of its instructions might be sufficient.
+
+
+Figure~\ref{fig:detour-hosting} depicts a detour hosting example.
+It involves a guest BB consisting of a single indirect \textsf{call} (3 bytes).
+The tricky part about a \textsf{call} is that its return address must be preserved.
+A \texttt{sub} instruction (5 bytes) is used to adjust the return address in the trampoline from \texttt{0xad67fd} to its original value of \texttt{0xad6803}.
+This adjustment also clobbers the CPU flags which is safe since they are not preserved across function calls in the x86-64 ABI.
+Note that this is the only case where we modify the CPU state.
+
+Now we have the following allocation problem: given a guest $g$ and a set of suitable hosts $H=\{h_1,h_2,..,h_n\}$, find the host $h_i$ whose selection incurs minimal overhead.
+Also, we are interested in the more general formulation: given a set of guests $G=\{g_1,g_2,..,g_k\}$ and a set of hosts $H=\{h_1,h_2,..,h_n\}$, where each host is suitable for at least one guest, find a function mapping $M:G\rightarrow H$ such that the overhead is minimal.
+We approach this problem using a greedy strategy where we prefer, in this order,
+(1)~packing more guests in a single host,
+(2)~a host already selected for instrumentation over an otherwise intact host,
+(3)~a host that is closer to the guest.
+Basically, for each guest, we iterate over all reachable BBs.
+A BB can offer a hosting offset, if possible.
+A higher offset means that more guests are packed in this host.
+The initial offset is 5 bytes from the start of the host.
+Should the offered offsets be equal, we look into (2) to avoid, as much as possible, relocating otherwise intact BBs.
+Finally, should both (1) and (2) be equal, then we look into (3) to improve the code cache locality.
+
+It is not possible to probe one-byte guests.
+Also, a suitable host might not be found.
+However, we can still reduce the loss in coverage information in such cases.
+To this end, we try to probe all of the immediate predecessors of the current SB, containing the guest, in the SB-DG.
+However, this does not necessarily entail adding more probes.
+For example, additional probes are unnecessary in the leaf-node policy should the current SB have siblings in the SB-DG.
+In the any-node policy, on the other hand, the predecessors might be probed already.
+
+Our detour hosting strategy targets a sweet spot balancing performance and relocation overheads.
+It achieves a hosting ratio of 1.2 guests per host on average.
+Also, it was able of hosting up to 14 guests in a single host.
+Around 80\% of the hosts are already probed. 
+That is, relocation overhead is expected for them anyway.
+Finally, it allowed {\bcov} to host about 94\% of all the guests.
+
+% clip, left, bottom, right, top
+\begin{figure}[t!]
+	\centering
+	\vspace{-4pt}
+	\begin{subfigure}[t]{\columnwidth}
+\begin{lstlisting}[style=custom-x64]
+ad67f3: jmp   ad6803
+ad67f5: nop   [multi-byte]
+ad6800: call  QWORD PTR [rax+0x58]
+\end{lstlisting}
+		\vspace{-4pt}
+		\caption{original code}
+		\label{fig:5:original}
+	\end{subfigure}
+	\begin{subfigure}[t]{\columnwidth}
+\begin{lstlisting}[style=custom-x64]
+ad67f3: jmp   1d31afa  ; jump to relocated host
+ad67f8: call  1d31b39  ; hosted detour
+ad67fd: nop   DOWRD PTR [rax]
+ad6800: jmp   ad67f8   ; jump to hosted detour
+\end{lstlisting}
+		\vspace{-4pt}
+		\caption{patched code}
+		\label{fig:5:patch}
+	\end{subfigure}
+	\hfill
+	\begin{subfigure}[t]{\columnwidth}
+		\vspace{-4pt}
+\begin{lstlisting}[style=custom-x64]
+1d31b39: mov  BYTE PTR [rip+0x4f8d01],1
+1d31b40: sub  QWORD PTR [rsp], -6
+1d31b45: jmp  QWORD PTR [rax + 0x58]
+\end{lstlisting}
+		\vspace{-4pt}
+		\caption{trampoline}
+		\label{fig:5:guest-trampoline}
+	\end{subfigure}
+	
+	\caption{Detour hosting example taken from \textsf{llc} v8.0 compiled with \textsf{clang} v5.0.
+		\textbf{(a)} host is a short \texttt{jmp} at \texttt{0xad67f3} followed by 11 padding bytes.
+		\textbf{(b)} inserting 2 detours leaves 3 padding bytes.
+		\textbf{(c)} return address adjusted at \texttt{0x1d31b40}. Original \texttt{call} at \texttt{0xad6800} is rewritten to a matching \textsf{jmp} at \texttt{0x1d31b45}}
+    \Description{Detour hosting example taken from llc v8.0 compiled with clang v5.0.}
+	\label{fig:detour-hosting}
+\end{figure}
+
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "binder"
+%%% End:

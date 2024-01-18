@@ -1,0 +1,270 @@
+Given $m$ groups of $n_{j}$ exchangeable data points $X_{j,i}$ where $1 
+\leq j \leq m, 1 \leq i \leq n_{j}$, i.e., data are presented in a two-level grouping structure, 
+our goal is to learn about the two-level clustering structure of the data. We want
+to obtain simultaneously local clusters for each data group, and global clusters among all groups. 
+
+\subsection{Multilevel Wasserstein Means (MWM) Algorithm} \label{Section:multilevel_kmeans}
+For any $j=1,\ldots, m$, we denote the empirical measure for group $j$ by $P_{n_{j}}
+^{j}:=\dfrac{1}{n_{j}}\sum \limits_{i=1}^{n_{j}}{\delta_{X_{j,i}}}$. Throughout 
+this section, for simplicity of exposition we assume that the number of 
+both local and global clusters are either known or bounded above by a given number. In 
+particular, for local clustering we allow group $j$ to have at most $k_{j}$ clusters 
+for $j=1,\ldots, m$. For global clustering, we assume to have $M$ group (Wasserstein) means
+among the $m$ given groups.
+
+ %Note that, the assumption of having exactly $M$ groups of global 
+%clustering is purely for convenience of inference purposes with our models later. We can 
+%easily extend our models to the setting when we have at most $M\leq m$ groups means among $m
+%$ groups. 
+\paragraph{High level idea}
+For local clustering, for each $j = 1,\ldots, m$,
+performing a K-means clustering for group $j$, as expressed by
+\eqref{eqn:Wasserstein_K_means}, can be viewed as finding a finite discrete measure $G_{j} 
+\in \mathcal{O}_{k_{j}}(\Theta)$ that minimizes squared Wasserstein distance $W_{2}^{2}
+(G_{j},P_{n_{j}}^{j})$. For global clustering, we are interested in 
+obtaining clusters out of $m$ groups, each of which is now represented by the
+discrete measure $G_j$, for $j=1,\ldots,m$. 
+Adopting again the viewpoint of Eq.~\eqref{eqn:Wasserstein_K_means}, 
+provided that all of $G_{j}$s are given, we can apply $K$-means quantization method 
+to find their distributional clusters. The global clustering in the
+space of measures of measures on $\Theta$ can be succintly expressed by
+\vspace{-6pt}
+\begin{eqnarray}
+\mathop {\inf }\limits_{\mathcal{H} \in \mathcal{E}_{M}(\mathcal{P}_{2}(\Theta))}{W_{2}^{2}\biggr(
+\mathcal{H},\dfrac{1}{m}\sum \limits_{j=1}^{m}{\delta_{G_{j}}}\biggr)}. \nonumber
+\end{eqnarray}
+%
+However, $G_{j}$ are not known --- they have to be optimized through local clustering in 
+each data group.
+\paragraph{MWM problem formulation} We have arrived at an objective function for jointly
+optimizing over both local and global clusters
+\vspace{-6pt}
+\begin{eqnarray}
+\mathop {\inf }\limits_{\substack {G_{j} \in \mathcal{O}_{k_{j}}(\Theta), \\\mathcal{H} \in 
+\mathcal{E}_{M}(\mathcal{P}_{2}(\Theta))}}{\mathop {\sum }\limits_{j=1}^{m}{W_{2}
+^{2}(G_{j},P_{n_{j}}^{j})}}
++ W_{2}^{2}(\mathcal{H},\dfrac{1}{m}\mathop {\sum }\limits_{j=1}^{m}{\delta_{G_{j}}}). \label{eqn:multilevel_Kmeans_typeone}
+\end{eqnarray}
+
+We call the above optimization the problem of \emph{Multilevel Wasserstein Means (MWM)}. 
+The notable feature of MWM is that its loss function consists of two types of distances 
+associated with the hierarchical data structure:
+one is distance in the space of measures, e.g., $W_{2}^{2}(G_{j},P_{n_{j}}^{j})$, 
+and the other in space of measures of measures, e.g., 
+$W_{2}^{2}(\mathcal{H},\dfrac{1}{m}\mathop {\sum }\limits_{j=1}^{m}{\delta_{G_{j}}})$. By 
+adopting K-means optimization to both local and global clustering, the multilevel Wasserstein means 
+problem might look formidable at the first sight. 
+%It is quite
+%clear from the formulation of multilevel Wasserstein means that this is not a convex problem.
+Fortunately, it is possible to simplify this original formulation substantially,
+by exploiting the structure of $\Hcal$.
+%we can develop an efficient algorithm of finding local optimal solutions to the
+%multilevel Wasserstein means problem based on finding suitable Wasserstein barycenters. 
+
+Indeed, we can show that formulation \eqref{eqn:multilevel_Kmeans_typeone} is
+equivalent to the following optimization problem, which looks much simpler as
+it involves only measures on $\Theta$:
+\begin{eqnarray}
+\mathop {\inf }\limits_{G_{j} \in \mathcal{O}_{k_{j}}(\Theta), \Hbold}
+%H_1,\ldots, H_M \in \mathcal{P}_2(\Theta)}}
+{\mathop {\sum }\limits_{j=1}^{m}{W_{2}^{2}(G_{j},P_{n_{j}}^{j})}+\dfrac{d_{W_{2}}^{2}(G_{j},\Hbold)}{m}} \label{eqn:multilevel_K_means_typeone_first}
+\end{eqnarray}
+where $d_{W_{2}}^{2}(G,\Hbold) := \mathop {\min } \limits_{1 \leq i \leq M}{W_{2}^{2}(G,H_{i})}$ and $\Hbold=(H_{1},\ldots,H_{M})$,
+with each $H_i \in \mathcal{P}_2(\Theta)$. The proof of this 
+equivalence is deferred to Proposition \ref{lemma:equivalence_multilevels_Kmeans} in the Supplement. 
+Before going into to the details of the algorithm for solving 
+\eqref{eqn:multilevel_K_means_typeone_first}
+in Section \ref{Section:mwm_algorithm}, we shall present some simpler cases,
+which help to illustrate some properties of the optimal solutions of 
+\eqref{eqn:multilevel_K_means_typeone_first},
+while providing insights of subsequent developments of the MWM formulation.
+Readers may proceed directly to Section \ref{Section:mwm_algorithm} 
+for the description of the algorithm in the first reading.
+%
+%
+%
+%
+\subsubsection{Properties of MWM in special cases} \label{Section:mwm_specical_cases}
+\paragraph{Example 1.} Suppose $k_{j}=1$ and $n_{j}=n$ for all $1 \leq j \leq m$, and $M=1$. Write
+$\Hbold = H \in \mathcal{P}_2(\Theta)$. Under 
+this setting, the objective function \eqref{eqn:multilevel_K_means_typeone_first} can be 
+rewritten as
+\begin{eqnarray}
+\mathop {\inf }\limits_{\substack {\theta_{j} \in \Theta, \\ H \in \mathcal{P}_{2}(\Theta)}}{\sum \limits_{j=1}^{m}{\sum \limits_{i=1}^{n}{\|\theta_{j}-X_{j,i}\|^{2}}}}
++W_{2}^{2}(\delta_{\theta_{j}},H)/m, \label{eqn:special_case_multilevel_Kmeans_one} 
+\end{eqnarray}
+where $G_{j}=\delta_{\theta_{j}}$ for any $1 \leq j \leq m$. From the result of Theorem 
+A.1 in the Supplement, %\ref{theorem:upperbound_barycenter}, 
+\vspace{-6pt}
+\begin{eqnarray}
+\mathop {\inf } \limits_{\theta_{j} \in \Theta}{\sum \limits_{j=1}^{m}{W_{2}^{2}(\delta_{\theta_{j}},H)}} & \geq & \mathop {\inf }\limits_{H \in \mathcal{E}_{1}(\Theta)}{\sum \limits_{j=1}^{m}{W_{2}^{2}(G_{j},H)}} \nonumber \\
+& = & \sum \limits_{j=1}^{m}{\|\theta_{j}-(\sum \limits_{i=1}^{m}{\theta_{i}})/m\|^{2}}, \nonumber
+\end{eqnarray}
+%where the infimum in the first term ranges over $H \in \mathcal{P}_{2}(\Theta)$ while the 
+where second infimum is achieved when $H=\delta_{(\sum \limits_{j=1}^{m}{\theta_{j}})/m}$. 
+Thus, objective function \eqref{eqn:special_case_multilevel_Kmeans_one} may
+be rewritten as
+\vspace{-6pt}
+\begin{eqnarray}
+\mathop {\inf }\limits_{\theta_{j} \in \Theta}{\sum \limits_{j=1}^{m}{\sum \limits_{i=1}^{n}{\|\theta_{j}-X_{j,i}\|^{2}}}} +\| m\theta_{j}-(\sum \limits_{l=1}^{m}{\theta_{l}})\|^{2}/m^{3}. \nonumber
+\end{eqnarray}
+Write $\overline{X}_{j}=(\sum \limits_{i=1}^{n}{X_{j,i}})/n$ for all $1 \leq j \leq m$. 
+As $m \geq 2$, we can check that the unique optimal solutions for the above optimization 
+problem are $\theta_{j}=\biggr((m^2n+1)\overline{X}_{j}+\sum \limits_{i \neq j}
+{\overline{X}_{i}}\biggr)/(m^{2}n+m)$ for any $1 \leq j \leq m$. If we further assume that 
+our data $X_{j,i}$ are i.i.d samples from probability measure $P^{j}$ having mean $\mu_{j}
+=E_{X \sim P^{j}}(X)$ for any $1 \leq j \leq m$, the previous result implies that $\theta_{i} 
+\not \to \theta_{j}$ for almost surely as long as $\mu_{i} \neq \mu_{j}$. As a 
+consequence, if $\mu_{j}$ are pairwise different, the multi-level Wasserstein means under 
+that simple scenario of \eqref{eqn:multilevel_K_means_typeone_first} will not have identical 
+centers among local groups. 
+
+On the other hand, we have $W_{2}^{2}(G_{i},G_{j})=\|\theta_{i}-\theta_{j}\|^{2}=
+\biggr(\dfrac{mn}{mn+1}\biggr)^{2}\|\overline{X}_{i}-\overline{X}_{j}\|^{2}$. Now, 
+from the definition of Wasserstein distance
+\vspace{-6pt}
+\begin{eqnarray}
+W_{2}^{2}(P_{n}^{i},P_{n}^{j}) & = & \mathop {\min }\limits_{\sigma}{\dfrac{1}{n}\sum \limits_{l=1}^{n}{\|X_{i,l}-X_{j,\sigma(l)}\|^{2}}} \nonumber \\
+& \geq & \|\overline{X}_{i}-\overline{X}_{j}\|^{2}, \nonumber
+\end{eqnarray}
+where $\sigma$ in the above sum varies over all the permutation of $\left\{1,2,\ldots,n
+\right\}$ and the second inequality is due to Cauchy-Schwarz's inequality. It implies that as 
+long as $W_{2}^{2}(P_{n}^{i},P_{n}^{j})$ is small, the optimal solution $G_{i}$ and $G_{j}
+$ of \eqref{eqn:special_case_multilevel_Kmeans_one} will be sufficiently close to each 
+other. By letting $n \to \infty$, we also achieve the same conclusion regarding the 
+asymptotic behavior of $G_{i}$ and $G_{j}$ with respect to $W_2(P^{i},P^{j})$.
+
+%
+%
+%
+\paragraph{Example 2.} $k_{j}=1$ and $n_{j}=n$ for all $1 \leq  j \leq m$ and $M=2$. 
+Write $\Hbold = (H_1,H_2)$.
+Moreover, assume that there is a strict subset A of $\left\{1,2,\ldots,m\right\}$ 
+such that 
+\vspace{-6pt}
+\begin{eqnarray}
+& & \mathop {\max }\biggr\{\mathop {\max }\limits_{i, j \in A}{W_{2}(P_{n}^{i},P_{n}^{j})}, \nonumber \\
+& & \mathop {\max }\limits_{i, j \in A^{c}}{W_{2}(P_{n}^{i},P_{n}^{j})}\biggr\} \ll \mathop {\min }\limits_{i \in A, j \in A^{c}}{W_{2}(P_{n}^{i},P_{n}^{j})}, \nonumber 
+\end{eqnarray}
+i.e., the distances of empirical measures $P_{n}^{i}$ and $P_{n}^{j}$ when $i$ and $j$ 
+belong to the same set $A$ or $A^{c}$ are much less than those when $i$ and $j$ do not 
+belong to the same set. Under this condition, by using the argument from part (i) we can write 
+the objective function \eqref{eqn:multilevel_K_means_typeone_first} as 
+\vspace{-6pt}
+\begin{eqnarray}
+\mathop {\inf }\limits_{\substack {\theta_{j} \in \Theta, \\ H_{1} \in \mathcal{P}_{2}(\Theta)}}{\sum \limits_{j \in A}{\sum \limits_{i=1}^{n}{\|\theta_{j}-X_{j,i}\|^{2}}}+\dfrac{W_{2}^{2}(\delta_{\theta_{j}},H_{1})}{|A|}}+ \nonumber \\ 
+\mathop {\inf }\limits_{\substack {\theta_{j} \in \Theta, \\ H_{2} \in \mathcal{P}_{2}(\Theta)}}{\sum \limits_{j \in A^{c}}{\sum \limits_{i=1}^{n}{\|\theta_{j}-X_{j,i}\|^{2}}}+\dfrac{W_{2}^{2}(\delta_{\theta_{j}},H_{2})}{|A^{c}|}}. \nonumber
+\end{eqnarray}
+The above objective function suggests that the optimal solutions $\theta_{i}$, $\theta_{j}$ 
+(equivalently, $G_{i}$ and $G_{j}$) will not be close to each other as long as $i$ and 
+$j$ do not belong to the same set $A$ or $A^{c}$, i.e., $P_{n}^{i}$ and $P_{n}^{j}$ are 
+very far. Therefore, the two groups of ``local'' measures $G_{j}$ do not share atoms under that 
+setting of empirical measures.
+
+The examples examined above indicate that the MWM problem in general
+do not ``encourage'' the local measures $G_{j}$ to share atoms among each other in its solution. Additionally, 
+when the empirical measures of local groups are very close, it may also suggest that they 
+belong to the same cluster and the distances among optimal local measures $G_{j}$ can be 
+very small. 
+
+\subsubsection{Algorithm Description} \label{Section:mwm_algorithm}
+Now we are ready to describe our algorithm in the general case. This is
+a procedure for finding a local minimum of Problem \eqref{eqn:multilevel_K_means_typeone_first} and
+is summarized in Algorithm \ref{alg:multilevels_Wasserstein_means}. 
+\begin{algorithm}[tb]
+   \caption{Multilevel Wasserstein Means (MWM)}
+   \label{alg:multilevels_Wasserstein_means}
+\begin{algorithmic}
+   \STATE {\bfseries Input:} Data $X_{j,i}$, Parameters $k_{j}$, $M$.
+   \STATE {\bfseries Output:} prob. measures $G_{j}$ and elements $H_{i}$ of $\Hbold$.
+   \STATE Initialize measures $G_{j}^{(0)}$, elements $H_{i}^{(0)}$ of $\Hbold^{(0)}$, $t=0$.
+   \WHILE{$Y_{j}^{(t)}, b_{j}^{(t)}, H_{i}^{(t)}$ have not converged}
+   \STATE 1. Update $Y_{j}^{(t)}$ and $b_{j}^{(t)}$ for $1 \leq j \leq m$:
+   \FOR{$j=1$ {\bfseries to} $m$}
+   \STATE $i_{j} \leftarrow \mathop {\arg \min}\limits_{1 \leq u \leq M}{W_{2}^{2}(G_{j}^{(t)},H_{u}^{(t)})}$.
+   \STATE $G_{j}^{(t+1)} \leftarrow \mathop {\arg \min }\limits_{G_{j} \in \mathcal{O}_{k_{j}}(\Theta)}{W_{2}^{2}(G_{j},P_{n_{j}}^{j})}+$\\$+W_{2}^{2}(G_{j},H_{i_{j}}^{(t)})/m$.
+   \ENDFOR
+   \STATE 2. Update $H_{i}^{(t)}$ for $1 \leq i \leq M$:
+   \FOR{$j=1$ {\bfseries to} $m$}
+   \STATE $i_{j} \leftarrow \mathop {\arg \min}\limits_{1 \leq u \leq M}{W_{2}^{2}(G_{j}^{(t+1)},H_{u}^{(t)})}$.
+   \ENDFOR
+   \FOR{$i=1$ {\bfseries to} $M$}
+   \STATE $C_{i} \leftarrow \left\{l: i_{l}=i\right\}$ for $1 \leq i \leq M$.
+   \STATE $H_{i}^{(t+1)} \leftarrow \mathop {\arg \min }\limits_{H_{i} \in \mathcal{P}_{2}(\Theta)}{\sum \limits_{l \in C_{i}}{W_{2}^{2}(H_{i}, G_{l}^{(t+1)})}}$.
+   \ENDFOR
+   \STATE 3. $t \leftarrow t+1$.
+   \ENDWHILE
+\end{algorithmic}
+\end{algorithm}
+We prepare the following details regarding the initialization and updating steps required by
+the algorithm: 
+\begin{itemize}
+\item The initialization of local measures $G_{j}^{(0)}$ (i.e., the initialization of their atoms and weights) can be 
+obtained by performing $K$-means clustering on local data $X_{j,i}$ for $1 \leq j \leq m$.
+The initialization of elements $H_{i}^{(0)}$ of $H^{(0)}$ is based on 
+a simple extension of the K-means algorithm. Details are given in Algorithm \ref{alg:three_stages_K_means} in the Supplement;
+\item The updates $G_{j}
+^{(t+1)}$ can be computed efficiently by simply using algorithms from \cite{Cuturi-2014} 
+to search for local solutions of these barycenter problems within the space $\mathcal{O}
+_{k_{j}}(\Theta)$ from the atoms and weights of 
+$G_{j}^{(t)}$; 
+\item Since all $G_{j}^{(t+1)}$ are finite discrete 
+measures, finding the updates for $H_{i}^{(t+1)}$ over the whole space $\mathcal{P}_{2}
+(\Theta)$ can be reduced to searching for a local solution within space $\mathcal{O}
+_{l^{(t)}}$ where $l^{(t)}=\sum \limits_{j \in C_{i}}{|\text{supp}(G_{j}^{(t+1)})|}-|C_{i}|$ from the global atoms $H_{i}^{(t)}$ of $\Hbold^{(t)}$
+(Justification of this reduction is derived from Theorem \ref{theorem:upperbound_barycenter} in the Supplement). 
+This again can be done by utilizing algorithms from \cite{Cuturi-2014}. Note that, as $l^{(t)}$ becomes very large when $m$ is large, to speed up the computation of Algorithm 
+\ref{alg:multilevels_Wasserstein_means} we impose a threshold $L$, e.g., $L=10$, for 
+$l^{(t)}$ in its implementation. 
+\end{itemize}
+The following guarantee for Algorithm~\ref{alg:multilevels_Wasserstein_means}
+can be established:
+\begin{theorem}\label{theorem:local_convergence_multilevel_Kmeans}
+Algorithm \ref{alg:multilevels_Wasserstein_means} monotonically decreases the objective 
+function \eqref{eqn:multilevel_Kmeans_typeone} of the MWM formulation.
+\end{theorem}
+\subsection{Multilevel Wasserstein Means with Sharing} \label{Section:constraint_multilevels_Kmeans}
+As we have observed from the analysis of several specific cases,
+the {\bf multilevel Waserstein means} formulation
+may not encourage the sharing components locally among $m$ groups in its solution.
+However, enforced sharing has been demonstrated to be a very useful technique, which
+leads to the ``borrowing of strength'' among different parts of the model, consequentially
+improving the inferential efficiency~\citep{Teh-etal-06,Nguyen-2016}. In this section, 
+we seek to encourage the borrowing of strength among groups by imposing additional
+constraints on the atoms of $G_{1},\ldots,G_{m}$ in the original MWM
+formulation \eqref{eqn:multilevel_Kmeans_typeone}. Denote $\mathcal{A}_{M,
+\mathcal{S}_{K}}=\biggr\{G_{j} \in \mathcal{O}_{K}(\Theta), \ \Hcal \in \mathcal{E}_{M}
+(\mathcal{P}(\Theta)): \text{supp}(G_{j}) \subseteq \mathcal{S}_{K}\ \forall 1 \leq j \leq 
+m \biggr\}$
+for any given $K, M \geq 1$ where the constraint set $\mathcal{S}_{K}$ has exactly $K$ 
+elements. To simplify the exposition, let us assume that $k_{j}=K$ for all $1 
+\leq j \leq m$. Consider the following locally constrained version of the
+multilevel Wasserstein means problem
+\begin{eqnarray}
+\mathop {\inf }{\mathop {\sum }\limits_{j=1}^{m}{W_{2}^{2}(G_{j},P_{n_{j}}^{j})}}
++W_{2}^{2}(\Hcal,\dfrac{1}{m}\mathop {\sum }\limits_{j=1}^{m}{\delta_{G_{j}}}). \label{eqn:local_constraint_multilevels_Kmeans_typeone}
+\end{eqnarray}
+where $\mathcal{S}_{K}, \ G_{j},\Hcal \in \mathcal{A}_{M,\mathcal{S}_{K}}$ in the above infimum. We call the above optimization the problem of \emph{Multilevel Wasserstein Means with Sharing (MWMS)}. The 
+local constraint assumption $\text{supp}(G_{j})\subseteq \mathcal{S}_{K}$ had been 
+utilized previously in the literature --- see for example the work of \citep{Kulis-2012}, 
+who developed an optimization-based approach to the inference of the HDP~\citep{Teh-etal-06},
+which also encourages explicitly the sharing of local group means among local clusters. 
+%The high level idea of this constraint stems from that from model-based approaches 
+%where the atoms of each local measure $G_{j}$ indeed come from a truncated Dirichlet 
+%Process, which enables the borrowing strength among different measures $G_{j}$. 
+Now, we can rewrite objective function 
+\eqref{eqn:local_constraint_multilevels_Kmeans_typeone} as follows
+\vspace{-6pt}
+\begin{eqnarray}
+\mathop {\inf }\limits_{\mathcal{S}_{K},G_{j} , \Hbold \in \mathcal{B}_{M,\mathcal{S}_{K}}}{\mathop {\sum }\limits_{j=1}^{m}{W_{2}^{2}(G_{j},P_{n_{j}}^{j})}+\dfrac{d_{W_{2}}^{2}(G_{j},\Hbold)}{m}} \label{eqn:local_constraint_multilevels_Kmeans_typetwo}
+\end{eqnarray}
+where  $\mathcal{B}_{M,\mathcal{S}_{K}}=\biggr\{G_{j} \in \mathcal{O}_{K}(\Theta), \ \Hbold=(H_{1},\ldots,H_{M}): 
+\text{supp}(G_{j})\subseteq \mathcal{S}_{K}\ \forall 1 \leq j \leq m \biggr\}$. 
+%The proof of this equivalence can be found in the argument of Lemma B.3 in 
+%the Supplement. 
+The high level idea of finding local minimums of objective function \eqref{eqn:local_constraint_multilevels_Kmeans_typetwo} 
+is to first, update the elements of constraint set $\mathcal{S}_{K}$ to provide the 
+supports for local measures $G_{j}$ and then, obtain the weights of these measures as 
+well as the elements of global set $H$ by computing appropriate Wasserstein barycenters. 
+Due to space constraint, the details of these steps of the MWMS Algorithm (Algorithm \ref{alg:local_constraint_multilevels_Wasserstein_means})
+are deferred to the Supplement.

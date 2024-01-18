@@ -1,0 +1,84 @@
+\section{Related work}
+\label{sec:related_work}
+%Boosting has been extensively studied. 
+%We first talk about FWBoost~\citep{wang+:arxiv15}, 
+%sounds related to our work. 
+FWBoost~\citep{wang+:arxiv15} seems to be related to our work.
+FWBoost is a boosting algorithm designed for 
+minimizing a general loss function by the Frank-Wolfe algorithm. 
+Since the Frank-Wolfe algorithm works over the closed convex set, 
+they introduce the $\ell_1$-norm ball constraint. 
+Note that the objective function for 
+the maximization problem~(\ref{eq:soft_margin_maximization}) is 
+not a strongly-smooth function, so 
+one cannot apply the FWBoost directly to guarantee the convergence rate. 
+
+%Now, we talk about the margin maximizing boosting algorithms. 
+%LPBoost~\citep{demiriz+:ml02} is the most practical boosting algorithm. 
+LPBoost~\citep{demiriz+:ml02} is a practical boosting algorithm 
+for solving problem (\ref{eq:soft_margin_maximization}). 
+In each iteration $t$, LPBoost updates its distribution as 
+an optimal solution to problem 
+\begin{align}
+    \label{eq:lpb_update}
+    \min_{\bm{d}}
+        \max_{k \in [t]} (\bm{d}^\top A)_{j_k}
+        + f(\bm d).
+\end{align}
+That is, LPBoost uses an optimal solution to 
+the edge minimization problem over the hypothesis set 
+$\{h_{j_1}, h_{j_2}, \dots, h_{j_t}\} \subset \hset$. 
+LPBoost converges to an $\epsilon$-accurate solution rapidly in practice. 
+However,~\cite{warmuth+:nips07} proved that LPBoost converges 
+in $\Omega(m)$ iterations for the worst case. 
+After that, the stabilized version of LPBoost, 
+ERLPBoost, was invented by~\cite{warmuth+:alt08}. 
+ERLPBoost updates the distribution as the solution of 
+\begin{align}
+    \label{eq:erlpb_update}
+    \min_{\bm{d}}
+        \max_{k \in [t]} (\bm{d}^\top A)_{j_k}
+        + f(\bm d)
+        + \frac 1 \eta \Delta(\bm{d}).
+\end{align}
+Here, $\Delta(\bm{d}) = \sum_{i=1}^m d_i \ln d_i + \ln m$ is 
+the relative entropy 
+from the uniform distribution $\frac 1 m \bm{1} \in \psimplex{m}_{\nu}$. 
+They proved that ERLPBoost finds a solution 
+that achieves~(\ref{eq:boosting_goal}) in 
+$O(\ln (m/\nu) / \epsilon^2)$ iterations. 
+They also demonstrate that ERLPBoost tends to terminate 
+in fewer iterations than LPBoost. 
+The disadvantage of ERLPBoost is its computational complexity; 
+ERLPBoost solves convex programs in each iteration. 
+This disadvantage leads to much more computation time than LPBoost. 
+C-ERLPBoost~\citep{shalev-shwartz+:jml10} 
+is the corrective version of ERLPBoost. 
+This algorithm achieves the same iteration bound 
+with much faster computation per iteration than LPBoost. 
+C-ERLPBoost maintains 
+the weight $\bm{w}_t \in \psimplex{n}$ that only has non-zero values on
+$\{ w_{t, j_1}, w_{t, j_2}, \dots, w_{t, j_t}\}$ 
+corresponding to the past hypotheses 
+$\{h_{j_1}, h_{j_2}, \dots, h_{j_t}\} \subset \hset$.
+C-ERLPBoost updates its distribution over the training instances as 
+\begin{align}
+    \label{eq:cerlpb_update}
+    \bm{d}_t \gets
+    \arg \min_{\bm{d}}
+    \bm{d}^\top A \bm{w}_t + f(\bm{d}) + \frac 1 \eta \Delta(\bm d). 
+\end{align}
+After receiving a hypothesis $h_{j_{t+1}} \in \hset$ 
+with the corresponding basis $\bm{e}_{j+1} \in \psimplex{n}$, 
+C-ERLPBoost updates the weights on hypotheses as 
+$\bm{w}_{t+1} = \bm{w}_t + \lambda (\bm{e}_{j_{t+1}} - \bm{w}_t)$, 
+where $\lambda_t \in [0, 1]$ is some proper value. 
+Although this update rule seems to be a convex program, 
+\cite{shalev-shwartz+:jml10} showed an algorithm 
+that solves~(\ref{eq:cerlpb_update}) in $O(m \ln m)$ time. 
+This algorithm seems better than LPBoost and ERLPBoost. 
+However, \cite{warmuth+:alt08} demonstrated that C-ERLPBoost takes 
+much more iterations than LPBoost and ERLPBoost. 
+Therefore, the overall computation time is worse than LPBoost. 
+
+

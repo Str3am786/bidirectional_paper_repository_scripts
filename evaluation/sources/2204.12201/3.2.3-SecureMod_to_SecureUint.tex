@@ -1,0 +1,24 @@
+\subsubsection{\secmod\ to \secuint{}}\label{sss:secmod2secuint}
+\vspace{-0.2cm}
+Conversion from \secmod\ to \secuint\ is theoretically possible using the expression:
+\vspace{-0.2cm}
+\begin{equation}\label{eq:secmod2secuint}
+    \vspace{-0.1cm}
+    X = \sum_{i=1}^{t-1}(i \cdot \secbool(1 - (x-i)^{t-1}))
+\end{equation}
+where $x$ is the \secmod\ variable to be converted, $t$ is the plaintext modulus and is prime, $i$ is a \secuint\ counter, and $X$ is the resulting \secuint. Due to the properties of modular arithmetic and the parameters used in homomorphic encryption, the exponentiation to $t-1$ results in zero in case the base is zero, and one otherwise. When $i = x$, the expression in the summation results in $i$, while in all other cases it will result in zero, since $1 - (x-i)^{t-1} = 0 \ \forall \ i \ne x$.
+% Breaking down Eq. \ref{eq:secmod2secuint}:
+% \begin{enumerate}
+%     \item The \secuint\ $i$ is automatically cast to \secmod\ in $x-i$ before the exponentiation, resulting in a subtraction between two \secmod{}s.
+%     \item The exponentiation of the \secmod\ $x-i$ to the integer $t-1$ results in a \secmod\ variable containing either the encryption of zero or one.
+%     \item The result of the exponentiation is negated by subtracting it from one. At this point, we have the encryption of one in case $x = i$ and zero otherwise stored in a \secmod\ variable. In order to avoid automatically casting $i$ to \secmod\ in the multiplication, we must first reinterpret the partial result as \secbool.
+%     \item We multiply the \secuint\ $i$ by the \secbool\ value resulting in a \secuint\ equal to $i$ or zero. We remark that a \secbool-\secuint\ multiplication is evaluated as a multiplexer operation.
+%     \item We repeat this process for all $i \in [1,t)$, adding the resulting values. The final result is a \secuint\ equal to $x$ since there is only one $i$ that is equal to $x$.
+% \end{enumerate}
+
+An implementation of the fast exponentiation algorithm is presented in Listing \ref{list:pow}. The number of multiplications is given by $\floor{\log_2{e}} + \omega(e) - 1$ and the multiplicative depth is $\ceil{\log_2{e}}$, where $e$ is the exponent and $\omega(\cdot)$ is a function that calculates the Hamming weight. The conversion from \secmod\ to \secuint\ can exploit this property of the exponentiation to $t-1$ resulting in zero or one to create an equality function, where the equality function is given by $1 - (x-i)^{t-1}$. With this information, we can build a linear search to find the \secuint\ $i$ that is equal to the \secmod\ $x$ using the result of the equality as a selector. Listing \ref{list:secmod2secuint} presents the algorithm that performs this conversion.
+The number of multiplications is given by $t \cdot (s + \floor{\log_2{(t-1)}} + \omega(t-1) - 1)$, while the multiplicative depth is equal to $\ceil{\log_2{(t-1)}} + 1$.
+One can notice that this algorithm is only practical for small plaintext moduli $t$. Once $t$ becomes large, the linear search makes it impractical. Since \secmod\ requires a large $t$ for it to be useful, this conversion should not be used in practice and should be avoided, as later presented and discussed in Section~\ref{ss:conversion}.
+
+\input{list/pow}
+\input{list/SecureMod_to_SecureUint}

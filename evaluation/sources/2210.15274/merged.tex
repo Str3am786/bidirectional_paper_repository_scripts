@@ -1,0 +1,453 @@
+\documentclass{article}
+
+
+% if you need to pass options to natbib, use, e.g.:
+%     \PassOptionsToPackage{numbers, compress}{natbib}
+% before loading neurips_2022
+
+
+% ready for submission
+%\usepackage{neurips_2022}
+
+
+% to compile a preprint version, e.g., for submission to arXiv, add add the
+% [preprint] option:
+%     \usepackage[preprint]{neurips_2022}
+
+
+% to compile a camera-ready version, add the [final] option, e.g.:
+\usepackage[final]{neurips_2022}
+
+
+% to avoid loading the natbib package, add option nonatbib:
+%    \usepackage[nonatbib]{neurips_2022}
+
+
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage{hyperref}       % hyperlinks
+\usepackage{url}            % simple URL typesetting
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{microtype}      % microtypography
+\usepackage{xcolor}         % colors
+\usepackage{cleveref}       % smart cross-referencing
+\usepackage{lipsum}         % Can be removed after putting your text content
+
+\usepackage{multirow}
+\usepackage{subfigure}
+\usepackage{graphicx}
+\usepackage{wrapfig}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+
+\title{Improved Feature Distillation via Projector Ensemble}
+
+
+% The \author macro works with any number of authors. There are two commands
+% used to separate the names and addresses of multiple authors: \And and \AND.
+%
+% Using \And between authors leaves it to LaTeX to determine where to break the
+% lines. Using \AND forces a line break at that point. So, if LaTeX puts 3 of 4
+% authors names on the first line, and the last on the second line, try using
+% \AND instead of \And before the third author name.
+
+\iffalse
+\author{%
+  Yudong Chen \\
+  The University of Queensland\\
+  \texttt{yudong.chen@uq.edu.au} \\
+  % examples of more authors
+  \And
+  Sen Wang \\
+  The University of Queensland \\
+  \texttt{sen.wang@uq.edu.au} \\
+  \AND
+  Jiajun Liu\thanks{Corresponding Author} \\
+  CSIRO \\
+  \texttt{Jiajun.liu@csiro.au} \\
+  \And
+  Xuwei Xu \\
+  The University of Queensland \\
+  \texttt{xuwei.xu@uq.net.au} \\
+  \AND
+  Frank de Hoog \\
+  CSIRO \\
+  \texttt{frank.dehoog@csiro.au} \\
+  \And
+  Zi Huang \\
+  The University of Queensland \\
+  \texttt{huang@itee.uq.edu.au} \\
+}
+\fi
+\author{%
+Yudong Chen$^{1,2}$ \quad Sen Wang$^{1}$\thanks{Corresponding Author} \quad Jiajun Liu$^{2}$$^*$ \quad Xuwei Xu$^{1,2}$ \quad Frank de Hoog$^2$ \quad Zi Huang$^{1}$  \\
+$^1$The University of Queensland \quad $^2$CSIRO Data61\\
+\texttt{\{yudong.chen,sen.wang,xuwei.xu\}@uq.edu.au}\\
+\texttt{\{jiajun.liu,frank.dehoog\}@csiro.au}\\
+\texttt{huang@itee.uq.edu.au}
+}
+
+
+\begin{document}
+
+
+\maketitle
+
+
+\begin{abstract}
+  %Knowledge Distillation (KD) has been widely used to improve the performance of a lightweight network (student) by introducing a large network (teacher) to guide its training. Among the existing KD methods, feature matching-based distillation has shown superior performance by minimizing the discrepancies between student and teacher features. Due to the dimension mismatch between student and teacher features, feature distillation methods usually impose a projector on the student or teacher networks to map features into a common dimensionality during training. 
+  In knowledge distillation, previous feature distillation methods mainly focus on the design of loss functions and the selection of the distilled layers, while the effect of the feature projector between the student and the teacher remains under-explored. In this paper, we first discuss a plausible mechanism of the projector with empirical evidence and then propose a new feature distillation method based on a projector ensemble for further performance improvement.
+  %To better understand the impact of projectors in distillation, we conduct comprehensive experiments in this paper and observe that the student network benefits from a projector even if the feature dimensions of the student and the teacher are the same. 
+  %One plausible reason is that the projector is optimised towards a ``global feature space alignment'' that cannot be achieved by just optimising independent feature pairs. 
+  We observe that the student network benefits from a projector even if the feature dimensions of the student and the teacher are the same.
+  Training a student backbone without a projector can be considered as a multi-task learning process, namely achieving discriminative feature extraction for classification and feature matching between the student and the teacher for distillation at the same time. We hypothesize and empirically verify that without a projector, the student network tends to overfit the teacher's feature distributions despite having different architecture and weights initialization. This leads to degradation on the quality of the student's deep features that are eventually used in classification. Adding a projector, on the other hand, disentangles the two learning tasks and helps the student network to focus better on the main feature extraction task while still being able to utilize teacher features as a guidance through the projector.
+  Motivated by the positive effect of the projector in feature distillation, we propose an ensemble of projectors to further improve the quality of student features. Experimental results on different datasets with a series of teacher-student pairs illustrate the effectiveness of the proposed method. Code is available at \url{https://github.com/chenyd7/PEFD}.
+\end{abstract}
+
+
+\section{Introduction}
+The last decade has witnessed the rapid development of Convolutional Neural Networks (CNNs) \cite{alexnet,inception,resnet,convnext,zhi1}. %The size of networks has leapt forward along with their performance. 
+The resulting increases in performance however, have come with substantial increases in network size and this largely limits the applications of CNNs on edge devices \cite{mobilenets}. To alleviate this problem, knowledge distillation has been proposed for network compression. The key idea of distillation is to use the knowledge obtained by the large network (teacher) to guide the optimization of the lightweight network (student) \cite{kd,fitnets,sp}.
+
+%According to the type of the selected knowledge, 
+Existing methods can be roughly categorized into logit-based, feature-based and similarity-based distillation \cite{kdsurvey}. Recent research shows that feature-based methods generally distill a better student network compared to the other two groups \cite{crd,cid}. We conjecture that the process of mimicking the teacher's features provides a clearer optimization direction for the training of the student network. Despite the promising performance of feature distillation, it is still challenging to narrow the gap between the student and teacher's feature spaces. To improve the feature learning ability of the student, various feature distillation methods have been developed by designing more powerful objective functions \cite{crd,pad,srrl,cid} and determining more effective links between the layers of the student and the teacher \cite{kr,afd,semckd}. 
+
+We have found that the feature projection process from the student to the teacher's feature space plays a key part in feature distillation and can be redesigned to improve the performance. Since the feature dimensions of student networks are not always the same with that of teacher networks, a projector is often required to map features into a common space for matching. As shown in Table \ref{ablationE}, imposing a projector on the student network can improve the distillation performance even if the feature dimensions of the student and the teacher are the same. We hypothesize that adding a projector for distillation helps to mitigate the overfitting problem when minimizing the feature discrepancy between the student and the teacher. As shown in Figure \ref{pipeline0}, distillation without a projector can be regarded as a multi-task learning process, including feature learning for classification and feature matching for distillation. In this case, the student network may overfit the teacher's feature distributions and the generated features are less distinguishable for classification. Our empirical results in Section \ref{methodsection} support this hypothesis to some extent. %that the network with a projector obtains lower between-class cosine similarity in the student feature space, which is beneficial to the subsequent classification task. 
+Besides, inspired by the effectiveness of adding a projector for feature distillation, we propose an ensemble of projectors for further improvement. Our intuition is that projectors with different initialization generate diverse transformed features. Therefore, it is helpful to improve the generalization of the student by using multiple projectors according to the theory behind ensemble learning \cite{ensemblepaper2,ensemblepaper,zhi2}. %Since the projectors will be removed after distillation, the proposed ensemble method does not change the original structure of the student, or its complexity of inference. 
+Figure \ref{pipeline} shows the comparisons of existing distillation methods and our method. %As presented in the diagrams, the main difference is that the proposed method integrates multiple projectors to enhance the feature learning ability of the student.
+
+Our contributions are three-fold:
+\begin{itemize}
+\item We investigate the phenomenon that the student benefits from a projector during feature distillation even when the student and the teacher have identical feature dimensionalities. 
+\item Technically, we propose an ensemble of feature projectors to improve the performance of feature distillation. The proposed method is extremely simple and easy to implement.
+\item Experimentally, we conduct comprehensive comparisons between different methods on benchmark datasets with a wide variety of teacher-student pairs. It is shown that the proposed method consistently outperforms state-of-the-art feature distillation methods.
+\end{itemize}
+
+\begin{figure}
+    \centering
+    \subfigure[w/o Projector]{\includegraphics[scale=0.16,trim=8 7 8.5 8, clip]{pipeline3.png}\label{pipeline0}}
+	\hspace{5mm}
+	\subfigure[w/ Single Projector]{\includegraphics[scale=0.16,trim=8 7 8.5 8, clip]{pipeline1.png}}
+	\hspace{5mm}
+	\subfigure[w/ Multiple Projectors]{\includegraphics[scale=0.16,trim=8 7 8 8, clip]{pipeline2.png}}
+	\caption{Illustration of (a) feature distillation without a projector when the feature dimensions of the student and the teacher are the same, (b) the general feature-based distillation with a single projector \cite{cid,srrl} and (c) the proposed method with multiple projectors, where $\mathcal{L}_{CE}$ and $\mathcal{L}_{FD}$ are the cross-entropy loss and the feature distillation loss, respectively.}
+	\label{pipeline}
+\end{figure}
+
+\section{Related Work}
+Since this paper mainly focuses on the design of the projector, we divided the existing methods into two categories in term of the usage of the projector as follows:
+
+\textbf{Projector-free methods.} As the most representative distillation method, Knowledge Distillation (KD) \cite{kd} proposes to utilize the logits generated by the pre-trained teacher to be the additional targets of the student. The intuition of KD is that the generated logits are able to provide more useful information than the general binary labels for optimization. Motivated by the success of KD, various logit-based methods have been proposed for further improvement. For example, Deep Mutual Learning (DML) \cite{dml} proposes to replace the pre-trained teacher with an ensemble of students so that the distillation mechanism does not need to train a large network in advance. Teacher Assistant Knowledge Distillation (TAKD) \cite{takd} observes that a better teacher may distill a worse student due to the large performance gap between them. Therefore, a teacher assistant network is introduced to alleviate this problem. Another technical route of projector-free methods is the similarity-based distillation. Unlike the logit-based methods that aim to exploit the category information hidden in the predictions of the teacher, similarity-based methods try to explore the latent relationships between samples in feature space. For example, Similarity-Preserving (SP) \cite{sp} distillation first constructs the similarity matrices of the student and the teacher by computing the inner products between features and then minimises the discrepancy between the obtained similarity matrices. Similarly, Correlation Congruence (CC) \cite{cc} forms the similarity matrices with a kernel function. Although the logit-based and similarity-based methods do not require an extra projector during training, they are generally less effective than the feature-based methods as shown in the recent research \cite{cid,srrl}.  
+
+\textbf{Projector-dependent methods.} Feature distillation methods aim to make student and teacher features as similar as possible. Therefore, a projector is essential to map features into a common space. The first feature distillation method FitNets \cite{fitnets} minimizes the L2 distance between student and teacher feature maps produced by the intermediate layer of networks. Furthermore, Contrastive Representation Distillation (CRD) \cite{crd}, Softmax Regression Representation Learning (SRRL) \cite{srrl} and Comprehensive Interventional Distillation (CID) \cite{cid} show that the last feature representations of networks are more suitable for distillation. One potential reason is that the last feature representations are closer to the classifier and will directly affect the classification performance \cite{srrl}. The aforementioned feature distillation methods mainly focus on the design of loss functions such as introducing contrastive learning \cite{crd} and imposing causal intervention \cite{cid}. A simple 1x1 convolutional kernel or a linear projection is adopted to transform features in these methods. We note that the effect of projectors is largely ignored. Previous works such as Factor Transfer (FT) \cite{ft} and Overhaul of Feature Distillation (OFD) \cite{ofd} try to improve the architecture of projectors by introducing the auto-encoder and modifying the activation function. However, their performance is not competitive when compared to the state-of-the-art methods \cite{srrl,cid}. Instead, this paper proposes a simple distillation framework by combining the ideas of distilling the last features and projector ensemble.
+
+\section{Improved Feature Distillation} \label{methodsection}
+We first define the notations used in the following sections. In line with observations in recent research \cite{crd,cid}, we apply the feature distillation loss to the layer before the classifier. $S=\{ s_{1},s_{2},...,s_{i},...,s_{b}\} \in \mathbb{R}^{d\times b}$ denotes the last student features, where $d$ and $b$ are the feature dimension and the batch size, respectively. The corresponding teacher features are represented by $T=\{ t_{1},t_{2},...,t_{i},...,t_{b}\} \in \mathbb{R}^{m\times b}$, where $m$ is the feature dimension. To match the dimensions of $S$ and $T$, a projector $g(\cdot)$ is required to transform the student or teacher features. We experimentally find that imposing the projector on the teacher is less effective since the original and more informative feature distribution from the teacher would be disrupted. %More details will be given in Section \ref{ablationsection}. 
+Therefore, in the proposed distillation framework, a projector will be added to the student as $g(s_i)=\sigma(Ws_i)$ during training and be removed after training, where $\sigma(\cdot)$ is the ReLU function and $W \in \mathbb{R}^{m\times d}$ is a weighting matrix.
+
+\subsection{Feature Distillation as Multi-task Learning}
+In recent work, SRRL and CID combine the feature-based loss with the logit-based loss to improve the performance. Since distillation methods are sensitive to hyper-parameters and changes of teacher-student combinations, the additional objectives will increase the training cost for coefficients adjustment. To alleviate this problem, we simply use the following Direction Alignment (DA) loss \cite{at,da1,da2} for feature distillation:
+\begin{equation}
+    \mathcal{L}_{DA} = \frac{1}{2b}\sum_{i=1}^b||\frac{g(s_i)}{||g(s_i)||_2}-\frac{t_i}{||t_i||_2}||_2^2=1- \frac{1}{b}\sum_{i=1}^b\frac{\langle g(s_i),t_i\rangle}{||g(s_i)||_2||t_i||_2},
+\end{equation}
+
+where $||\cdot||_2$ indicates the L2-norm and $\langle \cdot,\cdot\rangle$ represents the inner product of two vectors. By convention \cite{kd,crd,srrl}, the distillation loss is coupled with the cross-entropy loss to train a student. As mentioned in the Introduction, adding a projector helps to improve the distillation performance even if the feature dimensions of the student and the teacher are the same. We hypothesize that the training process of the student network without a projector can be viewed as a multi-task learning (i.e. distillation and classification tasks) in the same feature space. As such, student features tend to overfit teacher features and become less discriminative for classification. We use two measurements to empirically verify this hypothesis. The first one is to measure the discrepancy between student and teacher features as follows: 
+\begin{equation}
+    \mathcal{M}_{DA} = 1- \frac{1}{b}\sum_{i=1}^b\frac{\langle s_i,t_i\rangle}{||s_i||_2||t_i||_2}.
+\end{equation}
+We display the $\mathcal{M}_{DA}$ results of students with and without a projector in Figure \ref{visualisationofcos}. Apparently, since student features will directly interact with teacher features, the $\mathcal{M}_{DA}$ results of the student without a projector are significantly lower than that of the student with a projector in different seeds. However, we found that the distilled student features without a projector is less discriminative by investigating the between-class cosine similarity in the student's feature space. The between-class cosine similarity is computed as follows:
+\begin{equation}
+    \mathcal{M}_{BC} = \frac{1}{b}\sum_{i=1}^b\sum_{j=1}^{c_i}\frac{\langle s_i,s_j\rangle}{c_i||s_i||_2||s_j||_2},
+\end{equation}
+where $s_j$ is the $j$-th sample belonging to a class different from that of $s_i$ and $c_i$ is the total number of $s_j$ corresponding to $s_i$. The results of $\mathcal{M}_{BC}$ are in Figure \ref{visualisationofcos}. It is shown that the student network with a projector generate more discriminative features compared to the student network without a projector. The results of $\mathcal{M}_{DA}$ and $\mathcal{M}_{BC}$ suggest that the student tends to overfit the teacher's feature space without a projector. Since the tasks of classification and distillation are performed in the same feature space, the generated features are less distinguishable for classification. By adding a projector to disentangle the two tasks, we can improve the classification performance of the student.
+
+
+\begin{figure}
+    \centering
+	\subfigure{\includegraphics[scale=0.63,trim=10 20 10 10, clip]{l2loss.png}}
+	\hspace{5mm}
+	\subfigure{\includegraphics[scale=0.63,trim=10 20 10 10, clip]{betweencos.png}}
+	\par
+	\caption{The left figure displays the direction alignment loss between teacher and student features with and without a projector. The right figure displays the average between-class cosine similarities in students' feature spaces. These results are obtained on CIFAR-100 with a teacher-student pair ResNet32x4-ResNet8x4. The feature dimensions of ResNet32x4 and ResNet8x4 are the same, which means $m=d$.}
+	\label{visualisationofcos}
+\end{figure}
+
+\subsection{Improved Feature Distillation with Projector Ensemble}
+The above analysis suggests that the projector can boost the distillation performance of the student. Motivated by this, we propose an ensemble of projectors for further improvement. There are two motivations of using multiple projectors. Firstly, projectors with different initialization provide different transformed features, which is beneficial to the generalizability of the student \cite{ensemblepaper2,ensemblepaper}. Secondly, since we use the ReLU function to enable the projector to perform nonlinear feature extraction, the projected student features may contain zeros. On the other hand, teacher features are 
+less likely to be zeros due to the commonly used average pooling operation in CNNs. That is to say, the feature distribution gap between the teacher and the student is large with a single projector. Therefore, using ensemble learning is a natural way to achieve a good trade-off between training error and generalizability. By introducing multiple projectors, the Modified Direction Alignment (MDA) loss is as follows:
+\begin{equation}
+    \mathcal{L}_{MDA} = 1-\frac{1}{b}\sum_{i=1}^b\frac{\langle f(s_i),t_i\rangle}{||f(s_i)||_2||t_i||_2},
+    \label{mda}
+\end{equation}
+where $f(s_i)=\frac{1}{q}\sum_{k=1}^q g_k(s_i)$, $q$ is the number of projectors and $g_k(\cdot)$ indicates the $k$-th projector. By combining the distillation loss (\ref{mda}) and the classification loss together, we obtain the following objective function to train the student:
+\begin{equation}
+    \mathcal{L}_{total} = \mathcal{L}_{CE} + \alpha \mathcal{L}_{MDA},
+    \label{totaloss}
+\end{equation}
+where $\mathcal{L}_{CE}$ is the cross-entropy loss and $\alpha$ is a hyper-parameter. The details of our method are shown in Algorithm \ref{algorithm1}.
+
+
+\begin{algorithm}[tb]
+\caption{Improved Feature Distillation via Projector Ensemble.}
+\label{alg:algorithm}
+\textbf{Input:} The pre-trained teacher, the structure of the student, training data $X$ and labels. \\
+\textbf{Parameter:} Total iterations $N$, $\alpha$ and the number of projectors $q$.\\
+\textbf{Initialization:} Initialize different projectors and the student.
+\\
+\textbf{Training:} 
+\begin{algorithmic}[1] %[1] enables line numbers
+\FOR{$i=1\rightarrow N$}
+%\FOR{$j=1\rightarrow m/n$}
+\STATE Sample a mini-batch data from $X$.
+\STATE Generate $S$, $T$ and the student's prediction by forward propagation.
+\STATE Update projectors and the student network by minimizing objective (\ref{totaloss}).
+%\ENDFOR
+\ENDFOR
+\end{algorithmic}
+\textbf{Output}: The distilled student. 
+\label{algorithm1}
+\end{algorithm}
+
+\section{Experiments}
+We conduct comprehensive experiments to evaluate the performance of different methods and the effectiveness of the proposed projector ensemble-based feature distillation, on image classification task. Implementation details are as follows:
+
+\textbf{Baselines. }We select representative distillation methods in various categories for comparisons, including logit-based method KD \cite{kd}, similarity-based methods CC \cite{cc}, SP \cite{sp} and Relational Knowledge Distillation (RKD) \cite{rkd}, feature-based methods FitNets \cite{fitnets}, FT \cite{ft}, CRD \cite{crd}, SRRL \cite{srrl} and CID \cite{cid}. The logit-based and similarity-based methods are projector-free and the feature-based methods require additional projectors. FitNets and SRRL use convolutional kernels to transform the student features. FT adopts an auto-encoder to extract the latent feature representations of the student and the teacher. CRD maps student and teacher features into a low-dimensional space while CID maps student features into the teacher space with linear projections. For simplicity, the proposed method constructs the projector by combining a linear projection and the ReLU function.  
+%For the implement of FitNets, FT and CRD, the architecture of projectors are provided by an open source project \footnote{https://github.com/HobbitLong/RepDistiller}. For SRRL and CID, we follow the original designs in the corresponding papers.
+
+\textbf{Datasets. }Two benchmark datasets are used for evaluation in our experiments. ImageNet \cite{imagenet} contains approximately 1.28 million training images and 50,000 validation images from 1,000 classes. The validation images are used for testing. Each image is resized to 224x224. CIFAR-100 \cite{cifar100} dataset includes 50,000 training images and 10,000 testing images from 100 classes. Each image is resized to 32x32. On ImageNet and CIFAR-100, we adopt the commonly used random crop and horizontal flip techniques for data augmentation.
+
+\textbf{Teacher-student pairs. }To validate the generalizability of different distillation methods, we select a group of popular network architectures to form different teacher-student pairs. The teacher networks include ResNet34 \cite{resnet}, DenseNet201 \cite{densenet}, WRN-40-2 \cite{wrn}, VGG13 \cite{vgg}, ResNet32x4 \cite{resnet} and ResNet50 \cite{resnet}. The student networks comprise of ResNet18 \cite{resnet}, MobileNet \cite{mobilenets}, WRN-16-2 \cite{wrn}, VGG8 \cite{vgg}, ResNet8x4 \cite{resnet} and MobileNetV2 \cite{mobilenetsv2}. By combining different teacher and student networks, we can perform distillation between similar architectures (e.g., ResNet34-ResNet18) and different architectures (e.g., DenseNet201-ResNet18).
+
+\textbf{Training. }Following the settings of previous methods\footnote{https://github.com/HobbitLong/RepDistiller}, the batch size, epochs, learning rate decay rate and weight decay rate are 256/64, 100/240, 0.1/0.1, and 0.0001/0.0005, respectively on ImageNet/CIFAR-100. The initial learning rate is 0.1 on ImageNet, and 0.01 for MobileNetV2, 0.05 for the other students on CIFAR-100. Besides, the learning rate drops at every 30 epochs on ImageNet and drops at 150, 180, 210 epochs on CIFAR-100. The optimizer is Stochastic Gradient Descent (SGD) with momentum 0.9. All the experiments are performed on an NVIDIA V100 GPU. 
+
+\textbf{Hyper-parameters.} By following the conventions in CRD \cite{crd}, we use the same settings for the hyper-parameters of KD, CC, SP, RKD, FitNets, FT and CRD. For SRRL and CID, the settings of hyper-parameters are provided by the corresponding authors. For the proposed method, we set $\alpha=25$ and $q=3$ by tuning with teacher-student pair ResNet34-ResNet18 on ImageNet. For a fair comparison, the hyper-parameters of different methods are fixed in all experiments.
+
+\begin{table}
+    \caption{Top-1 classification accuracy ($\%$) on CIFAR-100 using horizontal ensembles with different teacher-student pairs. 1-Proj, 2-Proj, 3-Proj and 4-Proj indicate the number of single-layer projectors in the ensemble.}
+    \label{ablationE}
+    \centering
+    \begin{tabular}{c|cccccc|c}
+    \hline
+    Pair &Student &w/o Proj &1-Proj &2-Proj &3-Proj &4-Proj  &Teacher\\
+    \hline 
+    \multirow{1}{*}{VGG13-VGG8} &70.74 &73.76  &73.84  &74.21  &\textbf{74.35} &74.18  &74.64  \\
+    \hline
+    \multirow{1}{*}{ResNet32x4-ResNet8x4}  &72.93 &73.66  &75.14  &75.66  &\textbf{76.08}  &75.93 &79.42   \\
+    \hline
+    \end{tabular}
+\end{table}
+
+\begin{table}
+    \caption{Top-1 classification accuracy ($\%$) on CIFAR-100 using deep projectors with different teacher-student pairs. 2-MLP, 3-MLP and 4-MLP indicate the depth of the projectors with different number of layers.}
+    \label{ablationC}
+    \centering
+    \begin{tabular}{c|cccccc|c}
+    \hline
+    Pair &Student &w/o Proj &1-Proj &2-MLP &3-MLP &4-MLP &Teacher \\
+    \hline 
+    \multirow{1}{*}{VGG13-VGG8} &70.74  &73.76  &\textbf{73.84}  &73.31  &73.02 &72.73  &74.64   \\
+    \hline
+    \multirow{1}{*}{ResNet32x4-ResNet8x4}  &72.93 &73.66  &\textbf{75.14}  &75.12  &74.56 &74.30 &79.42   \\
+    \hline
+    \end{tabular}
+\end{table}
+
+
+
+\subsection{Ablation Studies} \label{ablationsection}
+This section studies the effectiveness of the proposed projector ensemble method, and how different ensemble strategies affect the performance. In this experiment, two different network architectures, i.e. VGG-style and ResNet-style networks are used for illustration in Tables \ref{ablationE}, \ref{ablationC} and \ref{widerproj}.
+
+\textbf{Horizontal ensemble of projectors. }Table \ref{ablationE} shows the top-1 classification accuracy of the proposed projector ensemble with different number of projectors. It verifies that imposing a projector improves the distillation performance when the feature dimensions of the student and the teacher are the same. A potential reason is that the projector helps to disentangle the two learning tasks (i.e. distillation and classification) and improves the quality of student features. In addition, by integrating multiple projectors, the proposed method further increases the classification accuracy by a clear margin with various numbers of projectors. 
+
+\begin{wraptable}{r}{7.3cm}
+    \setlength{\abovecaptionskip}{-0.45cm}
+    \setlength{\belowcaptionskip}{0.2cm}
+    \caption{Top-1 accuracy ($\%$)  on CIFAR-100 using deep projectors. 2x2-MLP and 2x3-MLP indicate two-layer MLPs with wider hidden layers.}
+    \label{widerproj}
+    \centering
+    \begin{tabular}{c|c|c} 
+		\hline
+		Teacher &VGG13 &{ResNet32x4} \\
+		Student &VGG8 &{ResNet8x4} \\
+		\hline 
+		2-MLP &73.31   &75.12\\
+		2x2-MLP &73.31   &75.00\\
+		2x3-MLP &\textbf{73.37}  &\textbf{75.13}\\
+		\hline
+    \end{tabular}
+\end{wraptable}
+\textbf{Deep cascade of projectors. }Another common way to modify the architecture is to increase the depth of the projector. Table \ref{ablationC} demonstrates the changes of distillation performance by gradually stacking non-linear projections. In this table, 2-MLP, 3-MLP and 4-MLP are multilayer perceptrons and each layer outputs $m$-dimensional features followed by a ReLU activation. For instance, the output of 2-MLP is $g(s_i)=\sigma(W_2\sigma(W_1s_i))$, where $W_1 \in \mathbb{R}^{m\times d}$ and $W_2 \in \mathbb{R}^{m\times m}$ are weighting matrices. It is shown that simply increasing the depth of the projector does not improve the performance of the student and tends to degrade the effectiveness of the projector. We hypothesize that with the increase of depth, the teacher's features can be overfitted by the projector. Besides, we also evaluate the effect of deep projectors with wider hidden layers as shown in Table \ref{widerproj}. In this experiment, the hidden dimensions of 2x2-MLP and 2x3-MLP are $2\times m$ and $3\times m$, respectively. Experimental results demonstrate that the improvement is marginal by increasing the width of deep projectors. %On the contrary, the horizontal ensemble strategy avoid overfitting while maintaining competitive accuracy and generalizability by having multiple shallow projects, which is further verified in \textcolor{red}{TBD}. 
+
+\begin{table}[t]
+    \caption{Diversity of projectors in the proposed distillation framework on CIFAR-100 with teacher-student pair ResNet32x4-ResNet8x4.}
+    \label{diversityofP}
+    \centering
+    \begin{tabular}{c|ccccccc}
+    \hline
+    Epoch &10 &40 &80 &120 &160 &200 &240  \\
+    \hline 
+    L2 distance &440.93 &394.57	 &372.82 &360.69 &298.86 &213.29 &206.32       \\
+    \hline
+    \end{tabular}
+\end{table}
+\subsection{Diversity of Projectors} \label{diversitysection}
+This section investigates the diversity of projectors in the proposed ensemble-based distillation framework. In this experiment, we set $q=2$ for demonstration. The L2 distances between two projectors at different epochs are given in Table \ref{diversityofP}. We can see that the diversity of projectors gradually decreases with the increase of training epochs and appears to converge after 200 epochs. In Supplementary Material, we discuss how to promote the diversity of projectors from the perspectives of using different initialization methods and adding a regularization term. 
+
+\begin{table}[t]
+    \caption{Top-1 classification accuracy and standard deviation ($\%$) on CIFAR-100 with different teacher-student pairs.}
+    \label{tableCIFAR}
+    \centering
+    \begin{tabular}{c|ccccc}
+    \hline
+    Teacher &WRN-40-2    &VGG13  &ResNet32x4  &ResNet50 &ResNet50        \\
+    Student &WRN-16-2   &VGG8    &ResNet8x4 &VGG8    &MobileNetV2      \\
+    \hline
+    Teacher &75.61  &74.64 &79.42 &79.34 &79.34 \\
+    Student &73.22$\pm$0.13  &70.74$\pm$0.31 &72.93$\pm$0.28 &70.74$\pm$0.31 &65.03$\pm$0.09\\
+    KD   &74.92$\pm$0.28  &72.98$\pm$0.19 &73.33$\pm$0.25 &73.81$\pm$0.13 &67.35$\pm$0.32\\
+    CC &73.56$\pm$0.26  &70.71$\pm$0.24 &72.97$\pm$0.17 &70.25$\pm$0.12 &65.43$\pm$0.15\\
+    SP &73.83$\pm$0.12 &72.68$\pm$0.19 &72.94$\pm$0.23 &73.34$\pm$0.34 &68.08$\pm$0.38\\
+    RKD &73.35$\pm$0.09  &71.48$\pm$0.05 &71.90$\pm$0.11 &71.50$\pm$0.07 &64.43$\pm$0.42  \\
+    FitNets &73.58$\pm$0.32  &71.02$\pm$0.31 &73.50$\pm$0.28 &70.69$\pm$0.22 &63.16$\pm$0.47\\
+    FT &73.25$\pm$0.20 &70.58$\pm$0.08 &72.86$\pm$0.12 &70.29$\pm$0.19 &60.99$\pm$0.37 \\
+    CRD  &75.48$\pm$0.09  &73.94$\pm$0.22 &75.51$\pm$0.18 &74.30$\pm$0.14 &69.11$\pm$0.28\\
+    SRRL &75.59$\pm$0.17 &73.44$\pm$0.07 &75.33$\pm$0.04 &74.23$\pm$0.08 &68.41$\pm$0.54\\
+    Ours &\textbf{76.02$\pm$0.10} &\textbf{74.35$\pm$0.12} &\textbf{76.08$\pm$0.33} &\textbf{74.58$\pm$0.22} &\textbf{69.81$\pm$0.42} \\
+    \hline
+    \end{tabular}
+\end{table}
+
+\subsection{Results on CIFAR-100} \label{cifarsection}
+
+
+\begin{wraptable}{r}{7.3cm}
+    \setlength{\abovecaptionskip}{-0.45cm}
+    \setlength{\belowcaptionskip}{0.2cm}
+    \caption{Top-1 accuracy ($\%$) of our method with different activation functions on CIFAR-100.}
+    \label{activation}
+    \centering
+    \begin{tabular}{c|c|c} 
+		\hline
+		Teacher &VGG13 &{ResNet32x4} \\
+		Student &VGG8 &{ResNet8x4} \\
+		\hline 
+		w/ ReLU (Ours) &74.35$\pm$0.12   &76.08$\pm$0.33\\
+		w/ GELU &\textbf{74.39$\pm$0.18}   &\textbf{76.32$\pm$0.27}\\
+		w/o activation &73.46$\pm$0.42  &75.04$\pm$0.37\\
+		\hline
+    \end{tabular}
+\end{wraptable}
+Table \ref{tableCIFAR} reports the experimental results on CIFAR-100 with five teacher-student pairs. We run our method for three times with different seeds and obtain the average accuracy. Since CID requires different hyper-parameters for different pairs to achieve good performance, we omit it for comparisons on CIFAR-100. Among the projector-free distillation methods, the logit-based method KD shows better performance compared to the similarity-based methods CC, SP and RKD. Furthermore, KD outperforms the projector-based methods FitNets and FT in most cases. Since FitNets is designed to distill the intermediate features, its performance is unstable for teacher-student pairs using different architectures. FT uses an auto-encoder as the projector to extract latent representations of the teacher, which may disturb the discriminative information to some extent and consequently degrade the performance. The recently proposed feature distillation methods CRD and SRRL show competitive performance compared to the previous methods by distilling the last layer of features. By harnessing the power of both distilling the last features and projector ensemble, the proposed method consistently achieves the highest accuracy on CIFAR-100.
+
+
+We further investigate the effect of the activation function. Table \ref{activation} shows that the addition of the ReLU activation function has a significant positive impact on the performance of the proposed method. The reason is that the lack of an activation function and the non-linearity introduced by it limits the diversity of the projectors, as a group of linear projections can be mathematically reduced to a single linear projection through sum-pooling, which will degrade the distillation performance. Recently, Gaussian Error Linear Units (GELU) \cite{gelu} has received attention because of its effectiveness on Transformer \cite{bert,vit}. We replace ReLU with GELU in the proposed method to test the performance. It is shown that the performance of our method can be further improved by using GELU as activation. 
+
+\begin{table}
+    \caption{Classification accuracy ($\%$) on ImageNet with different teacher-student pairs (a) ResNet34-ResNet18, (b) ResNet50-MobileNet, (c) DenseNet201-ResNet18 and (d) DenseNet201-MobileNet.}
+    \label{tableImageNet}
+    \centering
+    \begin{tabular}{c|c|ccccccc|c}
+    \hline
+    Pair &Accuracy &Student &KD &SP &CRD &SRRL &CID &Ours &Teacher\\
+    \hline 
+    \multirow{2}{*}{(a)}  &Top-1 &69.75 &70.83 &70.94 &70.85 &71.71 &71.86 &\textbf{71.94}  &73.31\\
+    &Top-5 &89.07 &90.15 &89.83 &90.12 &90.58 &90.63 &\textbf{90.68}    &91.41\\
+    \hline
+    \multirow{2}{*}{(b)}  &Top-1 &69.06 &70.65 &70.14 &71.03 &72.58 &72.25 &\textbf{73.16} &76.13\\
+    &Top-5 &88.84 &90.26 &89.64 &90.16 &91.05 &90.98 &\textbf{91.24}  &92.86\\
+    \hline
+    \multirow{2}{*}{(c)}  &Top-1 &69.75 &70.38 &70.75 &70.87 &71.76  &71.99 &\textbf{72.29} &76.89\\
+    &Top-5 &89.07 &90.12 &90.01 &89.86 &90.80  &90.64 &\textbf{90.99}  &93.37\\
+    \hline
+    \multirow{2}{*}{(d)}  &Top-1 &69.06 &69.98 &70.34 &70.82 &72.28 &71.90 &\textbf{73.24}  &76.89\\
+    &Top-5 &88.84 &89.93 &89.63 &90.09 &90.90 &90.97 &\textbf{91.47}  &93.37\\
+    \hline
+    \end{tabular}
+\end{table}
+
+
+\begin{figure}[t]
+    \centering
+	\subfigure{\includegraphics[scale=0.67,trim=15 10.5 2 15, clip]{trend1.png}}
+	\hspace{3mm}
+	\subfigure{\includegraphics[scale=0.67,trim=5 9 2 15, clip]{trend2.png}}
+	\caption{Top-1 accuracy of different methods on ImageNet with different number of epochs and different teacher-student pairs.}
+	\label{converge}
+\end{figure}
+\subsection{Results on ImageNet}
+The performance of the students distilled by different methods are listed in Table \ref{tableImageNet}. Compared to the settings in previous methods \cite{crd,srrl,cid}, we introduce more teacher-student pairs for evaluation in this experiment so that the generalizability of different methods can be better evaluated. As presented in the table, feature distillation methods (CRD, SRRL, CID and our method) outperform both the logit-based method (KD) and the similarity-based method (SP) in most cases. 
+
+One major difference between CRD and the other feature distillation methods is the way of feature transformation. CRD transforms teacher and student features simultaneously while the other methods only transform student features. By solely mapping student features into the teacher's space, the original teacher feature distribution can be preserved without losing discriminative information. Therefore, SRRL, CID and our method obtain better performance than CRD. Besides, our method consistently outperforms the state-of-the-art methods SRRL and CID with different teacher-student pairs. With pair DenseNet201-MobileNet, the proposed method obtains 0.96$\%$ and 0.50$\%$ improvements compared to the second best method in terms of top-1 and top-5 accuracy, respectively.  MobileNet (4.2M parameters) distilled by our method can obtain similar performance and reduce about 80$\%$ of the parameters compared to the ResNet34 (21.8M parameters). Figure \ref{converge} reports the top-1 accuracy of different methods with different training epochs. It is shown that the proposed method converges faster than the other distillation methods.
+
+
+In \cite{takd}, the authors observe that a better teacher may fail to distill a better student. Such phenomenon also exists in Table \ref{tableImageNet}. For example, compared to the pair ResNet50-MobileNet, most of the methods distill a worse student by using a better network DenseNet201 as the teacher. One plausible explanation for this phenomenon is that the knowledge of a better teacher is more complex and is more difficult to learn. To alleviate this problem, TAKD \cite{takd} introduces some smaller assistant networks to facilitate training. Densely Guided Knowledge Distillation (DGKD) \cite{densetakd} further extends TAKD with dense connections between different assistants. However, the training costs of these methods are greatly increased by using the assistant networks. As shown in Table \ref{tableImageNet}, the proposed method has the potential to alleviate this problem without introducing the additional networks.
+
+
+We compare the training costs of different methods in Table \ref{tabletime}. Since KD and SP are projector-free methods, their training costs are lower than that of the feature distillation methods. The training cost of our method is slightly higher than KD and SP because we use multiple projectors to improve the optimization of the student. On the other hand, the proposed method only uses a naive direction alignment loss to distill the knowledge. Therefore, the computation complexity and memory usages are lower compared to the other feature-based methods.
+
+\begin{wraptable}{r}{7.3cm}
+    \setlength{\abovecaptionskip}{-0.41cm}
+    \setlength{\belowcaptionskip}{0.2cm}
+    \caption{Comparisons of the proposed method and distillation methods using multiple layers of features.}
+    \label{crosslayer}
+    \centering
+    \begin{tabular}{c|cc|cc} 
+		\hline
+		Teacher &\multicolumn{2}{c|}{ResNet34} &\multicolumn{2}{c}{ResNet50} \\
+		Student &\multicolumn{2}{c|}{ResNet18} &\multicolumn{2}{c}{MobileNet} \\
+		\hline
+		Acc &Top-1  &Top-5 &Top-1  &Top-5   \\ 
+		
+		\hline 
+		Teacher &73.31 &91.41 &76.13 &92.86 \\
+		Student &69.75 &89.07 &69.06 &88.84   \\
+		AFD &71.38 &-- &-- &--   \\
+		KR &71.61 &90.51 &72.56 &91.00   \\
+		Ours &\textbf{71.94} &\textbf{90.68} &\textbf{73.16} &\textbf{91.24}    \\
+		\hline
+    \end{tabular}
+\end{wraptable}
+
+Two recently proposed methods, namely Attention-based Feature Distillation (AFD) \cite{afd} and Knowledge Review (KR) \cite{kr} are also introduced for comparisons as reported in Table \ref{crosslayer}. Unlike methods that utilize the last layer of features for distillation (CRD, SRRL, CID and ours), AFD and KR propose to extract information from multiple layers of features. Table \ref{crosslayer} shows that the proposed method performs better than AFD and KR with different teacher-student pairs in terms of the comparisons of top-1 and top-5 accuracy, which indicates that using the last layer of features is sufficient to obtain good distillation performance on ImageNet.
+
+
+
+
+
+\begin{table}
+    \caption{Training times (in second) of one epoch and peak GPU memory usages (MB) of different methods on ImageNet with teacher-student pair DenseNet201-ResNet18.}
+    \label{tabletime}
+    \centering
+    \begin{tabular}{c|cccccc}
+    \hline
+    Method &KD &SP &CRD &SRRL &CID &Ours\\
+    \hline 
+    Time &2,969 &2,989 &3,158 &3,026 &3,587 &2,995 \\
+    Memory &11,509  &11,509  &15,687  &11,991  &12,021  &11,523   \\
+    \hline
+    \end{tabular}
+\end{table}
+
+
+
+
+\section{Conclusion} \label{limitationsection}
+This paper studies the effect of the projector in feature distillation and proposes a projector ensemble-based architecture to improve the feature projection process from the student to the teacher. We first investigate the phenomenon that the addition of a projector improves the distillation performance even when the feature dimensions of the student and the teacher are the same. From the perspective of multi-task learning, we speculate that the student network without a projector tends to overfit the teacher's feature space and pays less attention to the task of discriminative feature learning for classification. By imposing a projector on the student network to mitigate the overfitting problem, the student's performance can be increased. Based on the positive effect of the projector in feature distillation, we propose an ensemble of projectors for further improvement. Empirical results on ImageNet and CIFAR-100 show that our method consistently achieves competitive performance with different teacher-student combinations, compared to other state-of-the-art methods.
+
+\textbf{Limitations and future work. }
+%Due to the limited computing resources, we only validate the effectiveness of our methods on image classification task. The generalization ability of the learned students on downstream tasks (e.g., object detection and semantic segmentation) is under-explored. 
+In addition to the image classification task, the proposed method can be further applied in other downstream tasks (e.g., object detection and semantic segmentation), which can be explored in future work. Besides, the proposed method focuses on using the direction alignment loss for distillation. How to effectively and efficiently integrate logits and similarity information into the proposed framework is a potential research direction.  
+
+\section{Acknowledgments} 
+This work is partially supported by Australian Research Council DE200101610 and CSIRO's Research Plus Science Leader Project R-91559.
+
+\bibliographystyle{plain}
+\bibliography{references}
+
+
+
+\end{document}
+
+

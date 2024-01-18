@@ -1,0 +1,709 @@
+
+\documentclass{ieeeaccess}
+% \usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts,arydshln}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage{enumitem}
+
+\usepackage{url}
+% \usepackage{xcolor}
+\newcommand{\ka}[1]{\textcolor{cyan}{#1}}
+\newcommand{\rav}[1]{\textcolor{green}{#1}}
+\newcommand{\dorien}[1]{\textcolor{blue}{#1}}
+\newcommand{\nbh}[1]{\texttt{#1}}
+\usepackage{booktabs}
+\newcommand{\newtext}[1]{\textcolor{black}{#1}} % highlight
+% \newcommand{\newtext}[1]{{#1}}
+\newcommand{\bookmarkdorien}{\textcolor{blue}{DH read until here}}
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em  T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+%\usepackage{placeins}
+
+
+\begin{document}
+\history{Date of publication xxxx 00, 0000, date of current version xxxx 00, 0000.}
+\doi{00.0000/ACCESS.2020.DOI}
+
+\title{nnAudio: An on-the-fly GPU Audio to Spectrogram Conversion Toolbox Using 1D Convolutional Neural Networks}
+\author{\uppercase{Kin Wai Cheuk}\authorrefmark{1,2} \IEEEmembership{Student~Member, IEEE},
+\uppercase{Hans Anderson\authorrefmark{3}}, \uppercase{Kat Agres\authorrefmark{2,4}} \IEEEmembership{Member, IEEE}, \uppercase{Dorien Herremans\authorrefmark{1}} \IEEEmembership{Senior~Member, IEEE},}
+\address[1]{Information Systems, Technology and Design, Singapore University of Technology and Design, 8 Somapah Rd, Singapore 487372 (e-mail: kinwai\_cheuk@mymail.sutd.edu.sg, dorien\_herremans@sutd.edu.sg)}
+\address[2]{Institute of High Performance Computing, Agency for Science, Technology and Research, 1 Fusionopolis Way, \#16-16 Connexis, Singapore 138632}
+\address[3]{Blue Mangoo Software (email: hans@bluemangoo.com)}
+\address[4]{Yong Siew Toh Conservatory of Music, National University of Singapore, 3 Conservatory Drive, Singapore 117376 (e-mail: katagres@nus.edu.sg)}
+\tfootnote{This work is supported by the SUTD-MIT IDC grant IDG31800103, MOE Grant no. MOE2018-T2-2-161, and SING-2018-02-0204. }
+
+\markboth
+{Cheuk \headeretal: Preparation of Papers for IEEE ACCESS}
+{Cheuk \headeretal: Preparation of Papers for IEEE ACCESS}
+
+\corresp{Corresponding author: Kin Wai Cheuk (e-mail:kinwai\_cheuk@mymail.sutd.edu.sg)}
+
+\begin{abstract}
+%Despite recent developments in neural network models that use raw audio as input, state-of-the-art results from tasks such as automatic music transcription (AMT) and automatic speech recognition (ASR) are often still achieved by using frequency domain features such as spectrograms as input. Converting time domain waveforms to frequency domain spectrograms is a preprocessing step that is traditionally done {separately} before model training. 
+%This approach, however, has several drawbacks. First, it takes a lot of hard disk space to store different frequency domain representations. This is especially true during the model development and tuning process, when exploring various types of spectrograms for optimal performance. Second, if another dataset is used, one must process all the audio clips again before the network can be retrained, {since the network is trained on frequency domain features previously, it does not make sense to train on waveforms when a new dataset is used.}
+% In this paper, we try to 
+%we integrate the time domain to frequency domain conversion as part of the model structure, and
+In this paper, we present \nbh{nnAudio}, a new neural network-based audio processing framework with graphics processing unit (GPU) support that leverages 1D convolutional neural networks to perform time domain to frequency domain conversion. It allows on-the-fly spectrogram extraction due to its fast speed, without the need to store any spectrograms on the disk. Moreover, this approach also allows back-propagation on the waveforms-to-spectrograms transformation layer, and hence, the transformation process can be made trainable, further optimizing the waveform-to-spectrogram transformation for the specific task that the neural network is trained on. All spectrogram implementations scale as Big-O of linear time with respect to the input length. \nbh{nnAudio}, however, leverages the compute unified device architecture (CUDA) of 1D convolutional neural network from \nbh{PyTorch}, its short-time Fourier transform (STFT), Mel spectrogram, and constant-Q transform (CQT) implementations are an order of magnitude faster than other implementations using only the central processing unit (CPU). We tested our framework on three different machines with NVIDIA GPUs, and our framework significantly reduces the spectrogram extraction time from the order of seconds (using a popular python library \nbh{librosa}) to the order of milliseconds, given that the audio recordings are of the same length. When applying nnAudio to variable input audio lengths, an average of 11.5 hours are required to extract 34 spectrogram types with different parameters from the MusicNet dataset using \nbh{librosa}. An average of 2.8 hours is required for \nbh{nnAudio}, which is still four times faster than \nbh{librosa}. Our proposed framework also outperforms existing GPU processing libraries such as \nbh{Kapre} and \nbh{torchaudio} in terms of processing speed. 
+\end{abstract}
+
+\begin{keywords}
+Convolution,
+Discrete Fourier transform,
+Short time Fourier transform,
+Spectrogram,
+CQT, 
+Constant Q Transform,
+Mel Spectrogram,
+Signal processing, 
+Library, 
+PyTorch,
+GPU
+\end{keywords}
+
+\titlepgskip=-15pt
+
+\maketitle
+
+\section{Introduction}
+\label{sec:Introduction}
+%\PARstart{M}{achine} learning for audio \newtext{usually requires the raw waveforms to be processed (for example, applying Fourier transform on the waveforms)} because raw waveforms are time domain features: since each observation in the time-series contains only a single data point representing the instantaneous amplitude of the signal, a model with a long-term memory is required to retrieve meaningful information. It is therefore necessary to convert these features into the frequency domain in order to extract the implicit frequency information from the waveforms. Therefore, we propose 
+%Recent advances in time domain based models, such as WaveNet~\cite{Oord2016WaveNetAG}, a model designed to take raw waveforms as input, have inspired several recent audio related machine learning models~\cite{Juvela2019GlotNetARW,Rushe2019AnomalyDI,Yoshimura2019SpeakerdependentWD}. Many models, however, are still using frequency domain features~\cite{choi2019zero, gururani2019attention,doras2019cover, doras2019use, meseguer2019conditioned,gillickestimating,balke2019learning,wigginsguitar,nidadavolu2019investigation,Neumann2019ImprovingSE,alAbdullah2019ArtificialNN,Kelz2019TowardsIP,hantrakulfast,taenzerinvestigating,park2019bi,kim2019adversarial,leeautomatic,fuhierarchical,wang2019adaptive} to achieve better results than models using time domain features~\cite{hertel2016comparing,Pons2017EndtoendLF}. Therefore, there is {significant} value in developing a faster time-frequency conversion computation method such as the one we propose in this paper. {In addition, our proposed method allows trainable kernels such as Fourier kernels, Mel filter banks, and CQT kernels.  Thus creating a new spectrogram representation specifically tailored to the prediction/classification task at hand.}
+
+\PARstart{S}{pectrograms}{, as time-frequency representations of audio signals, have been used as input for neural network models since the 1980s~\cite{palakal1989feature, hatazaki1989phoneme, recchione1996feedforward}. Different types of spectrograms are tailored to different applications. For example, Mel spectrograms and Mel frequency cepstral coefficients (MFCCs) are designed for speech-related applications~\cite{furui1986speaker, davis1980comparison}, and the constant-Q transformation is best for music related applications~\cite{brown1991calculation,brown1992efficient}. Despite recent advances in end-to-end learning in the audio domain, such as WaveNet~\cite{Oord2016WaveNetAG} and SampleCNN~\cite{kim2019comparison}, which make model training on raw audio data possible, many recent publications still use spectrograms as the input to their models for various applications~\cite{Purwins2019DeepLF}. These applications include speech recognition~\cite{lee2018samplecnn, kim2019end}, speech emotion detection~\cite{zhao2019speech}, speech-to-speech translation~\cite{tjandra2019speech}, speech enhancement~\cite{shahriyar2019speech}, voice separation~\cite{lin2020singing}, singing voice conversion~\cite{luo2020singing}, music tagging~\cite{choi2019zero}, cover detection~\cite{doras2019cover}, melody extraction~\cite{doras2019use}, and polyphonic music transcription~\cite{Kelz2019TowardsIP}. One drawback of training an end-to-end model on raw audio data is the longer training time. As pointed out by~\citet{lee2018samplecnn}, a model that uses raw audio data as input takes four times longer in terms of training time, and this longer training time only yields slightly better performance compared to a similar model that use spectrograms as their input.}
+
+%The Discrete Fourier transform is one of the classic algorithms that allows conversion from the time domain into the frequency domain but other algorithms may be used depending on the task. For example, the constant-Q transform (CQT) may be more suitable for processing music audio clips~\cite{brown1991calculation}. 
+{Using spectrograms as input, however, does not come without drawbacks. Each audio recording can be transformed into various spectrograms using different algorithms and parameters.} In order to find the audio transformation methods best suited to a specific task, trial and error may be needed. The usual way to conduct these trial and error experiments is to convert audio clips to different frequency domain representations and save each of the representations on the hard disk. After that, the neural networks are trained using each of the different representations and the best performing model is selected. Once {the best frequency domain representation has been identified, the transformation parameters, such as window size and number of frequency bins,} can be further fine-tuned to obtain an even better result. 
+
+Performing a parameter search to obtain the best spectrogram input yields two major problems. First, a considerable amount of hard disk space is required to store different frequency domain representations resulting from the different parameter settings. Given a dataset with 20GB of audio recordings (e.g. MusicNet~\cite{thickstun2017learning}), the resultant spectrograms can easily occupy up to 1TB of hard disk space {if one wants to experiment with different types of spectrograms with different parameters}. {A detailed case study will be discussed in Section~\ref{sec: eg1}. Second, the audio processing step is usually done separately from the model training. To combine the processing step and model training into one continuous pipeline, on-the-fly spectrogram extraction is needed.} The existing methods for time-frequency conversion of audio files, however, are too slow for on-the-fly spectrogram extraction. Most of the above-mentioned applications use \nbh{librosa}~\cite{mcfee2015Librosa}, a popular python audio processing library based on central processing units (CPUs). To use \nbh{librosa}together with a neural network model, the spectrograms need to be constantly transferred from a CPU to a graphics processing unit (GPU), since model training is done on GPUs. To make this process more efficient, it would be better to have a library that processes the spectrograms directly on the GPU.
+
+{There have been some attempts at implementing methods for GPU-based spectrogram extraction. \nbh{Tensorflow}~\cite{Tensorflow2015-whitepaper} has a \nbh{tf.signal} package that performs the Fast Fourier Transform (FFT) and Short-Time Fourier Transform (STFT) on GPUs. There is a high-level API, called \nbh{Keras}, for people who want to quickly build a neural network without having to work with \nbh{Tensorflow} sessions. \nbh{Kapre}~\cite{choi2017kapre} is the \nbh{Keras} version for GPU-based audio processing. Along similar lines, \nbh{PyTorch}~\cite{paszke2017automatic} has recently developed \nbh{torchaudio}, but this tool has not been fully integrated into \nbh{PyTorch} at the time of writing this paper. Furthermore, \nbh{torchaudio} requires \nbh{Libsox} as an extra dependency, and the installation often requires significant trouble-shooting~\cite{torchaudio_mac}; for example, \nbh{torchaudio} is currently not compatible with Windows 10~\cite{torchaudio_win}. Among the three tools, only \nbh{Kapre} and \nbh{torchaudio} support audio to Mel spectrogram conversion, but none of the existing libraries support constant-Q transform (CQT). Furthermore, only \nbh{Kapre} supports neural network-based signal processing since it is the only implementation that supports trainable kernels for time domain to frequency domain transformations. \nbh{Kapre}}, however, cannot be integrated with the popular machine learning library \nbh{PyTorch} {due to its \nbh{Tensorflow} backend}. {Despite the GPU support and differentiability}, \nbh{torchaudio} and \nbh{tf.signal} are not neural network-based, meaning that {there is no trainable parameter which can be learned or fine-tuned during neural network training. Although \nbh{torch-stft}\footnote{https://github.com/pseeth/torch-stft} {is a native \nbh{PyTorch} function without any additional dependency,} only STFT is available.} 
+
+
+ {Therefore, to bridge this gap in the field, we introduce a fast, differentiable, and trainable neural network-based audio processing framework called \nbh{nnAudio}~\cite{nnAudio}. \newtext{To ensure perfect integration with one of the most popular machine learning libraries, we built our spectrogram extraction method using \nbh{PyTorch}. This way, our library can be used as a \nbh{PyTorch} neural network layer, and all the functionalities available in \nbh{PyTorch}, such as data augmentations, can be used together with \nbh{nnAudio}}. Moreover, our proposed framework includes extended functionalities as compared to other existing libraries, such as calculating Mel spectrograms and constant-Q transforms. More specifically, we use a 1D convolution layer to implement the transformation algorithm, which makes the spectrogram extraction in \nbh{nnAudio} a trainable process (see Section~\ref{subsec:trainable}). \nbh{nnAudio} is hence useful when exploring different input representations for neural network models~\cite{balamurali2019toward,kelz2016potential}. Since our proposed framework is based on neural networks, the audio processing can be integrated into the model training as shown in Figure~\ref{fig: workflow}(b). That is, there is no need to do audio processing and model training separately, as in the traditional method shown in Figure~\ref{fig: workflow}(b). nnAudio enables on-the-fly spectrogram extraction and model training at the same time. In Section~\ref{subsec: speed} we discuss the improved performance of this method as compared to traditional approaches in Figure~\ref{fig: workflow}(a). The library is available online\footnote{\label{nnAudio} Via PyPI (nnAudio), and \url{https://github.com/KinWaiCheuk/nnAudio}}.}
+
+ 
+
+\Figure(topskip=0pt, botskip=0pt, midskip=0pt)[width=\linewidth]{fig/workflow.png}
+{A flowchart comparing (a): existing (slow) approach~\cite{wang2017two, yenigalla2018speech, wyse2017audio, lederle2018combining, sakashita2018acoustic, weiping2017acoustic, zhang2017empirical, murauer2018detecting, dong2018convolutional} and (b): our proposed (much faster as shown in Figure~\ref{fig:speed}a) neural network-based audio processing framework (nnAudio). Our proposed neural network is highlighted in yellow. Instead of pre-processing the waveforms, we can now feed-forward waveforms to the neural network directly, and spectrograms can be generated on-the-fly during training. The red arrows indicate how far the backpropagation $\nabla L$ may go, this allows the initialized kernels to be fine-tuned during training, resulting in specifically tailored new representations.} \label{fig: workflow}
+
+
+
+\subsection{Summary of key advantages}
+{The main contribution of this paper is the development of a GPU-based audio processing framework that is directly integrated into and leverages the power of neural networks. This provides the following benefits:
+\begin{enumerate}
+  \item End-to-end neural network training with an on-the-fly time-frequency conversion layer (i.e. one can directly use raw waveforms as the input to the neural network).
+  \item Significantly faster processing speed compared to the traditional audio processing approach {such as \nbh{librosa}~\cite{mcfee2015Librosa}.}
+  \item {CQT algorithms based on neural networks that can be run on GPUs (no neural network-based CQT algorithm that can be run on GPU is available at the time of this writing.)}
+  \item Trainable Fourier, Mel and CQT kernels that can be automatically tailored to the problem at hand.
+\end{enumerate}}
+
+
+
+In the following subsections, we will briefly summarize the mathematics of the Discrete Fourier Transform (DFT). We will then discuss how to initialize a neural network to perform the STFT, Mel spectrogram and constant-Q transform (CQT) in Section-\ref{sec: PyTorch}. In section~\ref{sec: Result}, we compare the speed and output of nnAudio versus a popular python signal processing library, librosa. Finally, we end with potential applications of our proposed library. 
+% The main contributions of this paper are (1) developing a CQT using a 1D convolutional neural network; (2) improving the existing CQT algorithm to reduce the number of steps required for the final result; and (3) providing an example to show how trainable STFT or Mel spectrograms can improve the overall model performance for a signal frequency prediction task. This paper can also serve as a guide on how to calculate the DFT and its variants using other automatic differentiation libraries available in the future.    
+
+
+\section{Signal processing: A Quick Overview}
+In this section, we will go over the basic transformation methods (DFT) used to convert signals from the time domain to the frequency domain. {Readers who have a solid background in signal processing are welcome to skip this section and may continue reading from Section~\ref{sec: PyTorch}.}
+
+\subsection{Discrete Fourier Transform (DFT)} \label{chap:DFT}
+When recording audio using any computer or mobile device, the analogue signal is converted to a digital signal before storing the data. Therefore, the audio waveforms consist of discrete data points. The Discrete Fourier Transform can be used to convert this discrete signal from the time domain to the frequency domain. Equation~\eqref{DFT2} shows the mathematical expression for the discrete Fourier transform~\cite{wang1984fast}, where $X[k]$ is the output in the frequency domain; and $x[n]$ is the $n^{th}$ sample of the audio input in the time domain. For real-valued inputs, the frequency domain output $X[k]$ for $k \in [1,N/2]$ is equal to the output $X[k]$ for $k \in [N/2,N-1]$ in reverse order, where $N$ is the window length (which is usually a power of two such as 1,024 and 2,048). To discard this redundant frequency domain information, only the first half of the frequency bins in the frequency domain will be extracted, i.e. $k \in [0,\frac{N}{2}]$. We define the DFT as a split-sum of real and complex components:
+
+%\begin{equation}
+%X[k] = \sum_{n=0}^{N-1}x[n]\cdot e^{-2\pi i k \frac{n}{N}}.\label{DFT}
+%\end{equation}
+
+%We can further use Euler's formula \eqref{Euler} on \eqref{DFT} to rewrite this expression as a sum of sine and cosine terms \eqref{DFT2},
+%\begin{equation} 
+%e^{-2\pi i k \frac{n}{N}} = \cos(2\pi k \frac{n}{N}) - i \sin(2\pi k %\frac{n}{N})\label{Euler},
+%\end{equation}
+
+\begin{equation} 
+X[k] = \sum_{n=0}^{N-1}x[n] \cos(2\pi k \frac{n}{N}) - i \sum_{n=0}^{N-1}x[n]\sin(2\pi k \frac{n}{N})
+\label{DFT2}.
+\end{equation}
+
+
+When we use \eqref{DFT2} to compute the DFT with a 1D convolutional neural network, we can calculate the real and complex terms separately using real-valued arithmetic.
+
+
+
+The frequency $k$ in the DFT is given in terms of normalized frequency (equivalent to cycles per window). The formula to convert the normalized frequency $k$ to the frequency $f$ in units of Hertz (Hz) is given by \eqref{f-k-conversion},
+
+\begin{equation}
+ f= k\frac{s}{N} \label{f-k-conversion},
+\end{equation}
+
+where $s$ is the sample rate and $N$ is the FFT window length.
+
+
+
+\subsection{DFT for arbitrary frequency ranges}
+Since $k$ is an integer ranging from zero to half of the window length, the DFT is only capable of resolving a finite number of distinct frequencies. For example, if the sampling rate is 44,100Hz, and the window length is 2,048, then the normalized frequencies for the DFT kernel are $k=[0,1,2,$\ldots$,1024]$ which corresponds to a DFT kernel with frequencies  $f=[0,21.53,43.07,$\ldots$, 22050]$~Hz (using \eqref{f-k-conversion}).  The frequency resolution under this setting is 21.53Hz. For comparison, the lowest two notes on a piano keyboard are $A0=27.5$ Hz and $A\#0=29.14$ Hz. With a difference of less than 2 Hz between them, the DFT of 1,024 frequency bins is not sufficient to resolve the correct note. The frequency resolution $\Delta f$ is given by \eqref{freq-resolution}. This resolution can be improved by increasing the window size $N$, however, increasing the window size results in a decrease in time resolution $\Delta t$, as shown in \eqref{time-resolution}. Therefore, we are forced to make a compromise between time and frequency resolution as per \eqref{freq-time-resolution}.
+
+\begin{equation}
+ \Delta f = \frac{s/2}{N/2} \label{freq-resolution}
+\end{equation}
+\begin{equation}
+ \Delta t = \frac{N}{s} \label{time-resolution}
+\end{equation}
+\begin{equation}
+ \Delta f\Delta t = 1 \label{freq-time-resolution}
+\end{equation}
+
+
+The vectors of the DFT transformation matrix are a basis for the set of all complex vectors of length N. This implies that applying the DFT followed by the inverse-DFT results in a perfect reconstruction of the original signal. Invertibility is important for many signal processing applications, but in information retrieval applications such as speech recognition and sound classification, it is not always necessary to use an invertible time-frequency transformation. In such cases we may want to modify the DFT in ways that no longer result in an orthogonal set of basis vectors.
+
+ 
+One way to modify the DFT is to change the frequencies of the basis vectors to increase or decrease the number of bins in certain parts of the spectrum. To achieve linear-scale frequency with non-integer multiples of $s/N$ in equation \eqref{f-k-conversion} we can replace $k$ with $\sigma(k) = Ak + B$, where $A$ and $B$ are two constants. To find $A$ and $B$, let $f_e$ and $f_s$ be the ending and starting frequencies of the range we want to analyse, and apply \eqref{f-k-conversion} to get \eqref{linear-frequency-DFT}, where $\mu \in \left[0, \frac{N}{2}+1 \right]$ is the number of bins chosen to be displayed in the spectrogram.
+
+\begin{equation}
+ \sigma(k) = \frac{(f_e-f_s)N}{\mu s}k + \frac{f_s N}{s}\label{linear-frequency-DFT}
+\end{equation}
+
+
+By the same token, we can generate basis vectors for a log-frequency spectrogram by using $\sigma(k) = Be^{Ak}$, resulting in $A=\frac{f_sN}{s}$ and $B=\frac{\ln{\frac{f_e}{f_s}}}{\mu}$ as shown in \eqref{log-frequency-DFT} below.
+
+
+\begin{equation}
+ \sigma(k) = \frac{f_s N}{s}\left(\frac{f_e}{f_s}\right)^\frac{k}{\mu} \label{log-frequency-DFT}
+\end{equation}
+
+
+Note that we use the word "basis" informally here. These formulae do not guarantee a linearly-independent set of vectors, so the basis we get from this method may in fact be rank-deficient. When using \eqref{log-frequency-DFT} or \eqref{linear-frequency-DFT}, \eqref{DFT2} becomes \eqref{DFT3}. This more general time-frequency transform permits us to focus the resolution of our spectrogram in the frequency range where it is most needed. For example, if our starting frequency is $f_s=50$Hz and the ending frequency is $f_e=6000$Hz, the linear frequency DFT kernel would have basis vectors with normalized frequency $\sigma(k \in [0,1024]) = [2.32,2.59,2.86, ..., 278.10,278.36]$. This corresponds to the frequency $f=[50,55.8,61.6,..., 5988,5994]$Hz. The frequency resolution has improved from $21.53$Hz to $5.8$Hz without changing the transform window size. 
+
+
+\begin{equation} X[k] = \sum_{n=0}^{N-1}x[n] \cos(2\pi \sigma(k) \frac{n}{N}) - i \sum_{n=0}^{N-1}x[n]\sin(2\pi \sigma(k) \frac{n}{N})\label{DFT3}\end{equation}
+
+Note that this method only changes the spacing between the centres of adjacent frequency bins without affecting the width of the bins themselves. Because each bin represents a range of frequencies in a fixed-width region centred around $f$ as given in \eqref{f-k-conversion}, we will lose information if we space the bins too far apart.  
+
+
+In the next section, we explain how the DFT in \eqref{DFT2} and the variable-resolution DFT in \eqref{DFT3} is used to calculate the short-time Fourier transform (STFT) using a convolutional neural network. The frequency scaling factor will be integrated as one of the input features in our neural network-based framework.
+
+
+
+\section{Neural Network-Based Framework} \label{sec: PyTorch}
+In this section, we will discuss how to calculate the short-time Fourier transform (STFT), Mel spectrogram, and constant-Q transform (CQT) using a 1D convolutional neural network. These are then  implemented as a library (nnAudio) in PyTorch\footnotemark[2]. {This paper assumes that the readers have a basic understanding of convolutional neural networks. {A detailed explanation of CNNs is outside of the scope of this paper. Readers are highly encouraged to consult these papers ~\cite{lecun1995convolutional,lecun1998gradient} in order to quickly obtain a grasp of the background knowledge in this area. Readers are also highly encouraged to visit our github page for the details of our implementations\footnotemark[2]}.}
+
+{A neural network-based approach means that we encode known audio processing knowledge (the algorithms discussed above) into the neurons of the neural network, so that the neural network behaves in the same way as the original algorithms.} The STFT is the fundamental operation for both Mel spectrogram calculation and CQT. To convert the STFT spectrogram to a Mel spectrogram we simply multiply the spectrogram by a Mel filter bank kernel. Similarly, the computation of the CQT also begins with the STFT, followed by multiplication with a CQT kernel. We begin this section by explaining how we use a convolutional neural network to compute the STFT.
+
+
+
+\subsection{Short-Time Fourier Transform (STFT)} \label{subsec:STFT}
+The Short-time Fourier Transform (STFT), also called the sliding-window DFT, refers to an application of the DFT wherein the signal is cut into short windows before performing the transform rather than performing one large transform on the entire signal~\cite{Nawab:1987:SFT:42739.42745}. For audio analysis applications, this is the standard way to apply the DFT.
+
+
+The STFT is usually calculated using the Cooley-tukey Fast Fourier Transform algorithm (FFT), which is preferred because it computes the DFT in $O(N \log N)$ operations, as opposed to $O(N^2)$ for the canonical DFT implementation. However, implementations of the $O(N^2)$ DFT often out-perform the $O(N \log N)$ FFT for small values of $N$ when the underlying platform supports fast vector multiplication. This is especially true when the computation is done in parallel on a GPU. Since neural network libraries typically include fast GPU-optimised convolution functions, we can compute the canonical DFT quickly on those platforms by expressing the vector multiplication in the DFT as a one-dimensional linear convolution operation. 
+
+Discrete linear convolution of a kernel $h$ with a signal $x$ is defined as follows,
+\begin{equation}
+    (h * x)[n] = \sum^{M-1}_{m=0}x[n-m]h[m],\label{convolutionDefinition}
+\end{equation}
+where $M$ is the length of the kernel $h$. PyTorch defines a convolution function with a stride argument. The one dimensional convolution of $x$ with $h$ using a stride setting of $k$, denoted by the symbol $*^k$ is,
+\begin{equation}
+    (h *^k x)[n] = \sum^{M-1}_{m=0}x[k n-m]h[m].\label{convolutionWithStride}
+\end{equation}
+We can use convolution with stride to make fast GPU-based implementations of the short time Fourier transform (STFT). To do this, we take each basis vector of the DFT as the filter kernel $h$, and compute the convolution with the input signal $x$ once for each basis vector. We set the stride value according to the amount of overlap that we want to have between each DFT window. For example, for zero overlap, we set the stride to $N$, the length of the DFT; and for 1/2 window overlap, we set the stride to $N/2$.
+
+
+Note that due to the way convolution is defined in \eqref{convolutionDefinition} and the way that \eqref{convolutionWithStride} computes array indices, we need to reverse the order of elements in the DFT basis vectors when creating the convolution kernels. The following expressions are the pair of convolution kernels ($h_{\text{re}}[k,n]$ and $h_{\text{i }}[k,n]$) that represent the real and imaginary components of the $k^{th}$ DFT basis vector respectively,
+
+
+\begin{align}
+    h_{\text{re}}[k,n] &= \cos(2\pi k \frac{N-n-1}{N}),\\
+    h_{\text{im}}[k,n] &= \sin(2\pi k \frac{N-n-1}{N}).
+\end{align}
+The DFT is usually computed with a function that fades the samples at the edges of each window smoothly down to near zero to avoid the high-frequency artefacts that are introduced by cutting the window abruptly at the edges~\cite{Oppenheim1989DiscretetimeSP}. Typical examples of DFT window functions include Hann, Hamming, and Blackman types. In a GPU-based DFT implementation using a convolution function with stride \eqref{convolutionWithStride}, we can implement the window smoothing efficiently by multiplying these window function elementwise with the filter kernels $h_i$ and $h_r$ before doing the convolution. 
+
+
+When calculating spectrograms, we typically use the Discrete Fourier Transform of length $N=2048$ or $N=4096$, but other values of $N$ are possible. We often cut the DFT windows so that they overlap each other by some amount in order to improve the time resolution. In a signal with $T$ windows, we let $X_t$  be the DFT of the window at index $t \in [0,T-1]$. The time domain representation of the window at index $t$ will be denoted by $x_t$. 
+
+
+%According to the \nbh{PyTorch} documentation\footnote{https://PyTorch.org/docs/stable/nn.html?highlight=conv1d\#torch.nn.Conv1d}, the expression for 1D convolution without bias is given by \eqref{conv1d}, where $B$ is the batch size, $C_{\text{in}}$ is the number of input channels, $C_{\text{out}}$ is the number of output channels, and $*$ is the convolution operator. In the most common case, where we have only one channel of audio input, \eqref{conv1d} can be reduced to \eqref{conv1d-2}.
+
+%\begin{equation}
+% \text{out}(B, C_{\text{out}}) = \sum_{c=0}^{C_{\text{in}}-1}\text{input}(B,c)* \text{kernel}(C_{\text{out}}, c)\label{conv1d}
+%\end{equation}
+
+%\begin{equation}
+% \text{out}(B, C_{\text{out}}) = \text{input}(B)* \text{kernel}(C_{\text{out}})\label{conv1d-2}
+%\end{equation}
+
+
+\Figure[t!](topskip=0pt, botskip=0pt, midskip=0pt)[width=\linewidth]{fig/conv1d_v2.png}
+{An STFT with a sliding window can be achieved by implementing DFT and initializing the 1D convolution kernels as cosine and sine in \nbh{PyTorch}. Applying logarithmic compression on the magnitude allows for a better visualization of the spectrogram. \label{fig: conv1d}}
+
+
+%By comparing \eqref{conv1d-2} with \eqref{DFT2} introduced in section~\ref{sec:Introduction}, one can observe that they are similar in a way that the input $x$ is convoluted with a kernel of either sine or cosine kernel, and the number of output channels $C_{\text{out}}$ would be the normalized frequency $k$. In order words, DFT can be modelled by two 1D convolutional neural networks. In one of the neural networks the kernel is initialized as $\cos (2\pi k \frac{n}{N})$ for the real part of the DFT, and the kernel for another neural network would be  $\sin (2\pi k \frac{n}{N})$ for the imaginary part. As mentioned in section~\ref{sec:Introduction}, each normalized frequency $k \in [0,\frac{N}{2}]$ is a channel for the convolution neural network, therefore the number of channels is $\frac{N}{2}+1$ to remove redundant information. Since 1D convolution in \nbh{PyTorch} supports a sliding window along the signal, the DFT implemented with \nbh{PyTorch} 1D convolutional neural network would automatically become a short-time Fourier transform (STFT). 
+
+
+
+Figure~\ref{fig: conv1d} shows the schematic diagram for a neural network-based STFT. There are two main advantages of implementing the STFT using a \nbh{PyTorch} 1D convolutional neural network. First, it supports batch processing. Using a neural network-based framework, we can convert a tensor of audio clips to a tensor of spectrograms using tensor operations. Second, the neural network weights can be either fixed or trainable. We will discuss how trainable STFT kernels improve the frequency prediction accuracy in Section~\ref{subsec:trainable}. 
+
+\hspace{11pt} 
+
+\noindent \textbf{nnAudio API}: The STFT is implemented in nnAudio as the function \nbh{Spectrogram.STFT()}, with default arguments: n\_fft = 2048, freq\_bins = None, hop\_length = 512, window = `hann', freq\_scale = `no', center = True, pad\_mode = `reflect', fmin = 50, fmax = 6000, sr = 22050, trainable = False. This function has an optional argument \nbh{freq\_scale} which allows the user to choose either a linear or a logarithmic frequency bin scale.
+
+
+
+\subsection{Mel spectrogram}
+The Mel frequency scale was proposed by Stevens et al. in 1937 as an attempt to quantify pitch such that equal differences in Mel-scale pitch correspond to equal differences in perceived pitch, regardless of the frequency in Hertz~\cite{Stevens1937ASF}. 
+%During the experiment, the participants were presented with two tones, with one tone being fixed, and another tone could be tuned by the participants using a crank. The goal of the experiment was to  tune the latter tone such that it sounds just half of the pitch of the fixed tone. This result allows research to understand how humans perceive tones and how is the perceptual tone distant different from the physical tone distant. For example, if the fixed tone has a frequency of 125Hz, the theoretical tone that is half of its frequency should be 62.5Hz. The participants, however, picked a tone with frequency around 90Hz to represent "half" of the fixed tone. Because of the difference in perceptual and physical distant in tone, the researchers can find a mapping from the physical frequency (in Hertz) to the perceptual pitch (in Mels). 
+In addition to the original Mel scale proposed by Stevens et al., there were several other attempts to obtain a revised version of the Mel scale~\cite{Stevens1940TheRO, fant1949analys, koening1949new}. Therefore, there is not a single ``right'' formula for the Mel scale, as various different formulae coexist in the literature~\cite{umesh1999fitting}.  The traditional frequency to Mel scale conversion is the one mentioned in O'Shaughnessy's book~\cite{o1987speech}, which was implemented in the HTK Speech Recognition toolkit~\cite{young2002htk} as~\eqref{mel-o}), shown below,
+
+\begin{equation}
+m=2595 \text{log}_{10}\left(1+\frac{f}{700} \right)
+\label{mel-o}
+\end{equation}
+
+We refer to this form as `htk' later on. Equation \eqref{mel-stanley} shows another form that is being used in the Auditory Toolbox for MATLAB~\cite{slaney1998matlab} and \nbh{librosa} (a python audio processing library)~\cite{mcfee2015Librosa}. This form is quasi-logarithmic, meaning that the frequency to Mel scale conversion is linear in the low frequency region (usually the breaking point is set to 1,000Hz), and logarithmic in the high frequency region (after the breaking point). The default Mel scale in \nbh{librosa} is in the form of \eqref{mel-stanley}, but it is possible to change it to the form defined in \eqref{mel-o} by setting the \nbh{htk} argument to \nbh{True}.
+
+\begin{equation}
+    m=
+    \begin{cases}
+      \frac{3f}{200}, & \text{if}\ 0 \text{Hz} \leq f\leq1000 \text{Hz} \\
+      \frac{3000}{200} + \frac{27\ln{(f/1000)}}{\ln{6.4}}, & \text{if}\ f \ge 1000\text{Hz}
+    \end{cases}
+    \label{mel-stanley}
+\end{equation}
+
+\Figure[t](topskip=0pt, botskip=0pt, midskip=0pt)[width=85mm]{fig/melspectrogram.png}
+{Mel spectrogram obtained by combining the STFT result (65 frequency bins) with 4 Mel filter banks. \label{fig: Mel spectrogram}}
+
+
+Once we have the frequency to Mel scale conversion, we can create Mel filter banks (for details on the computation of Mel filter banks, the readers may refer to~\cite{Davis1980ComparisonOP}) that are multiplied to each timestep of the STFT result to obtain a Mel spectrogram~\cite{rabiner2011theory}. An example of this conversion is shown in  Figure~\ref{fig: Mel spectrogram}, which depicts the STFT and Mel-scale spectrograms of a signal that starts with five pure tones at 25Hz, 75Hz, 150Hz, 400Hz, and 450Hz (shown in region A). After 0.25 seconds, three of the tones stop, leaving only 2 tones at 75Hz and 450Hz (shown in region B). After another 0.25 seconds, only the 75Hz tone remains (Region C), and finally, it ends with a single 450Hz tone (Region D). The STFT spectrogram is shown in the left-hand side of Figure~\ref{fig: Mel spectrogram}. In this example, the window size for the STFT is 128 samples, which would generate a spectrogram with 128 frequency bins. The complete spectrogram contains redundant information due to symmetry, therefore only 65 bins are used in the final STFT result. The hop size for STFT is 32 samples, which equals a quarter of the window size. To obtain a Mel spectrogram with four Mel bins, we need to have four Mel filter banks. The basis functions of a Mel filter bank are triangular in shape and the kernel that converts the raw STFT to the Mel-spectrogram by grouping multiple STFT bins to a single Mel bin. %Mel filter banks can be considered as a lookup table, mapping multiple frequency bins to a specific Mel bin and 
+
+The exact mapping for the example in Figure~\ref{fig: Mel spectrogram} is shown in Table~\ref{tab:mel}. There are five frequency components in region A, the three frequency components corresponding to $25$~Hz, $75$~Hz, and $150$~Hz will be mapped to Mel bin $0$. Since the Mel filter banks are overlapping with each other, the frequency component $150$~Hz will also be mapped to Mel bin $1$, while the two high frequency components $400$~Hz and $450$Hz will only be mapped to Mel bin $3$. Each timestep of the STFT is multiplied by the Mel filter banks matrix in the same way to obtain the Mel spectrogram.
+
+
+nnAudio's implementation of the Mel spectrogram extraction from raw waveforms in \nbh{PyTorch} is relatively straightforward. We obtain the STFT results using the \nbh{PyTorch} 1D convolutional neural network described in Section~\ref{subsec:STFT}, and then we use Mel filter banks obtained from \nbh{librosa}. The values of the Mel filter banks are used to initialize the weights of a single-layer fully-connected neural network. Each time step of the magnitude STFT is fed forward into this fully connected layer initialized with Mel weights.  The Mel filter banks only need to be created once when initializing the neural network. These weights can be set as trainable or remain fixed, much like the neural network implementation of STFT as discussed in Section~\ref{subsec:STFT}. Figure~\ref{fig: Mel model} shows the schematic diagram of our \nbh{PyTorch} implementation of the Mel spectrogram calculation.
+
+\hspace{11pt} 
+
+\noindent \textbf{nnAudio API} nnAudio implements the Mel spectrogram layer as \nbh{Spectrogram.MelSpectrogram()}, with default arguments: sr = 22050, n\_fft = 2048, n\_mels = 128, hop\_length = 512, window = `hann', center = True, pad\_mode = `reflect', htk = False, fmin = 0.0, fmax = None, norm = 1, trainable\_mel = False, trainable\_STFT = False.
+
+\Figure[t](topskip=0pt, botskip=0pt, midskip=0pt)[width=\linewidth]{fig/mel_model.png}
+{nnAudio's neural network-based implementation for Mel spectrograms. The STFT window size is 4,096 and the number of Mel filter banks is 64 in this example.} \label{fig: Mel model}
+
+\begin{table}\centering
+\caption{Mapping from frequency bins to Mel bins for the example in Figure~\ref{fig: Mel spectrogram}. The bin indexing starts with 0.}
+\label{tab:mel}
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lcc}
+\toprule
+Frequency bins& 
+Corresponding & 
+Mel bins\\
+&frequencies& (htk version)\\
+\midrule
+$1-21$& $0\text{Hz} \ \text{to}\ 168.4$Hz & 0 \\
+$11-34$& $79.8\text{Hz} \ \text{to}\ 267.3$Hz & 1 \\
+$22-48$& $168.4\text{Hz} \ \text{to}\ 377.4$Hz & 2 \\
+$35-64$& $267.3\text{Hz} \ \text{to}\ 500$Hz & 3 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+
+
+\subsection{Constant-Q transform}
+\subsubsection{A quick overview of the constant-Q transform (1992 version)}
+There is a logarithmic relationship between the frequencies of musical pitches: The frequency of a musical pitch doubles for every octave. In order to effectively reflect the relationship between musical pitches on a spectrogram, it is helpful to use a logarithmic frequency scale. One naive solution is to modify the frequencies of the basis functions of the discrete Fourier transform so that the centre frequencies of the bins form a geometric series ~\cite{haines1988logarithmic}. There are, however, numerous problems with this approach. 
+
+
+First, it is well-known that the standard DFT basis functions of length $N$ form an orthogonal basis for the space of all complex vectors of length $N$. The orthogonality of the basis guarantees that the DFT is an energy-preserving transformation. In other words, the magnitude of the transformed output is exactly equal to the magnitude of the input. This is important because it means that we can determine the volume of the input signal simply by looking at the magnitude of the DFT output. If we modify the frequencies of the basis vectors, they become non-orthogonal and therefore the relationship between input and output energy becomes much more complicated. 
+
+
+A second consequence of using unevenly spaced basis vectors in the DFT is that at the upper end of the spectrum, where the vectors are farthest apart, there will be wide gaps between frequency bins. If we insist on using a set of only $N$ vectors as the basis, these gaps are so wide that high frequency tones lying between bins will not be detected at all.
+The lack of frequency resolution in the high end can be remedied by increasing the number of basis vectors beyond $N$, but doing so leads to an excessive density on the low frequency end of the spectrum. Since the width of each bin is constant with respect to frequency, this results in significant overlap between bins in the low end. In frequency ranges with significant overlap between bins, the energy shown in the transformed output is exaggerated with respect to the actual energy in the input signal.
+
+
+The challenges mentioned above are the motivation for the design of the constant-Q transform, first proposed by Brown in 1991 as a modification of the discrete Fourier transform~\cite{brown1991calculation} where the window size $N_{k_{cq}}$ scales inversely proportional to the centre frequency of the CQT bin $k_{cq}$ to maintain a fixed number of cycles for sine and cosine within the window. Since the width of each bin is inversely proportional to the length of its basis vector, the width of each CQT frequency bin expands proportionally to the space between bins so that there are no gaps between bins at the upper end of the spectrum and no excessive overlap between bins at the lower end of the spectrum.
+
+
+In signal processing, the letter Q~\cite{q-factor}, which stands for quality, indicates the centre frequency divided by the bandwidth of a filter. There are many types of filters for which the term bandwidth is applied and correspondingly there are various different definitions of the bandwidth and of Q. In the context of the CQT, Q is defined to be the number of cycles of oscillation in each basis vector. The corresponding equation for Q is shown in \eqref{Q}, where $b$ is the number of bins per octave. Once $Q$ is known, we can calculate the window size $N_{k_{cq}}$ for each bin $k_{cq}$ by \eqref{N_k}. The equation for CQT is very similar to the DFT, with the varying index $k$ replaced by $Q$ and fixed window size $N$ replaced by varying window size $N_{k_{cq}}$ as shown in \eqref{CQT}. Despite the fact that constant-Q transform (CQT) uses a  similar concept as logarithmic frequency DFT, i.e., both of them have a logarithmic frequency scale, they are not the same. CQT maintains a constant frequency resolution by keeping a constant Q value while the logarithmic frequency STFT has a varying Q. The subtle differences between the CQT and logarithmic frequency scale STFT can be observed in Figure~\ref{fig: performance_1}, and~\ref{fig: performance_2}.
+\begin{equation}
+    Q=(2^{\frac{1}{b}}-1)^{-1}
+    \label{Q}
+\end{equation}
+
+\begin{equation}
+    N_{k_{cq}}=   \text{ceil}{\left(\frac{s}{f_{k_{cq}}}\right)Q}
+    \label{N_k}
+\end{equation}
+
+\begin{equation}
+    X^{cq}[k_{cq}]= \sum_{n=0}^{N_{k_{cq}}-1}x[n]\cdot e^{-2\pi i Q \frac{n}{N_{k_{cq}}}}
+    \label{CQT}
+\end{equation}
+
+
+\subsubsection{CQT using neural networks}
+The naive implementation of CQT consists of looping through all of the kernels one by one, and calculating the dot-product between the kernel $e^{-2\pi Q/N_k}$ and the input signal $x$~\cite{brown1991calculation}. This type of implementation, however, is not feasible for our 1D convolution approach. Most neural network frameworks only support a fixed kernel size across different channels for a 1D convolutional neural network. This means that if we have 84 CQT kernels, we would need 84 convolutional networks to include all of the kernels.
+
+
+\Figure[h](topskip=0pt, botskip=0pt, midskip=0pt)[width=\linewidth]{fig/cqt_kernels.png}
+{An example of CQT kernels whereby the number of bins per octave is set to 12. The x-axis shows the time in digital samples ($n$). Each CQT kernel has a frequency that corresponds to a musical pitch. Only the real components of $y[n, k_{cq}]$ and $Y[k, k_{cq}]$ are shown here.  \label{fig: CQT_kernels}}
+
+Youngberg and Boll~\cite{youngberg1978constant} first proposed the concept of CQT in 1978. Brown later proposed an efficient way to calculate CQT in 1992~\cite{brown1992efficient}. The trick is to use Parseval's equation~\cite{Oppenheim1989DiscretetimeSP} as shown in \eqref{Parseval}, where $a[n]$ and $b[n]$ are arbitrary functions in the time domain, and $A[k]$ and $B[k]$ are the frequency domain versions of $a[n]$ and $b[n]$, respectively. If we define $X[k]$ and $Y[k]$ as the DFT of input $x[n]$ and kernel $e^{-2\pi Q/N_{k_{cq}}}$, respectively, then this approach converts both $x[n]$ and $e^{-2\pi iQ\frac{n}{N_{k_{cq}}}}$ to $X[k]$ and $Y[k]$, respectively, in the frequency domain, and subsequently multiplies them together to get the approximated CQT as shown in \eqref{CQT1992}. It should be noted that both $X[k]$ and $Y[k]$ are  matrices containing complex numbers, and $N$ is the longest window size for the CQT kernels, which is equal to the length of the kernel with the lowest frequency. Also, $Y[k]$ is a sparse matrix in this case. Figure~\ref{fig: CQT_kernels} shows an example of the CQT kernels in the time domain and frequency domain respectively. The bottom and top kernels correspond to the musical notes A3 ($220$Hz) and A7 ($3520$Hz) respectively, with 12 bins per octave and a sampling rate of $8000Hz$. There are 60 bins in total. Only the real components for the kernels are shown in Figure~\ref{fig: CQT_kernels}, but readers should note that $y[n,k_{cq}]$ is a matrix with complex numbers, and each row of $y[n,k_{cq}]$ is transformed to a row of $Y[k,k_{cq}]$ by using the Fast Fourier Transform (FFT). Therefore, the frequency domain CQT are also matrices of complex numbers and the magnitude CQT can be obtained by taking element-wise norm.
+
+\begin{equation}
+    \sum_{n=0}^{N_k-1}a[n]b[n] = \frac{1}{N}\sum_{k=0}^{N-1}A[k]B[k]
+    \label{Parseval}
+\end{equation}
+
+\begin{equation}
+    X^{cq}[k_{cq}]= \sum_{n=0}^{N_{k_{cq}}-1}x[n]\cdot e^{-2\pi i Q \frac{n}{N_{k_{cq}}}} = \frac{1}{N}\sum_{k=0}^{N-1}X[k]Y[k, k_{cq}]
+    \label{CQT1992}
+\end{equation}
+
+
+
+
+Using the definition of CQT from Brown et al., the conversion from the time domain input $x[n]$ to $X[k]$ can be done with a 1D convolutional neural network. The DFT basis vectors will be the kernels for the neural network. Since there is a real part and an imaginary part to the DFT kernels, we need two 1D convolutional neural networks, one network for the real component of the kernels, and another network for the imaginary component. We can perform the DFT using the same procedure described in Section~\ref{subsec:STFT} for the STFT. Next, each time step of the STFT result $X[k]$ is multiplied with the same CQT kernels $Y[k, k_{cq}]$. Therefore, the CQT kernels only need to be created once as part of the initialization for the STFT 1D convolutional nerual network. In the end we obtain a CQT matrix $X^{cq}[k_{cq}]$ with real and imaginary parts and the final CQT ouput is calculated using the element-wise magnitude $\text{abs}{X^{cq}[k_{cq}]}$.
+
+
+Unfortunately there is a major flaw in this approach. If the number of octaves is large and the CQT kernels start at a low frequency, the size of CQT kernels will be huge. For example, if we want to cover 88 notes (from A0 to C8 as the range for a piano) with a sampling rate of $44100$Hz and 24 bins per octave, then the longest time domain CQT kernel window size is 54,727, according to \eqref{N_k}. When rounding this up to the next power of $2$, the window size will be 65,536, assuming that we want the FFT length to be a power of 2. %It has been shown that windows whose size are a power of 2 work better for FFT~\cite{rabiner1969chirp}. 
+Even though the FFT has not been implemented in nnAudio, we will still follow these recommendations for existing CQT implementations so that we can directly compare them with our implementation. By transforming time domain CQT kernels to frequency domain kernels, we discard half of the kernel length due to symmetry. Therefore, the longest frequency domain CQT kernel has a length of 32,768. With 88 piano keys and 24 bins per octave, the CQT kernels would have a shape of (176, 32768). This also implies that the window size for the STFT would be 32,768, which is extremely long, making this implementation inefficient for huge CQT kernels that have a low frequency. In the following sections, we will discuss how to implement a more efficient version of CQT by using a downsampling method~\cite{brown1991calculation}.
+
+\hspace{11pt} 
+
+\noindent \textbf{nnAudio API} Despite its inefficiency, we still provide this function for research purposes. It can be executed in nnAudio via the function \nbh{Spectrogram.CQT1992}, with default arguments: sr = 22050, hop\_length = 512, fmin = 220, fmax = None, n\_bins = 84, bins\_per\_octave = 12, norm = 1, window = `hann', center = True, pad\_mode = `reflect', device = ``cuda:0".
+
+\Figure[h](topskip=0pt, botskip=0pt, midskip=0pt)[width=\linewidth]{fig/CQT_torch.png}
+{nnAudio's implementation of the 1992 version of CQT~\cite{brown1992efficient} using a 1D convolutional neural network. The DFT kernels and CQT kernels only need to be initialized once and can be reused. \label{fig: CQT_torch}}
+
+
+\subsubsection{Downsampling}
+Next, we will discuss how to do downsampling with a neural network before moving on to the downsampling method used in the computation of the CQT. In order to downsample input audio clips by a factor of two without aliasing, a low pass filter is required so that any frequencies above the downsampled Nyquist frequency will be filtered out first, before performing the actual downsampling. This is performed using a technique called Finite impulse response filtering (FIR). FIR refers to the convolution of an input signal with a filter kernel using the same formula shown earlier in \eqref{convolutionDefinition}. This type of filtering can be implemented efficiently using a convolutional neural network.
+The definition of FIR is shown in~\eqref{FIR}, where $x[n-i]$ is the input signal at time step $n$, $b\_i$ is the FIR filter. 
+
+To downsample, we first design the low-pass FIR filter kernel using the Window Method~\cite{rajput2012implementation}, which is implemented in \nbh{SciPy} as the function \nbh{scipy.signal.firwin}. To achieve a steep cutoff at the Nyquist frequency we set the passband of the filter to end at 0.4995 and the stopband to start at 0.5005 times the Nyquist frequency. These values were chosen so as to achieve a steep cutoff. The impulse response and frequency response of our antialiasing filter is shown in Figure~\ref{fig:low-pass-filter}. This filter is used as the kernel of the downsampling component of our convolutional neural network. An effective antialiasing filter design is important for the CQT implementation, which we explain in the following section.
+
+\Figure(topskip=0pt, botskip=0pt, midskip=0pt)[width=80mm]{fig/low-pass-filter.png}
+{Impulse response and magnitude frequency response for the antialiasing filter. This filter forms the kernel for the 1D convolutional neural network that performs downsampling in nnAudio's CQT computation. \label{fig:low-pass-filter}}
+
+\begin{equation}
+    y[n] = \sum_{i=0}^{N}b_i\cdot x[n-i]
+    \label{FIR}
+\end{equation}
+
+
+\subsubsection{Constant-Q transform (2010 version)}
+
+The constant-Q transform uses basis vectors of varying lengths. The basis kernels for the lowest frequencies are several orders of magnitude longer than the high frequency kernels. Since low frequency audio signals can be accurately represented with lower sample rates, we can compute the lower frequency components of the CQT more efficiently by downsampling the input and using correspondingly shorter filter kernels. This technique is described in detail in~\cite{schorkhuber2010constant, brown1991calculation}. Only one octave of CQT kernels is created using this approach. These CQT kernels usually start from the highest octave due to the short window size as described in \eqref{N_k}. By doing so, the computational complexity can be reduced. When applying the CQT kernels (of this highest octave) to the frequency domain input $X[k]$, only the CQT result for the highest octave is obtained. After that, we downsample the input by a factor of two and apply the same CQT kernels to this new input to obtain the CQT result for the next octave down. The same process is repeated until the desired number of octaves is processed. In this approach, the CQT kernels are kept the same while the input audio is being downsampled recursively. By referring to \eqref{N_k}, $N_{k_{cq}}$ and $Q$ are constant. When we downsample the audio by a factor of 2, $s$ is reduced by half. In order to keep $N_{k_{cq}}$ and $Q$ constant, $f_{k_{cq}}$ must also be reduced by half. Physically, it means the CQT output obtained by same CQT kernels relative to a downsampled audio with factor $2^\alpha$ is $\alpha$ octave lower than the original audio, where $\alpha \in [1,2,3,...]$ is a positive integer. Figure~\ref{fig: CQT2010} shows the schematic diagram for this implementation. Each downsampled input $x_\alpha[n]$ produces the CQT result for one octave. The complete CQT result can then be obtained by appending the results for each of the octaves together.
+
+
+
+\hspace{11pt} 
+
+\noindent \textbf{nnAudio API} This algorithm can be executed in nnAudio via the function \nbh{Spectrogram.CQT2010}, with default arguments: sr = 22050, hop\_length = 512, fmin = 32.70, fmax = None, n\_bins = 84, bins\_per\_octave = 12, norm = True, basis\_norm = 1, window = `hann', pad\_mode = `reflect', earlydownsample = True, device = `cuda:0'.
+
+\Figure(topskip=0pt, botskip=0pt, midskip=0pt)[width=\linewidth]{fig/CQT2010.png}
+{Schematic diagram of the 2010 version of CQT~\cite{schorkhuber2010constant, brown1991calculation} using the recursive downsampling method. The kernels  only need to be initialized once and can be reused over and over again. \label{fig: CQT2010}}
+
+
+
+
+\subsubsection{CQT with time domain kernels}
+\label{subsec:CQTv2}
+When \citet{brown1992efficient} proposed their more efficient algorithm in 1992, they were facing limitations in computer memory. The time domain CQT kernels form a very large, dense matrix. Storing a matrix like this requires a lot of memory. When converting time domain CQT kernels into frequency domain kernels, the dense matrix becomes a sparse matrix. Storing this sparse matrix using either the compressed sparse row (CSR) format or the compressed sparse column (CSC) algorithm is more memory efficient than storing a dense matrix. Therefore, by converting the time domain CQT kernels to the frequency domain, the same information is retained, while requiring less memory to store it.
+
+With modern technology, memory is no longer an issue. Thus, it is no longer necessary to convert the time domain CQT kernels to frequency domain kernels. By not doing this conversion, we remove a computationally heavy step, thus improving the CQT computation speed. Both the 1992 version of CQT and the 2010 version of CQT can benefit from this modification. The resulting modified implementation is shown in Figure~\ref{fig: CQT2010v1} and~\ref{fig: CQT2010v2}. The improvement in computational speed is reported as CQT1992v2 and CQT2010v2, respectively, for each algorithm in Figure~\ref{fig:speed}. {The differences between the existing CQT algorithm and our proposed modification based on the down-sampling approach are shown in Figure~\ref{fig: CQT2010} and Figure~\ref{fig: CQT2010v2}. For the differences between the existing CQT algorithm and our proposed modification based on the \citet{brown1992efficient} approach, readers can refer to Figure~\ref{fig: CQT_torch} and Figure~\ref{fig: CQT2010v1}.}
+
+
+
+\hspace{11pt} 
+
+\noindent \textbf{nnAudio API} The improved version of CQT1992 is implemented as \nbh{Spectrogram.CQT1992v2()} with the default parameters: sr = 22050, hop\_length = 512, fmin = 32.70, fmax = None, n\_bins = 84, bins\_per\_octave = 12, norm = 1, window = `hann', center = True, pad\_mode = `reflect', trainable = False, output\_format = `Magnitude', device = `cuda:0'. 
+
+The improved version of CQT2010 can be executed in nnAudio via the function \nbh{Spectrogram.CQT2010v2()} with default parameters: sr = 22050, hop\_length = 512, fmin = 32.70, fmax = None, n\_bins = 84, bins\_per\_octave = 12, norm = True, basis\_norm = 1, window = 'hann', pad\_mode = 'reflect', earlydownsample = True, device = 'cuda:0'.
+
+\Figure(topskip=0pt, botskip=0pt, midskip=0pt)[width=80mm]{fig/CQT2019v1.png}
+{A schematic diagram showing our proposed improvement of the CQT1992 algorithm that uses time domain CQT kernels instead of frequency domain kernels, which requires less computational steps compared to the original algorithm as shown in Figure~\ref{fig: CQT_torch}\label{fig: CQT2010v1}}
+
+\Figure(topskip=0pt, botskip=0pt, midskip=0pt)[width=80mm]{fig/CQT2019v2.png}
+{A schematic diagram showing our proposed improvement of the CQT2010 algorithm that uses only time domain CQT kernels. Note that the output of the convolution between the audio input and the CQT kernels is still a complex number, even though this is not shown in the figure for simplicity. \label{fig: CQT2010v2}}
+
+
+
+\section{Experimental results}\label{sec: Result}
+In this section, we analyse the speed and the accuracy of the proposed framework, \texttt{nnAudio}. We compare our \nbh{PyTorch} implementation, nnAudio, with the existing audio processing library \nbh{librosa}~\cite{mcfee2015Librosa}. More specifically, our STFT implementation is compared to \nbh{librosa.stft}, Mel Spectrogram to \nbh{librosa.feature.melspectrogram}, and CQT to \nbh{librosa.cqt}. {We also compare our proposed framework to other existing GPU audio processing libraries such as \texttt{Kapre} and \texttt{torchaudio}}. In the first subsection, we compare the speed required to  process 1,770 audio files in .wav format. In the second subsection, we focus on testing the correctness of the resulting spectrograms.  In what follows, the different implementations for CQT,  namely CQT1992v2 and CQT2010v2, will be discussed individually. These are the implementations that directly use time domain CQT kernels as mentioned in Section~\ref{subsec:CQTv2}. For the sake of easy reference, the Mel spectrogram will be referred to as MelSpec below.
+
+
+
+\subsection{Speed}\label{subsec: speed}
+
+\subsubsection{Setup}\label{subsec: spec}
+We use the MAPS dataset~\cite{emiya2010maps} to benchmark nnAudio. A total of 1,770 .wav files from the \nbh{AkPnBcht/UCHO/} folder were used for the benchmark. We discard the first 20,000 samples (which is equivalent to 0.45 seconds under the 44.1kHz sampling rate) from each audio excerpt in order to remove the silence. Each audio excerpt is kept the same length (80,000 samples) by removing the excessive samples in the end. Their final length is equivalent to 1.8 seconds. The audio excerpts are stored as an array with shape $1,770 \times 80,000$. The goal of the speed test is to convert this array of waveforms into an array of spectrograms while maintaining the order of the audio excerpts. We conducted this test {on three different machines:
+\begin{enumerate}[label=(\Alph*)]
+  \item A Windows Desktop with CPU: Intel Core i7-8700 @ 3.20GHz and GeForce GTX 1070 Ti 8Gb GPU
+  \item A Linux Desktop with CPU: AMD Ryzen 7 PRO 3700 and 1 GeForce RTX 2080 Ti 11Gb GPU
+  \item A DGX station with CPU: Intel Xeon E5-2698 v4 @ 2.20GHz and Tesla v100 32Gb GPU
+\end{enumerate}}
+During the test, we compared the speed of our proposed nnAudio toolkit to one of the popular signal processing libraries, \nbh{librosa}~\cite{mcfee2015Librosa}. Although \nbh{Essentia} is reported to be faster than \nbh{librosa} in terms of audio processing speed~\cite{moffat2015evaluation}, our experimental results show that \nbh{Essentia} is slower than \nbh{librosa}. (It takes \nbh{Essentia} 30 seconds to finish the STFT task and 180 seconds to finish the CQT task on machine C.) One possible reason is that \nbh{Essentia} only supports the versions of STFT and CQT without a moving window. Therefore it can only produce spectrums, not spectrograms. To obtain the spectrograms, we first need to cut the input audio into small audio segments and then apply the CQT or STFT on each of these segments. This is done using extra nested \nbh{for} loops, which could cause a slower speed in \nbh{Essentia}. On top of that, \nbh{Essentia} does not support MelSpec, making a side-by-side comparison to nnAudio impossible. We therefore report the results for \nbh{nnAudio} and \nbh{librosa} in Figure~\ref{fig:speed}.
+
+Because our task is to transform an array of waveforms to an array of spectrograms (in the same order), \nbh{librosa} with multi-process will not work well. The time it takes to finish this task while maintaining the same order for the output array as the original array using multiprocessing is longer than when a plain sequential \textbf{for} loop is used. Therefore, the speed test for \nbh{librosa} is performed by using a \nbh{for} loop. Furthermore, the performance for \nbh{librosa} can be optimized by using caching, but this option is disabled by default. To emulate the situation in which most people use \nbh{librosa}, we run the speed test with caching disabled. Even when caching is used, it only reduces the computation time for CQT by around 10 seconds. As for nnAudio, despite the fact that multiple GPUs are available on machine C, only one GPU is used to convert the array of waveforms to the array of spectrograms to ensure a fair comparison with other machines. Since \nbh{PyTorch} can also run on a CPU, we will also test this configuration of nnAudio. {Finally, the computation time of nnAudio is compared with other GPU-based processing libraries: \nbh{Kapre} and \nbh{torchaudio}.}
+
+
+\Figure(topskip=0pt, botskip=0pt, midskip=0pt)[width=\linewidth]{fig/speedv3.png}
+{(a): Processing times to compute different types of spectrograms with nnAudio GPU, nnAudio CPU, and librosa. (b): Processing times for different versions of CQT. (c): Processing times for different GPU processing libraries: Kapre, \newtext{tensorflow}, torchaudio, and nnAudio  \label{fig:speed}}
+
+
+
+
+\begin{table}[h!]
+\caption{The GPU initialization time needed for the two kernels (STFT and model-specific kernel) in each nnAudio neural network model, together with the required memory. }
+\centering
+\label{tab: mem}
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{p{60pt} p{45pt} p{45pt} p{35pt}}
+\toprule
+Model& 
+DFT kernels (in s)& 
+Model kernels (in s) & Memory (in MiB)\\\midrule
+STFT:   & $5.5\pm 0.1$   & N.A. & $1135$\\
+n\_fft=4096 & & & \\\hdashline
+MelSpec:  n\_fft=4096, n\_mels=512 & $5.5\pm 0.04$  & $0.02\pm 0.004$ & $1155$\\\hdashline
+CQT1992: bins\_p\_oct=24, bins=176  & $194.9\pm 1.0$ & $5.6 \pm 0.08$ & $17505$\\\hdashline
+CQT1992v2: bins\_p\_oct=24, bins=176& N.A.           & $4.9 \pm 0.08$ & $1157$\\\hdashline
+CQT2010: bins\_p\_oct=24, bins=176  & $0.05\pm 0.03$ & $4.8\pm 0.08$ & $1177$\\\hdashline
+CQT2010v2: bins\_p\_oct=24, bins=176& N.A            & $4.6\pm 0.05$ & $1089$\\
+\bottomrule
+\end{tabular}
+\label{tab: GPU_util}
+\end{table}
+
+
+\subsubsection{Results}
+Figure~\ref{fig:speed}(a) shows the time taken to convert an array of 1,770 waveforms to an array of 1,770 spectrograms using Mel frequency scale, STFT, and CQT on three different machines. It is clear from the figure that our newly proposed method is faster than \nbh{librosa} {regardless of which machine it is run on. Interestingly, machine A and B (normal desktops) are faster than machine C (DGX station) when running the test on CPU. This is possibly due to the fact that the CPU clock rates for machine A and B are much higher than machine~C. Nevertheless, using a GPU reduces the time taken to finish the spectrogram extractions, whereby the performance of the RTX 2080 Ti GPU is similar to the high end Tesla v100 GPU.} We should note that, when using \nbh{PyTorch} with GPU, extra time is required to transfer the kernels from RAM to GPU memory, which only takes a few seconds. This process can be considered as part of the model initialization. The time required to initialize the models is not included in Figure~\ref{fig:speed}. Table~\ref{tab: GPU_util} shows the time taken to initialize each neural network model with nnAudio. This time is influenced by the kernel sizes of STFT, MelSpec, and CQT. For STFT, a longer window size (n\_fft) results in larger STFT kernels. The same goes for MelSpec and CQT. More time is required to transfer larger kernels to GPU memory. In our experiment, an STFT window size of 4,096 is used for both STFT and MelSpec. For MelSpec, a total of 512 Mel filter banks are used. For the different implementations of CQT, the kernels start at $32.7$Hz, which corresponds to the note C1, and 24 bins per octave, covering 176 bins in total. The neural network models used by nnAudio to calculate MelSpec and CQT require operations with multiple kernels (an initial DFT kernel followed by a model-specific kernel), therefore, we break the initialization time down into two steps (columns 2 and 3 in Table~\ref{tab: GPU_util}). Model kernels refer to the convolution kernels specific to each spectrogram type. For MelSpec, the model kernels are the Mel filter banks. For CQT, they consist of both DFT and CQT kernels. The initialization of the kernels of the network only needs to be performed once. As we can observe from Table~\ref{tab: GPU_util}, CQT2010 has a much faster initialization time compared to CQT1992 (5 seconds compared to over 200 seconds). This can be explained as the bottleneck for CQT1992 in the STFT stage. If the starting frequency is too low, the CQT kernels become very long, which in turn causes a huge window size (n\_fft) for STFT. In the CQT setting used for the kernel initialization speed test (sampling rate=$44,100$Hz, minimum frequency= $32.7$Hz, bins per octaves=24, and bins=176), the longest CQT kernel is 46,020, which results in a n\_fft of 65,536 (rounding up the to nearest power of two, $2^{16}$). To mitigate this problem, a Fast Fourier Transform (FFT) may be used instead of DFT, which will be explored in future research. Another way to prevent this problem would be to use the implementation mentioned in~\ref{subsec:CQTv2}. Once everything is loaded into the GPU memory, the computation will occur at the speed as shown in Figure~\ref{fig:speed}~(a) and Figure~\ref{fig:speed}~(b). Even when only a CPU is used, nnAudio still outperforms \nbh{librosa} and \nbh{Essentia} significantly. 
+
+
+As mentioned in Section~\ref{subsec:CQTv2}, converting the time domain CQT kernels to frequency domain CQT kernels is not necessary if there is enough computing memory. In the experiment, we compare the improvement in computation speed when using the time domain CQT kernels directly. Figure~\ref{fig:speed}~(b) shows how the improved constant-Q Transform (CQT1992v2) and the improved constant-Q Transform with downsampling (CQT2010v2) further improve the computation speed. CQT2010v2 is faster than CQT2010 regardless of whether the CPU or GPU is used. While CQT1992v2 is extremely fast when GPU is used, the CPU version is slower than the CQT2010. Therefore, CQT2010v2 should be used in a computer without GPU, and CQT1992v2 should be used when GPU is available. However, there are subtle differences between the 1992 and 2010 implementation, and under normal circumstances, CQT1992v2 is the best option among all the implementations. The subtle differences between various CQT implementations will be discussed in detail in the following subsection. Nevertheless, to ensure flexibility, \nbh{nnAudio} provides all implementations discussed above (CQT1992, CQT2010, CQT1992v2, CQT2010v2). 
+
+Finally, the speeds of different GPU-based audio processing libraries (Kapre, \newtext{tensorflow}, and torchaudio) are compared with nnAudio on the same task. The results are shown in Figure~\ref{fig:speed}(c). {Since torchaudio does not support the Windows operating system, the result is not available for machine A. For STFT, torchaudio is marginally faster than nnAudio on machine~C, but nnAudio is always faster than torchaudio on machine~B. nnAudio outperforms Kapre on all three machines. For MelSpec, nnAudio is at least three times faster than torchaudio, and at least 40} times faster than Kapre. There is no comparison available for CQT because \nbh{Kapre} and \nbh{torchaudio} do not have this functionality. Kapre is the slowest among the three libraries. This is most likely due to the fact that it directly takes a numpy array as the input which causes slower performance than when a \nbh{PyTorch} tensor is used (like in {torchaudio} and \nbh{}{nnAudio}). \newtext{The speed of tensorflow is slightly faster than Kapre but it is much slower than torchaudio and nnAudio. This result makes sense because Kapre is based on tensorflow, and both torchaudio and nnAudio are based on PyTorch; therefore, the speed of Kapre should be similar to tensorflow whereas the speed of torchaudio should be similar to nnAudio. Although NVIDIA DALI also includes GPU audio to spectrogram processing in its recent releases (since version 0.17.0), its main purpose is for GPU data loading~\cite{zolnouri2020importance, Gayer2019EffectiveRA}. In other words, unlike the libraries we compared here, NVIDIA DALI is not differentiable (it does not calculate the gradient for the spectrograms). For example, if we have waveforms generated from a neural network, and we want to convert these synthesized waveforms to spectrograms and calculate the loss with respect to ground truth spectrograms, only the libraries we included in Figure~\ref{fig:speed} support backpropagation all the way back to the synthesized layers. Since one of the main features of nnAudio is to offer differentiable/trainable spectrograms, we do not include NVIDIA DALI (a GPU data loading tool) in our results as this feature is not supported.}
+
+
+\subsection{Conversion output}
+
+\subsubsection{Setup}
+We use \nbh{librosa} as our benchmark to check the correctness of our implementation. The spectrograms produced by our implementation are compared to the \nbh{librosa} output by using the numpy function \nbh{np.allclose}. Four input signals, a linear sine sweep, a logarithmic sine sweep, an impulse tone, and a chromatic scaled played on a piano, are used in this study to determine the model output correctness. The chromatic piano scale is recorded with a piano instrument provided by Garritan Personal Orchestra 5\footnote{\url{https://www.garritan.com/products/personal-orchestra-5/}} and saved as a .wav file. Because adapting the time domain CQT kernels does not change the output spectrogram, the result for CQT1992 is the same as that for CQT1992v2, and is better than the results for CQT2010 and CQT2010v2. Therefore we will only report the results for the faster and better quality implementation (CQT1992v2) here.
+
+
+
+\subsubsection{Results}
+The results of the accuracy test are shown in Figures~\ref{fig: performance_1} and~\ref{fig: performance_2}. The output magnitudes are displayed in a logarithmic scale so that the subtle differences can be observed easily. When looking at the results, we notice that the STFT results from \nbh{librosa} and nnAudio are very similar to each other with an absolute tolerance of $10^{-2}$ and a relative tolerance of $10^{-2}$. The same can be said for MelSpec, for which the results of both libraries are very similar, with an absolute tolerance of $10^{-3}$ and a relative tolerance of $10^{-4}$. For CQT, the absolute tolerance is $0.8$ and the relative tolerance is $2$. The CQT output for nnAudio is smoother because we are using the CQT1992v2 approach in our implementation for which downsampling is not required. Figure~\ref{fig: CQT_compare} shows the comparison between our proposed CQT1992v2, our CQT2010v2 and \nbh{librosa}'s implementation of CQT (\nbh{librosa} uses the 2010 downsampling algorithm). In the implementation of both \nbh{librosa}and CQT2010v2, the aliasing in the figure is due to downsampling. Although the magnitude of the aliasing is negligible, it is still observable when we use a logarithmic magnitude scale. Further study is required to determine the effects of the aliasing due to downsampling in the neural network models. The CQT1992v2 model, however, is the fastest of all proposed GPU-based CQT implementations (see Figure~\ref{fig:speed}({b})), and its output is the best among the different implementations. Therefore CQT1992v2 should be used, and hence it is set as the default CQT computation algorithm for \nbh{nnAudio}.
+
+
+
+\Figure(topskip=0pt, botskip=0pt, midskip=0pt)[width=170mm]{fig/performance_1.png}
+{Comparing the output of \nbh{nnAudio} and \nbh{librosa} when converting a linear and logarithmic sine sweep, \label{fig: performance_1}}
+\Figure(topskip=0pt, botskip=0pt, midskip=0pt)[width=170mm]{fig/performance_2.png}
+{Comparing the output of \nbh{nnAudio} and \nbh{librosa} when converting an impulse tone and a chromatic piano scale. \label{fig: performance_2}}
+
+
+
+\Figure(topskip=0pt, botskip=0pt, midskip=0pt)[width=85mm]{fig/CQT_compare.png}
+{A visualisation of the subtle differences between \nbh{librosa}, CQT2010v2 and CQT1992v2 implementations using a logarithmic scale. CQT1992v2 yields the best result. A linear sine sweep is used as the input signal.\label{fig: CQT_compare}}
+
+\Figure(topskip=0pt, botskip=0pt, midskip=0pt)[width=70mm]{fig/accuracy_plot.png}
+{Performance of the four different input representations, with different parameters settings, when performing transcription of the audio files in the MusicNet dataset. \newtext{The dashed black line indicates the transcription accuracy using the same linear model as reported in MusicNet}~\cite{thickstun2017learning, thickstun2018invariances}.  \label{fig: accuracy_plot}}
+
+
+\section{Example applications}
+In this section, two potential applications of nnAudio will be discussed. First, we will elaborate on using nnAudio to explore different spectrograms as the input for a music transcription model, and discuss how this process can benefit from on-the-fly GPU processing. Second, we will demonstrate that nnAudio allows the STFT kernels to be trained/finetuned, so that a better spectrogram can be obtained.
+
+
+\subsection{Exploring different input representations}
+\label{sec: eg1}
+In this section, we discuss one possible application of this work, namely music transcription~\cite{benetos2013automatic, holzapfel2019automatic}. We will show that with nnAudio, one can quickly explore different types of spectrograms as the input for a neural network and easily choose the spectrogram that yields the best transcription accuracy.
+
+Consider the following scenario: we want to do polyphonic music transcription, and we have picked a specific model (fully connected neural network) to tackle this task, but we want to know which input spectrogram representation would yield the best results for this task~\cite{Cheuk2020TheIO}. In our experiment, a total of four types of spectrograms are explored: linear frequency scale spectrogram (LinSpec), logarithmic frequency scale spectrogram (LogSpec), Mel spectrogram (MelSpec), and CQT. In addition, each of these representations will have different parameter settings that we need to consider. For LinSpec and LogSpec, we want to explore five different sizes of Fourier kernels. For MelSpec, we will be exploring four different sizes of Fourier kernels, and for each of these kernels, the number of Mel filter banks will be varied. Finally, for CQT, ten different bins per octave will be examined. This means that there will be a total of 34 different input representations.
+
+If we use MusicNet~\cite{thickstun2017learning, thickstun2018invariances} as our training data, the traditional approach would require the raw waveforms of this dataset to be converted into 34 different spectrograms that are saved to the hard disk. Then we would use a dataloader to load different types of spectrograms into different neural networks to train them one by one (Figure~\ref{fig: workflow}(a)). This approach is impractical, as the training set of MusicNet consists of 20GB of waveforms. After processing these waveforms into 34 different input representations (with varying types of spectrograms, window size, etc.), 950.4GB of data would be generated. {As shown in Table~\ref{tab: input represtation example}, Obtaining these different representations takes a total of 633, 445 and 983 minutes of processing time on machine A, B, and C, respectively (refer to Section~\ref{subsec: spec} for the machine specifications).} Even if we delete the spectrograms after training the model to avoid the storage issue, after knowing which type of spectrogram is the best input representation, we still need to obtain that spectrogram again. This traditional approach is tedious.
+
+To alleviate this problem, we use our proposed nnAudio framework to create a neural network capable of converting waveforms to spectrograms on-the-fly (See Section~\ref{sec: PyTorch} for how nnAudio works and Figure~\ref{fig: workflow}(b) for how nnAudio is different from the traditional approach). Thanks to the fast computation speed obtained by leveraging convolutional neural network on GPUs (Figure~\ref{fig:speed}), we can train 34 different models without the need of saving the spectrograms on the hard disk first. The neural network layer created by nnAudio directly (and quickly) extracts the spectrograms during the model training. By doing so, our dataloader only needs to load the raw waveforms into the neural network. The neural network will then convert the waveforms to spectrograms on-the-fly when training the model (Figure~\ref{fig: workflow}(b)). Moreover, as nnAudio extracts spectrograms really fast, it significantly reduces the computation time from $983$ minutes to only $99$ minutes. Figure~\ref{fig: accuracy_plot} shows the transcription accuracy obtained with different input representations. The accuracy is measured by using \nbh{mir\_eval.multipitch.metrics()}. Because all of these parameters affect the output shape of the spectrograms (number of bins), the results can be plotted as transcription accuracy versus number of frequency bins. It is clear from the image that the input representation and its settings have a big influence on model performance. Using nnAudio, which enables fast comparison of different representations, results in easier to configure and more efficient models. 
+
+\begin{table*}[ht]
+\centering
+\caption{Table~\ref{tab: input represtation example} shows a comparison of the computing time (on the three different machines as before), together with the hard disk space needed to store spectrograms when using traditional data pre-processing with \nbh{librosa}on the MusicNet dataset. Different settings for the spectrogram calculation are explored: For CQT, the parameters are (bins, number of bins per octave, hop size); for LinSpec and LogSpec, the parameters are (n\_fft, hop size); for Mel spectrograms, the parameters are (n\_fft, n\_mels, hop size). Note that \nbh{librosa}does not provide the spectrogram type of LogSpec, we estimate that the time taken to calculate LogSpec is the same as its LinSpec counterpart. The size occupied by LogSpec is the same as LinSpec, as they have the same output array size given the set parameters. Using nnAudio, we can avoid these long processing times and the huge storage requirements by calculating the spectrograms on-the-fly. The numbers in parentheses in the final column indicate the time taken for nnAudio to finish the same task.}
+
+
+
+\begin{tabular}{lcccc}
+\toprule
+Index  & Input type      & Parameters       & Size \\
+&&  & GB\\ \midrule
+1  & CQT      & (84, 12; 512)       & 6.6           \\ 
+2  & CQT      & (84*2, 12*2; 512)   & 13.1          \\ 
+3  & CQT      & (84*3, 12*3; 512)   & 19.7          \\ 
+4  & CQT      & (84*4, 12*4; 512)   & 26.2          \\ 
+5  & CQT      & (84*5, 12*5; 512)   & 32.8          \\ 
+6  & CQT      & (84*6, 12*6; 512)   & 39.3          \\ 
+7  & CQT      & (84*7, 12*7; 512)   & 45.9          \\ 
+8  & CQT      & (84*8, 12*8; 512)   & 52.4          \\ 
+9  & CQT      & (84*9, 12*9; 512)   & 58.9          \\ 
+10 & CQT      & (84*10, 12*10; 512) & 65.5          \\ 
+11 & LinSpec     & (256, 512)          & 5.1        \\ 
+12 & LinSpec     & (512, 512)          & 10.1       \\ 
+13 & LinSpec     & (1024, 512)         & 20         \\ 
+14 & LinSpec     & (2048, 512)         & 40         \\ 
+15 & LinSpec     & (4096, 512)         & 79.9       \\ 
+16 & LogSpec & (256, 512)          & 5.1            \\ 
+17 & LogSpec & (512, 512)          & 10.1           \\ 
+18 & LogSpec & (1024, 512)         & 20             \\ 
+19 & LogSpec & (2048, 512)         & 40             \\ 
+20 & LogSpec & (4096, 512)         & 79.9           \\ 
+21 & MelSpec      & (512, 128; 512)     & 5         \\ 
+22 & MelSpec      & (512, 256; 512)     & 10        \\ 
+23 & MelSpec      & (1024, 128; 512)    & 5         \\ 
+24 & MelSpec      & (1024, 256; 512)    & 10        \\ 
+25 & MelSpec      & (1024, 512; 512)    & 20        \\ 
+26 & MelSpec      & (2048, 128; 512)    & 5         \\ 
+27 & MelSpec      & (2048, 256; 512)    & 10        \\ 
+28 & MelSpec      & (2048, 512; 512)    & 20        \\ 
+29 & MelSpec      & (2048, 1024; 512)   & 39.9      \\ 
+30 & MelSpec      & (4096, 128; 512)    & 5         \\ 
+31 & MelSpec      & (4096, 256; 512)    & 10        \\ 
+32 & MelSpec      & (4096, 512; 512)    & 20        \\ 
+33 & MelSpec      & (4096, 1024; 512)   & 39.9      \\ 
+34 & MelSpec      & (4096, 2048; 512)   & 80        \\ \midrule
+  &          &                     & \textbf{Total space} \\ 
+  &          &                     & 950.4GB         \\
+\bottomrule
+\end{tabular}%
+\begin{tabular}{c}
+\toprule
+Time A\\
+min:sec\\ \midrule
+30:57 \textit{(5:29)} \\ 36:37 \textit{(10:14)} \\ 44:26 \textit{(11:35)} \\ 45:00 \textit{(14:21)} \\ 45:33 \textit{(16:43)} \\ 64:05 \textit{(21:21)} \\ 64:42 \textit{(33:45)} \\ 65:22 \textit{(36:30)} \\ 65:55 \textit{(37:36)} \\ 66:36 \textit{(41:30)} \\ 
+1:02 \textit{(0:26)} \\ 1:33 \textit{(0:28)} \\ 2:39 \textit{(0:37)} \\ 4:56 \textit{(1:07)} \\ 9:17 \textit{(2:37)} \\ 
+1:02 \textit{(0:26)} \\ 1:33 \textit{(0:28)} \\ 2:39 \textit{(0:37)} \\ 4:56 \textit{(1:07)} \\ 9:17 \textit{(2:37)} \\ 
+1:36 \textit{(0:30)} \\ 1:44 \textit{(0:30)} \\ 2:34 \textit{(0:39)} \\ 2:42 \textit{(0:40)} \\ 3:01 \textit{(0:42)} \\ 4:40 \textit{(1:10)} \\ 4:49 \textit{(1:11)} \\ 5:14 \textit{(1:12)} \\ 6:04 \textit{(1:16)} \\ 9:05 \textit{(2:41)} \\ 9:21 \textit{(2:43)} \\ 9:55 \textit{(2:45)} \\ 11:04 \textit{(2:51)} \\ 13:08 \textit{(3:01)} \\ \midrule
+\textbf{Total time} \\ 
+633:51 \textit{(262:11)} \\ \bottomrule
+\end{tabular}%
+\begin{tabular}{c}
+\toprule
+Time B\\
+min:sec\\ \midrule
+24:15 \textit{(0:35)}\\ 27:14 \textit{(1:16)} \\ 32:23 \textit{(2:40)} \\ 32:52 \textit{(6:26)} \\ 33:18 \textit{(7:00)} \\ 43:24 \textit{(13:13)} \\ 43:21 \textit{(21:49)} \\ 44:07 \textit{(22:44)} \\ 44:54 \textit{(27:24)} \\ 45:24 \textit{(32:41)} \\ 
+0:31 \textit{(0:8)} \\ 0:51 \textit{(0:08)} \\ 1:31 \textit{(0:08)} \\ 2:54 \textit{(0:15)} \\ 5:46 \textit{(0:45)} \\
+0:31 \textit{(0:08)} \\ 0:51 \textit{(0:08)} \\ 1:31 \textit{(0:08)} \\ 2:54 \textit{(0:15)} \\ 5:46 \textit{(0:46)} \\
+0:55 \textit{(0:08)} \\ 1:01 \textit{(0:08)}  \\ 1:34 \textit{(0:09)} \\ 1:43 \textit{(0:09)} \\ 2:00 \textit{(0:09)}  \\ 2:58 \textit{(0:16)}\\ 3:13 \textit{(0:16)} \\3:42 \textit{(0:17)}  \\ 4:42 \textit{(0:18)}  \\\ 5:49 \textit{(0:48)}\\ 6:13 \textit{(0:48)} \\ 7:05 \textit{(0:49)}  \\ 8:50 \textit{(0:51)}  \\ 12:23 \textit{(0:55)}  \\
+\midrule
+\textbf{Total time} \\ 
+445:07 \textit{(145:01)} \\ \bottomrule
+\end{tabular}%
+\begin{tabular}{c}
+\toprule
+Time C\\
+min:sec\\ \midrule
+41:46 \textit{(0:35) } \\50:01 \textit{(2:11)} \\ 67:03 \textit{(2:25)} \\ 68:01 \textit{(3:30) } \\ 72:39 \textit{(4:39)}  \\ 101:18 \textit{(12:52)} \\ 102:59 \textit{(13:19)}  \\ 104:14 \textit{(16:09)}\\ 105:13 \textit{(16:55)}   \\106:22 \textit{(19:17)}\\ 
+1:39 \textit{(0:08) } \\ 2:33 \textit{(0:08)} \\ 4:16 \textit{(0:08)}  \\7:34 \textit{(0:13)} \\ 15:30 \textit{(0:39)}  \\ 
+1:39 \textit{(0:08) } \\ 2:33 \textit{(0:08)} \\ 4:16 \textit{(0:08)}  \\7:34 \textit{(0:13)} \\ 15:30 \textit{(0:39)}  \\ 
+2:31 \textit{(0:10)} \\ 2:43 \textit{(0:10)}   \\4:25 \textit{(0:10)}  \\ 4:23 \textit{(0:10)} \\ 4:43 \textit{(0:10)}  \\ 8:26 \textit{(0:14)}  \\ 8:36 \textit{(0:14)} \\ 9:02 \textit{(0:14)} \\ 9:53 \textit{(0:15)}  \\ 8:17 \textit{(0:40)} \\ 8:27 \textit{(0:41)}   \\ 8:56 \textit{(0:41)}  \\ 9:44 \textit{(0:43)} \\ 10:14 \textit{(0:47)} \\ \midrule
+\textbf{Total time} \\ 
+983:00 \textit{(99.43)} \\ \bottomrule
+\end{tabular}
+
+\label{tab: input represtation example}
+\end{table*}
+
+\Figure(topskip=0pt, botskip=0pt, midskip=0pt)[width=\linewidth]{fig/case_study.png}
+{\newtext{Comparisons between on-the-fly audio processing and pre-processed audio in terms of computing time needed to train a neural network model for 100 epochs using \nbh{librosa}(dashed blue lines) and nnAudio (green and dashed green lines). The blue lines represent model training using spectrograms as the input; the dashed blue lines include the pre-processing time taken by \nbh{librosa}to convert waveforms to spectrograms. The green lines represent model training using waveforms as the input; the dashed green lines represent the model with a trainable waveforms-to-spectrograms layer. This experiment is conducted on machine C; the results for other machines are reported in Figure S1 and Figure S2 of the supplementary material. }\label{fig: case_study}}
+
+\newtext{Next, we want to know if and when (i.e., after how many epochs of training), nnAudio will become slower than the pre-processed approach where the spectrograms are already saved on the hard disk. In this experiment, we will continue using MusicNet as our dataset. Instead of using a simple linear layer as our model, we use a more sophisticated model which consists of two convolutional layers and one bidirectional long short-term memory (LSTM) block. For the on-the-fly approach, the audio files (in .wav format) are loaded, and spectrograms are extracted on-the-fly during training. For the pre-processed approach, the spectrograms are loaded and fed-forward to the neural network (as shown in Figure~\ref{fig: workflow}(a)). The experimental results are shown in Figure~\ref{fig: case_study}. Here, we also consider the case in which we work on the dataset for the first time. If we take the audio processing time (using librosa) into consideration (dashed blue lines), we can see that the on-the-fly approach using nnAudio (solid green lines) is much faster. However, once the spectrograms are saved on the hard disk, the pre-processed approach (solid blue lines) is faster than nnAudio, since there is no need to repeatedly convert the audio files to spectrograms. As we have discussed before,  nnAudio is a useful tool for people to experiment with different spectrograms each with different parameters quickly without any pre-processing. In this setting, nnAudio can drastically reduce the time required for the experimental phase (from the dashed blue lines to the solid green lines). The order of magnitude of how much faster nnAudio can be, compared to the pre-processed approach, depends on the computer configuration, such as whether the CPU is fast enough to load data from RAM to GPU so that the GPU does not stay idle, or whether the GPU is fast enough to handle the data fetched by the CPU. The results for other machines are reported in the supplementary material.}
+
+\newtext{To sum up, nnAudio allows us to integrate audio processing into one of the layers of our neural network model.} This layer is responsible for the waveform to spectrogram conversion during the feedforward process. This way, we only need to store the audio clips in the original waveform, without saving extra copies of the dataset for the spectrograms. In addition, nnAudio is also useful when the dataset is so large that it takes tens of hours to convert the data from waveforms to spectrograms. Once the waveforms are ready, they can be loaded batch by batch (when using \nbh{PyTorch}) and fed-forward to nnAudio, which then converts batches of waveforms into spectrograms on-the-fly. This saves the user the trouble of processing the original waveforms and saving them as 34 different sets of spectrogram on the hard disk. Yet, it still allows us to perform the same analysis on the results~\ref{fig: accuracy_plot}. The full details of this experiment are outside of the scope of this paper and may be published in future work. 
+
+
+
+\subsection{Trainable Transformation Kernels}\label{subsec:trainable}
+Because we implement STFT and MelSpec with a 1D convolutional neural network whereby the neuron weights correspond to the Fourier kernels and Mel filter banks, it is possible to further finetune these kernels and filter banks together with the model via gradient descent. This technique is available for all transformations implemented with a neural network, but we will only focus on discussing the STFT and MelSpec in this subsection as an example.
+
+ 
+Consider the following task: given a pure sine wave, we need to train a model that is able to return the frequency of the signal. To make this task non-trival, the STFT window size is deliberately set to a small number ($64$), so that the output spectrograms have a very poor frequency resolution. The frequencies for pure sine waves are integers ranging from $200$Hz to $22,050$Hz (the Nyquist frequency). In other words, we have only $33$ frequency bins to represent the entire audible spectrum from 20 Hz to 20 KHz. To conduct our experiment, we generated 10,925 pure sine waves with different frequencies (between $200$ and $22,050$Hz). For each frequency, we generate 10 different pure sine waves with different phases. In total, 109,250 pure sine waves are generated to form our dataset. 80\% of these sine waves are used as the training set, and the remaining 20\% are used as test set. We explore whether trainable kernels are able to improve the model accuracy. We focus on two models for predicting the frequency of the input sign wave: a fully connected network and a 2D convolutional neural network (CNN). For the fully connected network, we use one layer with one neuron and sigmoid activation. The spectrogram is flattened to a 1D-vector, and used as the input to the model. For CNN, two 2D convolution layers are used, with a kernel size  ($4\times4$) for each layer. The final feature maps of the CNN are flattened and fed forward to a fully connected network with one neuron and sigmoid activation. nnAudio is used as the first layer of these models, to convert waveforms to either standard spectrograms, Mel spectrograms, or CQT spectrograms. We set this first layer to be trainable and compare the resulting loss to the same model with this layer set as non-trainable. As can be seen in Figure~\ref{fig: trainable_loss}, a trainable transformation layer results in a lower mean square error (MSE) for STFT, MelSpec, and CQT layers and for both the Linear as well as the CNN models.
+
+
+\Figure(topskip=0pt, botskip=0pt, midskip=0pt)[width=85mm]{fig/trainable_loss.png}
+{The evolution of loss during training for trainable and non-trainable kernels on a frequency prediction task. The models with trainable kernels consistently outperform the models with fixed kernels. The models were trained on 87,400 pure sine waves and evaluated on 21,850 pure sine waves.\label{fig: trainable_loss}}
+
+
+In order to explain how a trainable STFT, MelSpec, and CQT layer improves the prediction accuracy, we need to study the trained Fourier kernels and Mel filter banks. The first two rows in Figure~\ref{fig: Trained_STFT} show the Fourier Basis when the filter bank is $k=1,2$. Since the results for the fully connected model are quite similar to the CNN model, we will only report the results for the CNN model here. The column on the left visualizes the original Fourier kernels, and the column on the right visualizes the trained Fourier kernels. Although the overall shape of the trained Fourier kernels is similar to the original Fourier kernels, it contains some higher frequencies on top of the fundamental frequency for the kernels. These extra frequencies may allow more information to be extracted via STFT. The trained STFT spectrogram is shown in the last row of the same figure. It is clear from this figure that it has more overtone-like signals around the fundamental frequency, while the original STFT shows a very clean response for the pure sine wave input. The spectrogram obtained via the trained STFT may be able to provide clues to the neural network about the input frequency of the input signal. The same is true for the trained Mel filter banks and CQT kernels as shown in Figure~\ref{fig: Trained_Mel} and~\ref{fig: Trained_CQT}. By allowing the neural network to further train or finetune the Mel filter banks and CQT kernels, we allow a richer spectrogram to be obtained. This provides the frequency prediction models, regardless of the network architecture, with more information so as to reach a lower MSE loss.
+
+This subsection shows that further training or finetuning the spectrogram transformation layer with nnAudio results in a lower MSE loss. Despite the fact that this analysis uses a simple, artificially generated dataset, it still provides a good example of how a higher-performing end-to-end model can be obtained with a trainable transformation layer. The detailed experimental results are available on the \nbh{nnAudio} github repository\footnotemark[2].
+
+\Figure(topskip=0pt, botskip=0pt, midskip=0pt)[width=85mm]{fig/Trained_STFT.png}
+{The first two rows show the Fourier kernels before and after training (only two of the kernels are shown here), and the third row shows the spectrograms resulting from the original and trained kernels.  \label{fig: Trained_STFT}}
+\Figure(topskip=0pt, botskip=0pt, midskip=0pt)[width=80mm]{fig/Trained_Mel.png}
+{The first row shows the complete set of Mel filter banks before and after training. The resulting spectrograms are shown below.\label{fig: Trained_Mel}}
+\Figure(topskip=0pt, botskip=0pt, midskip=0pt)[width=80mm]{fig/Trained_CQT.png}
+{The first row shows the complete set of CQT kernels before and after training. Their resulting spectrograms are shown below. \label{fig: Trained_CQT}}
+%----------------------------Figures in the end of the paper--------------
+
+
+\section{Conclusion}
+{We have presented a new framework for extracting different types of spectrograms on-the-fly with neural networks. This approach allows one to dynamically train the kernels (including Fourier kernels, Mel filter banks, and CQT kernels) as part of the larger neural network training, specifically adapted to the problem at hand. Our approach has been implemented as the GPU-based library, nnAudio.} 
+
+Different time domain to frequency domain transformation algorithms such as short-time Fourier transform, Mel spectrograms, and constant-Q transform have been implemented in \nbh{PyTorch}, an open-source machine learning library. We leverage the CUDA integration of \nbh{PyTorch} that enables fast GPU based audio processing. In our experiments we found that GPU audio processing reduces the time it takes to convert 1,770 waveforms to spectrograms from $10.6$ seconds to only $0.001$ seconds for the Short-Time Fourier Transform (STFT); from $18.3$ seconds to $0.015$ seconds for the Mel spectrogram; and from $103.4$ seconds to $0.258$ seconds for the constant-Q Transform (CQT). These experiments were performed on three different machines: two desktops with GTX 1070 and RTX 2080 Ti respectively, and one DGX station with a Tesla v100 GPU. Although it takes some time (around 5 seconds) to initialize the transformation layer (transferring Fourier kernels from RAM to GPU memory), once everything is ready on the GPU memory, the processing time is in the order of microseconds for a single spectrogram, making the initialization time negligible in the context of training a neural network. 
+
+{Furthermore, our proposed neural network-based audio processing framework allows for trainable and finetunable Fourier kernels, Mel filter banks, and even CQT kernels. An experiment discussed in Section~\ref{subsec:trainable} confirms that trainable kernels result in a better final model on a frequency prediction task compared to non-trainable kernels. }
+
+{Finally, we present a neural network approach to calculate different versions of the CQT (direct computation, downsampling method, and by removing the frequency domain kernels). To our knowledge, our proposed framework is the first neural network-based audio processing toolbox that supports CQT. When comparing the computation speed of different neural network-based CQT algorithms (Figure~\ref{fig:speed}(b)), we discovered (in Section~\ref{subsec:CQTv2}) that the CQT algorithm, which uses time domain CQT kernels, performs faster than the commonly used CQT algorithm based on frequency domain kernels~\cite{brown1992efficient, schorkhuber2010constant}. As a result, the CQT computation speed of converting 1,770 waveforms to spectrograms is reduced drastically in our proposed GPU neural network-based framework from $0.258$ to only $0.001$. When applying nnAudio to a real dataset, MusicNet, it significantly reduces the computation time from $983$ minutes to only $99$ minutes.} 
+
+
+
+To make our proposed GPU audio processing tool easy to use for other researchers, we have combined all of the algorithms discussed above into a user-friendly PyPI package called nnAudio \footnotemark[2].
+% \vfill\null
+% \pagebreak
+
+% \appendices
+% \section{Supplementary Figures}
+
+% \Figure(topskip=0pt, botskip=0pt, midskip=0pt)[width=\linewidth]{fig/Appendix1.png}
+% {Overhead time for Machine A. Machine A does not have enough RAM to load the spectrograms for STFT: n\_fft=4096 and STFT: n\_fft=2048, therefore the pre-processed results are not available.\label{fig: app1}}
+
+% \Figure(topskip=0pt, botskip=0pt, midskip=0pt)[width=\linewidth]{fig/Appendix2.png}
+% {Overhead time for Machine B. This machine has a powerful CPU and thus the time taken for audio pre-processing is much shorter than Machine A and Machine C.\label{fig: app2}}
+
+% \Figure(topskip=0pt, botskip=0pt, midskip=0pt)[width=\linewidth]{fig/Appendix3.png}
+% {The training curve corresponding to Figure S1, Figure S2 and Figure 16. Since all machines give nearly the same training curve, we report the result only once in this figure.\label{fig: app3}}
+
+% \FloatBarrier
+
+\section*{Acknowledgment}
+We thank En Yan Koh (Ph.D. student at the Singapore University of Technology and Design (SUTD)) and the SUTD Game Lab for providing the RTX 2080 Ti and GTX 1070 Ti GPUs for our experiments. This work is supported by a Singapore International Graduate Award (SINGA) provided by the Agency for Science, Technology and Research (A*STAR), under grant no. SING-2018-02-0204. It was also supported by SUTD-MIT IDC grant no. IDG31800103, MOE Grant no. MOE2018-T2-2-161 and SRG ISTD 2017 129.
+
+% \vfill\pagebreak
+
+\bibliography{citation.bib}
+\bibliographystyle{IEEEtranN} %IEEEtran
+
+
+\vfill\pagebreak
+
+
+\begin{IEEEbiography}[{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{fig/kwc.png}}]{Kin Wai Cheuk} (S'19) is a Ph.D student at Singapore University of Technology and Design (SUTD), supervised by Dr. Herremans and affiliated with the Institute of High Performance Computing at the Agency for Science Technology and Research, A*STAR. He received a B.S. degree in physics and M.Phil in mechanical engineering from the University of Hong Kong in 2014 and 2016 respectively. After graduation, he worked for an IT solution company and had a growing interest in machine learning during this period. In 2018, he joined Dr. Herremans' research group and started working on music related machine learning projects. He started his Ph.D in 2019 at SUTD. He is interested in digital signal processing and music transcription using machine learning. He received the Singapore International Graduate Award (SINGA) for his Ph.D degree.
+\end{IEEEbiography}
+
+\begin{IEEEbiography}[{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{hansPhoto.png}}]{Hans Anderson} is director of Blue Mangoo Software, a company based in Ha Noi that develops musical audio applications for mobile phones and tablets. He is also a freelance audio signal processing consultant. He completed his doctoral studies at the Singapore University of Technology and Design in 2018, and his master's degree in computational mathematics at the University of Minnesota in 2007. He loves designing signal processing algorithms for practical applications and commercial products, with a focus on improving the subjective sound quality of widely-used methods. Recently, he is working on eliminating aliasing noise from nonlinear audio effects such as saturation, compression, and amplifier models.
+\end{IEEEbiography}
+
+\begin{IEEEbiography}[{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{Kat_headshot.jpg}}]{Kat Agres} (M'17) is an Assistant Professor at the National University of Singapore (NUS), and a Research Scientist and Principal Investigator of the Music Cognition group at the Institute of High Performance Computing (IHPC), which is housed within the Agency for Science, Technology and Research (A*STAR). She received her PhD in Psychology with a graduate minor in Cognitive Science from Cornell University in 2013. She also holds a bachelor's degree in Cognitive Psychology and Cello Performance from Carnegie Mellon University, and has received numerous grants to support her research, including a Fellowship from the National Institute of Health (NIH), and a training fellowship from the National Institute of Mental (NIMH). Before moving to Singapore, she completed two postdoctoral research positions in the School of Electronic Engineering and Computer Science at Queen Mary University of London (QMUL). Her research explores a wide range of topics, including music technology for healthcare and well-being, music perception and cognition, computational creativity, information theoretic modelling of learning and memory, statistical learning, and the evaluation of creativity in humans and artificial systems.
+\end{IEEEbiography}
+
+\begin{IEEEbiography}[{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{fig/profile_dorien.jpg}}]{Dorien Herremans} (M'12, SM'17) is an Assistant Professor at Singapore University of Technology and Design, with a joint appointment at the Institute of High Performance Computing at the Agency for Science Technology and Research, A*STAR. In 2015, she was awarded the individual Marie-Curie Fellowship for Experienced Researchers, and worked at the Centre for Digital Music, Queen Mary University of London. Prof. Herremans received her PhD in Applied Economics from the University of Antwerp. After graduating as a commercial engineer in management information systems at the University of Antwerp in 2005, she worked as a Drupal consultant and was an IT lecturer at Les Roches University in Bluche, Switzerland. Prof. Herremans' research focuses on the intersection of machine learning/optimization and digital music/audio. She is a Senior Member of the IEEE and co-organizer of the First International
+Workshop ton Deep Learning and Music as part of IJCNN, as well as guest editor for Springer's Neural Computing and Applications.
+\end{IEEEbiography}
+\vfill\null
+\EOD
+
+\end{document}
+

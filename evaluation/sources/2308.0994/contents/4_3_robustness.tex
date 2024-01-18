@@ -1,0 +1,82 @@
+
+A class may include dominant patterns, \ie, spurious correlations.
+For example, waterbirds are usually on water rather than land.
+It leads DNNs to rely heavily on these spurious features rather than reasoning; thereby, DNNs classify water images as waterbirds regardless of the existence of waterbirds.
+This spurious correlation is also caused by data imbalance because fewer waterbirds are located on land.
+While spurious correlation occurs naturally, we can mitigate their impact by resolving data imbalance
+% generating samples
+similar to model fairness.
+% long-tailed distribution.
+% not to be correlated with spurious features.
+We demonstrate whether SYNAuG can mitigate the data imbalance problem of spurious correlations.
+
+% % which can drift the model to cause bias or misconception, \ie, spurious correlations.
+% % DNNs heavily rely on these spurious features rather than reasoning, because these features are easy to learn.
+% For example, DNNs can classify the empty road image as the models are trained with lots of car images on a road that usually takes a much larger area than that of cars.
+% % spurious corr하고 imbalance하고 연관
+% Although spurious correlations caaturally, we can mitigate their impact by generating samples in rare classes that are not correlated with the sensitive attributes.
+% % to generate rare samples using diffusion models.
+% We demonstrate whether SYNAuG can mitigate the data imbalance problem, which causes spurious correlations.
+
+
+\begin{table}
+    \centering
+        \resizebox{0.9\linewidth}{!}{
+            \begin{tabular}{lcc}
+            \toprule
+            \multirow{2}[2]{*}{\textbf{Method}} & \multicolumn{2}{c}{\textbf{Waterbirds}}\\
+            \cmidrule{2-3}
+            & \textbf{Worst} & \textbf{Mean}\\
+            \midrule
+            ERM & 72.6 & 97.3\\
+            JTT$_\texttt{ ICML'21}$~\cite{liu2021just} & 86.7 & 93.3 \\
+            Group-DRO$_\texttt{ ICLR'20}$~\cite{sagawa2019distributionally} & 91.4 & 93.5\\
+            SUBG$_\texttt{ ICML'20}$~\cite{sagawa2020investigation} & 89.1$_{\pm 1.1}$ & -\\
+            SSA$_\texttt{ ICLR'22}$~\cite{nam2022spread} & 89.0$_{\pm 0.55}$ & 92.2$_{\pm 0.87}$\\
+            \midrule
+            BaseModel & 73.7$_{\pm 3.04}$ & 90.4$_{\pm 0.21}$\\
+            % BaseModel$_{\text{web}}$ & 80.1$_{\pm 1.95}$ & 94.3$_{\pm 0.38}$\\
+            SYNAuG & 79.9$_{\pm 2.22}$ & 91.52$_{\pm 0.98}$\\
+            \midrule
+            % DFR$^{\text{Tr}}_{\text{Tr}}$$_\texttt{ ICLR'23}$~\cite{kirichenko2023last} & 89.2$_{\pm 1.91}$ & 94.2$_{\pm 0.74}$\\
+            % % DFR$^{\text{Tr-web}}_{\text{Tr}}$ & 92.8$_{\pm 1.13}$ & 96.0$_{\pm 0.55}$\\
+            % SYNAuG & 90.3$_{\pm 0.81}$ & 93.7$_{\pm 0.24}$\\
+            % SYNAuG & 79.8$_{\pm }$ & 92.4$_{\pm }$\\
+            % \midrule
+            DFR$^{\text{Tr}}_{\text{Val}}$$_\texttt{ ICLR'23}$~\cite{kirichenko2023last} & 91.2$_{\pm 1.92}$ & 93.1$_{\pm 0.91}$\\
+            % DFR$^{\text{Tr-web}}_{\text{Val}}$ & 93.9$_{\pm 0.60}$ & 95.4$_{\pm 0.40}$\\
+            SYNAuG (re-train) & 92.9$_{\pm 0.45}$ & 93.6$_{\pm 0.35}$\\
+            SYNAuG (fine-tuning) & 93.2$_{\pm 0.42}$ & 94.8$_{\pm 0.11}$\\
+            \bottomrule
+           \end{tabular}}
+       \caption{\textbf{Robustness to spurious correlation on Waterbirds.} 
+       SYNAuG outperforms DFR consistently in worst-group accuracy.}\vspace{4mm}
+       \label{tab:robustness}
+\end{table}
+
+\paragraph{Experiments.} 
+We use Waterbirds dataset~\cite{sagawa2019distributionally}, which is a synthetic dataset created by combining images of birds from the CUB dataset~\cite{WelinderEtal2010} with backgrounds.
+%The seabirds and waterfowl are grouped in a waterbird, and the other birds in a landbird.
+The birds are grouped into two categories: waterbirds, which include seabirds and waterfowl, and landbirds.
+Land and water background are spurious features.
+Let $G_{\text{background}}^{\text{class}}$ be the class with the background, \eg, $G_{\text{water}}^{\text{landbird}}$ is the landbird with water background.
+% where the class is waterbirds or landbirds, and the background is land or water.
+% Let $G_1, G_2, G_3$, and $G_4$ be landbird with land background, landbird with water background, waterbird on land background, and waterbird with water background, respectively.
+In the Waterbirds dataset, $G_{\text{land}}^{\text{landbird}}$ has more samples than $G_{\text{water}}^{\text{landbird}}$, and $G_{\text{water}}^{\text{waterbird}}$ has more samples than $G_{\text{land}}^{\text{waterbird}}$.
+We generate the samples to match the number of samples such as $|G_{\text{land}}^{\text{landbird}}| = |G_{\text{water}}^{\text{landbird}}|$ and $|G_{\text{water}}^{\text{waterbird}}| = |G_{\text{land}}^{\text{waterbird}}|$.
+% $G_1$ and $G_2$, and $G_3$ and $G_4$.
+% Following Sagawa~\etal\cite{sagawa2019distributionally}, we evaluate algorithms using the minimum group accuracy and the average (in-distribution) accuracy, denoted as Worst and Mean, respectively.
+We report the result over 5 independent runs using the code from DFR~\cite{kirichenko2023last}.
+We reproduce the BaseModel and DFR and report the performance at the last epoch\footnote{\url{https://github.com/PolinaKirichenko/deep_feature_reweighting}}.
+
+In \Tref{tab:robustness}, our SYNAuG generates samples not to be correlated with spurious features, which
+improves the performance in BaseModel both on worst and mean accuracies.
+When applying DFR, the synthetic data can increase the worst and mean accuracy consistently.
+% In addition, w
+We also observe that fine-tuning is more effective 
+% shows better performance
+compared to re-train, which is consistent with \Tref{tab:ablation}.
+% It indicates 
+The overall results demonstrate that the synthetic data from the generative model can be exploited to mitigate the spurious correlation.
+
+

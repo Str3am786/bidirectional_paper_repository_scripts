@@ -1,0 +1,243 @@
+\section{Evaluation of the Detection Performances}
+\label{section: evaluation performances}
+In this section, we address the evaluation of \NAME{} in detecting the two anti-patterns considered in this study. We answer the two following research questions:
+
+\begin{itemize}
+\item \textbf{RQ1:} \textit{\RQone{}}
+\item \textbf{RQ2:} \textit{\RQtwo{}}
+\end{itemize}
+
+\subsection{Study Design}
+\label{subsection: study1 design}
+The goal of this study is to evaluate the proposed ensemble method on both God Class and Feature Envy. We compare \NAME{} to the standalone detection tools aggregated through our approach as well as to other ensemble methods. To assess the performances of the respective approaches on each subject system, we rely on a leave-one-out cross validation. Consequently, for each of the eight systems presented in Table~\ref{Table: systems-hand}, we leave this system out for testing while keeping the other seven for hyper-parameters tuning and training. 
+
+To run the standalone tools on the evaluation systems (\textbf{RQ1}), we used their publicly-available implementations whenever possible and replicated the approaches for which no implementation was available. Thus, we ran DECOR using the Ptidej API\footnote{https://github.com/ptidejteam/v5.2/} and JDeodorant using its Eclipse plug-in\footnote{https://marketplace.eclipse.org/content/jdeodorant/}. We implemented the detection rules for HIST as described in the original paper \cite{PalombaBPOLP13}. InCode Eclipse plug-in is no longer available and we re-implemented its detection rule as described in the original book \cite{lanza2007object} to retrieve also information about the envied class, as explained in Section~\ref{Paragragh: metrics feature envy}. 
+
+
+To answer \textbf{RQ2}, we choose to compare \NAME{} to the voting technique and the method ASCI proposed by Di Nucci et al.~\cite{di2017dynamic}. We selected these two techniques because, to the best of our knowledge, other ensemble methods are specific to machine-learning classifiers and cannot be adapted to our problem. Furthermore, these two techniques have been shown to achieve state-of-the-art results in the context of bug prediction \cite{wang2011software, liu2010evolutionary, di2017dynamic}. However, one must note that these methods are originally used to aggregate the output of several pre-trained machine learning classifiers while in this study, we use them to combine anti-patterns detection tools. The voting technique predicts an entity as affected if it has been detected by at least $k$ classifiers. We call $k$ the policy of the vote. This parameter has been tuned before conducting our experiments, contrary to the \textit{Validation and Voting} method proposed by Liu et al.~\cite{liu2010evolutionary}, which uses a majority voting policy ($k=2$ in our case). The ASCI method uses a decision tree algorithm to predict the best classifier for each entity given its characteristics. Then, an entity is declared as affected according to the classifier selected by ASCI for this entity. Regarding the input of the decision tree, i.e., the characteristics of the entities, we used the same metrics used for \NAME{} and presented in Section~\ref{subsection: input}. Also, similarly to a neural-network, a decision tree is subject to variations in its prediction from one training to another. Hence, to compute the performances of ASCI, we use the same boosting technique used for \NAME{} and explained in Section~\ref{boosting}. 
+
+\subsection{Hyper-parameters Tuning}
+
+\begin{table}
+\caption{Hyper-parameters Tuning} 
+\label{Table: hyper-parameters tuning}
+\centering
+\resizebox{9.2cm}{!}{
+\begin{threeparttable}
+\begin{tabular} { l l l }
+\hline
+Model & Hyper-parameter & Range \\ \hline
+\multirow{5}{*}{\NAME{}} & $\eta$ & $10^{-[0.0; 2.5]}$\\
+& $\lambda$ &  $10^{-[0.0; 2.5]}$\\
+& $\gamma$ & $[1; 10]$\\
+& $num\_hidden\_layers$ & $[1; 3]$ \\
+& $hidden\_layers\_sizes$ & $[4; 100]$ then $[4; s]$\\ \hline
+\multirow{4}{*}{ASCI} & $max\_features$ & $\{sqrt, log2, None\}$\\
+& $max\_depth$ & $10\times[1; 10]$\\
+& $min\_samples\_leaf$ & $[1; 5]$\\
+& $min\_samples\_split$ & $10^{-[1.0; 4.0]}$\\ \hline
+Vote & $k$ & $[1;3]$ \\ \hline
+HIST (FE) & $\alpha$ & From 100\% to 300\% by 5\% \\ \hline
+HIST (GC) & $\beta$ &  From 0\% to 20\% by 0.5\%\\ \hline
+\multirow{3}{*}{InCode} & $T_{ATFD}$ & $[1; 5]$\\
+& $T_{LAA}$ & $[1; 5]$\\
+& $T_{FDP}$ & $[1; 5]$ \\ \hline
+
+\end{tabular}
+\begin{tablenotes}
+\small
+\item \textit{With $s$ the size of the previous dense layer.}
+\end{tablenotes}
+\end{threeparttable}
+}
+\end{table}
+
+Before computing the performances achieved by each approach on a given system, we first calibrate its hyper-parameters whenever necessary. As explained in the previous subsection, this calibration is performed using instances of the seven remaining systems. The number of hyper-parameters to be tuned for \NAME{} and ASCI makes it impossible to perform an exhaustive search, thus we relied on a random search (200 random generations). This technique has shown to be more efficient than grid search on similar multi-dimensional optimization problems \cite{bergstra2012random}.
+For these two approaches, we evaluate the performances achieved with each hyper-parameters' combination by carrying out a leave-one-out cross-validation. At each iteration, we thus keep instances of six systems for training (100 epochs) and use the remaining one as a validation set. We finally keep the hyper-parameters that led to the best overall MCC on the validation sets.
+
+For \NAME{}, we tuned five hyper-parameters: the learning rate ($\eta$), the $L_{2}$ regularization weight ($\lambda$), the parameter $\gamma$ of our loss function (cf. Section~\ref{section: loss}), the number of hidden layers, and the number of neurons per hidden layer. Finally, the two models used for experiments (i.e., one model per anti-pattern) have been trained during 120 epochs with an exponential learning rate decay of 0.5 at the $100^{th}$ epoch. For ASCI, we tuned four hyper-parameters: the number of features to consider for a split ($max\_features$), the maximum depth of the decision tree ($max\_depth$), the minimum number of samples required to be at a leaf node ($min\_samples\_leaf$) and the minimum proportion of samples required to split an internal node ($min\_samples\_split$). As explained in Section~\ref{subsection: study1 design}, for the voting technique, we tuned one single parameter: the policy of the vote ($k$).
+
+Although we followed rigorously the guidelines given by the authors of HIST and InCode when reimplementing these tools, some differences may remain between our respective implementations. Such differences could affect the optimal values of their parameters. Thus, we performed an additional parameter tuning for these tools. For HIST we tuned the parameters $\alpha$ and $\beta$ respectively related to Feature Envy and God Class detection (cf. Section~\ref{subsection: input}), while for InCode, we tuned the thresholds related to the metrics ATFD, LAA and FDP ($T_{ATFD}$, $T_{LAA}$ and $T_{FDP}$). Table~\ref{Table: hyper-parameters tuning} reports for each approach investigated, the hyper-parameters that have been tuned, as well as the ranges of values experimented.
+
+\subsection{Analysis of the Results}
+Table~\ref{Table: performances god class} reports the results of our experiments for God Class while Table~\ref{Table: performances feature envy} reports our results for Feature Envy. Our results report the performances on the eight subject systems, in terms of precision, recall, and MCC, achieved by: (1) the three detection tools used for aggregation; (2) the two competing ensemble methods: Vote and ASCI; and, (3) \NAME{}. Note that a "--" is indicated in the cells where it was not possible to compute a metric, e.g., when an approach did not detect any occurrence. To resume our results, Table~\ref{Table: overall performances} reports the overall performances achieved by each approach for God Class and Feature Envy. The overall performances are computed by merging the instances of the eight subject systems, as if they belonged to a single one.
+
+\begin{table}
+\caption{Overall Performances}
+\label{Table: overall performances}
+\begin{adjustbox}{width=\linewidth}
+\begin{tabular}{|c|c|c|c|c|c|c|}
+\hline
+\multirow{2}{*}{Approaches}& 
+\multicolumn{3}{c|}{
+	God Class
+} 
+&\multicolumn{3}{c|}{
+	Feature Envy
+}\bigstrut [t] \\ 
+\cline{2-7}
+&\textit{Precision}&\textit{Recall}&\textit{  MCC  }
+&\textit{Precision}&\textit{Recall}&\textit{  MCC  }
+\bigstrut [t]\\
+\hline
+Rule Card &28\%&47\%&35\%&45\%&54\%&49\% \bigstrut \\ \hline
+HIST &53\%&14\%&26\%&2\%&8\%&2\% \bigstrut \\ \hline
+JDeodorant &8\%&47\%&16\%&38\%&47\%&42\% \bigstrut \\ \hline
+Vote &34\%&32\%&32\%&12\%&41\%&22\% \bigstrut \\ \hline
+ASCI &27\%&26\%&25\%&48\%&54\%&51\% \bigstrut \\ \hline
+\textbf{\NAME{}} &45\%&51\%&\textbf{46\%}&40\%&80\%&\textbf{56\%} \bigstrut \\ \hline
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\begin{table*}
+\caption{Performances per System for God Class}
+\label{Table: performances god class}
+\begin{adjustbox}{width=\textwidth}
+\begin{tabular}{|c|c|c|c|c|c|c|c|c|c|c|c|c|}
+\hline
+\multirow{2}{*}{Approaches}& 
+\multicolumn{3}{c|}{
+	Android Telephony
+} 
+&\multicolumn{3}{c|}{
+	Android Support
+}
+&\multicolumn{3}{c|}{
+	Apache Ant
+}
+&\multicolumn{3}{c|}{
+	Apache Lucene 
+}\bigstrut [t] \\ 
+\cline{2-13}
+&\textit{Precision}&\textit{Recall}&\textit{  MCC  }
+&\textit{Precision}&\textit{Recall}&\textit{  MCC  }
+&\textit{Precision}&\textit{Recall}&\textit{  MCC  }
+&\textit{Precision}&\textit{Recall}&\textit{  MCC  } \bigstrut [t]\\
+\hline
+DECOR &17\%&9\%&8\%&--&0\%&--&14\%&43\%&24\%&100\%&25\%&50\% \bigstrut \\ \hline
+HIST &75\%&55\%&62\%&100\%&50\%&70\%&--&0\%&--&--&0\%&-- \bigstrut \\ \hline
+JDeodorant &17\%&36\%&18\%&33\%&25\%&26\%&3\%&57\%&11\%&7\%&25\%&9\% \bigstrut \\ \hline
+Vote &75\%&27\%&44\%&100\%&25\%&49\%&13\%&29\%&18\%&100\%&25\%&50\% \bigstrut \\ \hline
+ASCI &17\%&9\%&8\%&--&0\%&--&27\%&43\%&33\%&100\%&25\%&50\% \bigstrut \\ \hline
+\textbf{\NAME{}} &0\%&0\%&-4\%&100\%&50\%&70\%&36\%&71\%&50\%&67\%&50\%&57\% \bigstrut \\ \hline
+\end{tabular}
+\end{adjustbox}
+
+\bigskip
+
+\begin{adjustbox}{width=\textwidth}
+\begin{tabular}{|c|c|c|c|c|c|c|c|c|c|c|c|c|}
+\hline
+\multirow{2}{*}{Approaches}& 
+\multicolumn{3}{c|}{
+	Apache Tomcat
+} 
+&\multicolumn{3}{c|}{
+	Apache Xerces
+}
+&\multicolumn{3}{c|}{
+	ArgoUML
+}
+&\multicolumn{3}{c|}{
+	Jedit 
+}\bigstrut [t] \\ 
+\cline{2-13}
+&\textit{Precision}&\textit{Recall}&\textit{  MCC  }
+&\textit{Precision}&\textit{Recall}&\textit{  MCC  }
+&\textit{Precision}&\textit{Recall}&\textit{  MCC  }
+&\textit{Precision}&\textit{Recall}&\textit{  MCC  } \bigstrut [t]\\
+\hline
+DECOR &67\%&40\%&52\%&54\%&100\%&72\%&21\%&41\%&27\%&17\%&60\%&30\% \bigstrut \\ \hline
+HIST &--&0\%&--&--&0\%&--&--&0\%&--&22\%&40\%&29\% \bigstrut \\ \hline
+JDeodorant &2\%&60\%&10\%&18\%&47\%&26\%&18\%&50\%&28\%&5\%&60\%&15\% \bigstrut \\ \hline
+Vote &100\%&20\%&45\%&54\%&47\%&49\%&35\%&27\%&30\%&13\%&40\%&22\% \bigstrut \\ \hline
+ASCI &100\%&20\%&45\%&100\%&20\%&44\%&20\%&32\%&24\%&23\%&60\%&36\% \bigstrut \\ \hline
+\textbf{\NAME{}} &26\%&100\%&51\%&63\%&67\%&64\%&53\%&41\%&46\%&44\%&80\%&59\% \bigstrut \\ \hline
+\end{tabular}
+\end{adjustbox}
+
+\vspace{2cm}
+
+\caption{Performances per System for Feature Envy}
+\label{Table: performances feature envy}
+\begin{adjustbox}{width=\textwidth}
+\begin{tabular}{|c|c|c|c|c|c|c|c|c|c|c|c|c|}
+\hline
+\multirow{2}{*}{Approaches}& 
+\multicolumn{3}{c|}{
+	Android Telephony
+} 
+&\multicolumn{3}{c|}{
+	Android Support
+}
+&\multicolumn{3}{c|}{
+	Apache Ant
+}
+&\multicolumn{3}{c|}{
+	Apache Lucene 
+}\bigstrut [t] \\ 
+\cline{2-13}
+&\textit{Precision}&\textit{Recall}&\textit{  MCC  }
+&\textit{Precision}&\textit{Recall}&\textit{  MCC  }
+&\textit{Precision}&\textit{Recall}&\textit{  MCC  }
+&\textit{Precision}&\textit{Recall}&\textit{  MCC  } \bigstrut [t]\\
+\hline
+InCode &39\%&75\%&54\%&100\%&50\%&71\%&67\%&46\%&55\%&100\%&67\%&82\% \bigstrut \\ \hline
+HIST &0\%&0\%&-1\%&0\%&0\%&-1\%&1\%&5\%&1\%&0&0\%&-1\% \bigstrut \\ \hline
+JDeodorant &67\%&33\%&47\%&100\%&50\%&71\%&43\%&59\%&50\%&0\%&0\%&-1\% \bigstrut \\ \hline
+Vote &100\%&8\%&29\%&20\%&100\%&44\%&67\%&9\%&25\%&8\%&67\%&23\% \bigstrut \\ \hline
+ASCI &44\%&100\%&66\%&100\%&50\%&71\%&60\%&41\%&49\%&67\%&67\%&67\% \bigstrut \\ \hline
+\textbf{\NAME{}} &50\%&83\%&64\%&67\%&100\%&82\%&37\%&86\%&56\%&15\%&67\%&32\% \bigstrut \\ \hline
+\end{tabular}
+\end{adjustbox}
+
+\bigskip
+
+\begin{adjustbox}{width=\textwidth}
+\begin{tabular}{|c|c|c|c|c|c|c|c|c|c|c|c|c|}
+\hline
+\multirow{2}{*}{Approaches}& 
+\multicolumn{3}{c|}{
+	Apache Tomcat
+} 
+&\multicolumn{3}{c|}{
+	Apache Xerces
+}
+&\multicolumn{3}{c|}{
+	ArgoUML
+}
+&\multicolumn{3}{c|}{
+	Jedit 
+}\bigstrut [t] \\ 
+\cline{2-13}
+&\textit{Precision}&\textit{Recall}&\textit{  MCC  }
+&\textit{Precision}&\textit{Recall}&\textit{  MCC  }
+&\textit{Precision}&\textit{Recall}&\textit{  MCC  }
+&\textit{Precision}&\textit{Recall}&\textit{  MCC  } \bigstrut [t]\\
+\hline
+InCode &57\%&52\%&54\%&31\%&78\%&49\%&67\%&18\%&35\%&50\%&53\%&51\% \bigstrut \\ \hline
+HIST &5\%&15\%&8\%&1\%&6\%&1\%&1\%&5\%&1\%&1\%&6\%&0\% \bigstrut \\ \hline
+JDeodorant &31\%&50\%&39\%&43\%&50\%&46\%&46\%&23\%&32\%&44\%&65\%&53\% \bigstrut \\ \hline
+Vote &73\%&17\%&35\%&12\%&100\%&34\%&--&0\%&--&9\%&100\%&28\% \bigstrut \\ \hline
+ASCI &60\%&50\%&54\%&36\%&78\%&52\%&80\%&18\%&38\%&50\%&53\%&51\% \bigstrut \\ \hline
+\textbf{\NAME{}} &39\%&81\%&56\%&36\%&75\%&51\%&47\%&68\%&56\%&48\%&88\%&65\% \bigstrut \\ \hline
+\end{tabular}
+\end{adjustbox}
+\end{table*}
+
+\subsubsection{\RQone{}}
+For God Class detection, \NAME{} shows a precision of $45\%$, a recall of $51\%$ and a Matthew's Correlation Coefficient of $0.46$ on overall over the subject systems. Thus, the proposed ensemble method clearly outperforms the three approaches used for aggregation. Specifically, the overall MCC improves by $45\%$ in comparison to the tool that performed the best (DECOR with $0.35$). Considering the performances achieved on each system, we can see that \NAME{} achieves poor performances on the first system (Android Telephony) due to our model over-fitting its training data. However on the remaining seven systems the proposed method shows a MCC ranging between $0.46$ and $0.70$, which confirms that \NAME{} performs well independently of the systems characteristics. On the contrary, the competing tools show wider ranges of MCC and achieve poor performances on several systems. However, the low performances reported for JDeodorant (especially precision) can be due to this tool relying on a different definition of God Class than others. Indeed, affected entities are detected only if opportunities to split them are identified.
+
+For Feature Envy detection, \NAME{} achieves on overall a precision of $40\%$ and a recall of $80\%$ leading to an MCC of $0.56$. We observe better performances in terms of MCC achieved by the static code analysis tools ($0.49$ by InCode and $0.42$ by JDeodorant) than for God Class detection and low results for HIST. These results show that \NAME{} outperforms the standalone tools when detecting Feature Envy with an overall MCC $14\%$ higher than that of the tool that performed the best (InCode). Similarly to God Class, \NAME{} shows acceptable performances on every systems with an MCC ranging between $0.32$ and $0.82$. It is important to highlight that when replicating HIST's rule for Feature Envy detection, we used a different component\footnote{http://www.incava.org/projects/diffj} to extract changes at method level than that of the original approach because the original component is supposedly unavailable because of its license. We are aware that such difference could affect the reported performances.
+
+\Answer{\NAME{} significantly outperforms the standalone detection tools in detecting God Class and Feature Envy. Furthermore, our results indicate that \NAME{} performs well independently of the systems characteristics.}
+
+\subsubsection{\RQtwo{}}
+We report the results of our study aiming to compare the performances of \NAME{} with those of the two competing ensemble methods considering God Class and Feature Envy independently in turn. For God Class, we can see that our method outperforms on overall both the voting technique and ASCI in terms of precision, recall and MCC. Indeed, for this anti-pattern none of the competing ensemble method seems to improve the performances of the aggregated tools. However when looking at the performances achieved on each system, we observe that contrary to ASCI, the voting technique has the advantage of showing an acceptable MCC for every systems. However, we must notice that in our experiments we chose to feed the decision tree used by ASCI with the same metrics used to feed the MLP on which rely our approach \NAME{}. We cannot exclude that another version of ASCI based on different software metrics may have led to better results.
+
+For Feature Envy, we can see that in term of precision, ASCI outperforms our method with $48\%$ against $40\%$ for \NAME{}. However, \NAME{} achieves a recall significantly higher than its competitors with a value of $80\%$ against $54\%$ and $41\%$. Finally, regarding the MCC, we can see that although ASCI is able to improve the performances of the aggregated tools, its is our method, \NAME{} that shows the biggest improvement with an MCC of $0.56$
+
+
+\Answer{\NAME{} significantly outperforms both the voting technique and ASCI in terms of recall and MCC. Furthermore, our results indicate that none of the competing method is able to improve the detection for both anti-patterns.}
+

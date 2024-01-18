@@ -1,0 +1,35 @@
+\input{figures/map_results}
+\input{figures/qasper_results}
+\input{figures/hotpotqa_results}
+\input{figures/ablation_hotpotqa}
+\section{Evaluation and Analysis}
+In this section, we provide details about the experiments that we conducted and their outcomes. 
+\subsection{Experimental Setup}
+
+
+In order to demonstrate the contribution of our method, we evaluated it over the recent QAsper dataset~\cite{dasigi-etal-2021-dataset} and the well-known HotpoQA dataset~\cite{yang-etal-2018-hotpotqa},
+which share the same setup (\sect \ref{sec:background}). 
+
+\paragraph{QAsper}~\cite{dasigi-etal-2021-dataset} is a long-document QA dataset which was built over academic papers, where NLP practitioners were recruited to (abstractedly) generate questions following the title and the abstract of a particular paper, as well as creating the the correct evidence and answers to those questions based on the entire paper. More than half of the examples in QAsper require collecting evidences from multiple evidences in the given paper. For this benchmark, $\mathcal{L}_{QA}$ represents the sum of the teacher-forced text generation and evidence classification loss functions, in a multi-task training setup.
+
+
+\paragraph{HotpotQA}~\cite{yang-etal-2018-hotpotqa} introduced the task of multihop extractive question answering, in the reading comprehension setting, where the inputs are a question and multiple paragraphs from various related and non-related documents. A model is queried to extract answer spans and evidence sentences, where it should handle challenging questions that require finding and reasoning over multiple supporting documents. For the models we applied to this benchmark, $\mathcal{L}_{QA}$ represents the standard cross-entropy answer extraction loss.
+
+To test the contribution of our $\mathcal{L}_{QE}$ loss, We replicated the experiments described in~\citet{dasigi-etal-2021-dataset} and~\citet{caciularu-etal-2021-cdlm-cross} for QAsper and HotpotQA, respectively. For QAsper, we finetuned the LED-base model,\footnote{According to~\citet{dasigi-etal-2021-dataset}, LED-base outperforms LED-large over QAsper.} and evaluated it on the question answering and evidence selection tasks. For HotpotQA, we used the Longformer model and CDLM\footnote{CDLM was shown to be an effective long-range cross-encoder model for HotpotQA.} as the backbone long-sequence language models for this task. Since CDLM was provided only as a base-sized model, we pretrained a larger version of the CDLM model, and hence used both the base and large versions of both Longformer and CDLM. For further details see Appendix~\ref{subsec:qasper} and~\ref{subsec:hotpotqa}.
+
+For both benchmarks, we performed a grid search for determining the hyper-parameters of the contrastive loss (more details in Appendix~\ref{sec:contrastive}).
+\subsection{Results and Analysis}
+\paragraph{Qustion-Evidence Similarity Analysis.} As a preliminary assessment, we first investigate the question and evidences representations of models trained on the HopotQA dataset. We motivate the use of our method by presenting the mean Average Precision (mAP) ranking results produced according to the question-sentence cosine similarities for the marker tokens trained representations of the CDLM-large model. \red{From Table~\ref{tab:map}, we observe that without applying our additional loss term, the question representations are distant from the evidence representations. Using a single learned projection increases this desirable similarity, and using a learned projection per question type yields the highest mAP scores. Hence, integrating question-type aware linear projections can be a beneficial part of our contrastive loss, and overall it further improves the QA results as we show next.} An additional illustration of this effect, where we visualize the marker representations, appears in Appendix~\ref{sec:appndx1}.
+
+\paragraph{Main results.} We adopted the F1 evaluation metrics corresponding to the original works~\cite{dasigi-etal-2021-dataset,longformer}. Tables \ref{tab:qasper_results} and \ref{tab:hotpotqa} present the evaluation results over the QAsper and HotpoQA datasets, respectively. We show the performance difference when adding our additional loss term with ``+$\mathcal{L}_{QE}$'' (and question-type similarity function from Eq.~\ref{eq:cos_k}). 
+
+As shown in the table, the addition of $\mathcal{L}_{QE}$ exhibits the best performance across all examined models and benchmarks, clearly demonstrating its consistent advantage. Note that maximizing the question-evidence similarity resulted also in evidence detection improvement -- see the ``Evidence'' and the ``Sup'' metrics in Tables~\ref{tab:qasper_results} and ~\ref{tab:hotpotqa}, respectively. All the results are statistically significant using the bootstrap test with ${p<0.01}$~\cite{dror-etal-2018-hitchhikers}.
+
+\paragraph{Ablations.} Table~\ref{tab:ablations} demonstrates ablation study results for evaluating the effectiveness of our design decisions. Using a constant temperature parameter for all question types, as well as using different degenerated similarity functions, exhibits lower performance. Further, the last row in Table~\ref{tab:ablations} shows that treating correct answers that are projected to the wrong question type as negatives also improves the results.
+Overall, the ablation study shows the advantage of using Eq.~\ref{eq:cos_k} as a similarity function that provides fine-grained expressive modeling for each question type, in its own sub-space. 
+
+\paragraph{Discussion.} An additional theoretical justification to our contrastive learning is provided in~\cite{gao-etal-2021-simcse}, where we can imply that our loss term improves the uniformity and therefore the expressiveness of the question and evidence representations. Moreover, one can attribute the success of our contrastive loss to the fact that long-range transformer models lack long-range signals during pretraining, and hence such explicit modeling as we suggest is necessary. In fact, comparing CDLM's results to the Longformer illustrates that our cotrastive term has higher impact on models without global attention-based pretraining.  
+
+
+
+

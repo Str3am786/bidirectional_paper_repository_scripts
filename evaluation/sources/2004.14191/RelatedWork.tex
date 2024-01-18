@@ -1,0 +1,49 @@
+%-------------------------------------------------------------------------------
+\section{Related Work}
+\label{sec:related-work}
+%-------------------------------------------------------------------------------
+
+Instrumentation using trampolines is known for a long time.
+It is typically used in restricted applications such as function interception~\cite{MicrosoftDetours}.
+We systematically use trampolines at a fine granularity to instrument individual basic blocks.
+Also, we are aggressive in exploiting padding bytes and hosting detours, which allows us to avoid relocating entire functions like in PEBIL~\cite{Laurenzano2010}.
+
+
+Recently, several works considered static instrumentation via reassembly~\cite{Wang2015,RetroWriteSP2020} and recompilation~\cite{Anand:EuroSys2013}.
+Both enable instrumentation code to be inlined in their recovered artifacts, namely, assembly and IR respectively. 
+Therefore, they are orthogonal to our approach, in principle. 
+However, code inlining means that relocated references need to be
+fixed, e.g., in CFI records, which increases the engineering overhead. 
+This can also be challenging to implement correctly since distinguishing references from scalars is an undecidable problem in general. 
+In comparison, trampolines maintain reference stability which allowed us to seamlessly scale to large C/C++ binaries. 
+Also, they make it easy to map analysis results back to the original binaries.
+
+The analysis of jump tables was considered in several works.
+A combination of pattern matching and data-flow analysis was proposed in~\cite{BenKhadra2016,Meng:ISSTA2016}. 
+Cifuentes \etal~\cite{Cifuentes1999} use backward slicing to produce a slice, which they convert to a canonical IR expression before checking it against known jump table forms.
+A custom value-set analysis using SMT solving was implemented in JTR~\cite{Cojocar2017a}.
+It is applied after lifting instructions to LLVM IR.
+In contrast, our approach, sliced microexecution, semantically reasons about jump tables without manual pattern matching. 
+Also, it does not require lifting instructions to an IR. 
+Such lifting is known to be error-prone~\cite{BinIR:ASE17} and can drastically slow down binary analyses~\cite{QSYMYun2018}.
+Instead, we leverage the executable instruction semantics already available in off-the-shelf emulators.
+Moreover, we move beyond mere recovery to jump table instrumentation.
+
+
+Tikir \etal~\cite{Tikir2002} propose an approach for binary-level coverage analysis and use probe pruning to improve its efficiency.
+It is the closest related work to ours. 
+However, our approaches differ in several aspects. 
+First, they focus on dynamic coverage analysis where binaries can be analyzed, patched, and potentially restored at runtime.
+In contrast, our static instrumentation approach allows us to spend more time on optimizations.
+Second, their work builds on Dyninst~\cite{DyninstWeb}, a generic binary instrumentation tool.
+However, the generality of Dyninst comes at a considerable cost in terms of overhead and complexity. 
+For example, it has multiple levels of trampolines.
+In comparison, we focus on the bare minimum required for tracking code coverage. 
+Consequently, {\bcov} provides better performance and transparency.
+Finally, as acknowledged by the authors, the probe pruning
+technique implemented in \bcov{} is more efficient than that of~\cite{Tikir2002}. 
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "binder"
+%%% End:

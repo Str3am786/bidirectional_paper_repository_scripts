@@ -1,0 +1,79 @@
+\section{Experiments}
+\label{sec:experiments}
+\begin{table*}[tb]
+    \centering
+    \small
+    \begin{tabular}{l|r@{\ \ }rr@{\ \ }rr@{\ \ }r|r@{\ \ }rr@{\ \ }rr@{\ \ }r}
+    \toprule
+        & \multicolumn{6}{c|}{Character Error Rate} &\multicolumn{6}{c}{Word Error Rate} \\
+        & \multicolumn{2}{c}{Ainu} & \multicolumn{2}{c}{Griko} & \multicolumn{2}{c|}{Yakkha} & \multicolumn{2}{c}{Ainu} & \multicolumn{2}{c}{Griko} & \multicolumn{2}{c}{Yakkha} \\[-0.3em]
+        Model & \small Multi & \small Single & \small Multi & \small Single & \small Multi & \small Single & \small Multi & \small Single & \small Multi & \small Single & \small Multi & \small Single\\
+        \midrule
+        \textsc{Fp-Ocr} & \multicolumn{1}{c}{--} & $1.34$ & \multicolumn{1}{c}{--} & $3.27$ & \multicolumn{1}{c}{--} & $8.90$ & \multicolumn{1}{c}{--} & $6.27$ & \multicolumn{1}{c}{--} & $15.63$ & \multicolumn{1}{c}{--} & $31.64$ \\
+        \textsc{Base} & $1.56$ & $1.41$ & $6.78$ & $5.95$ & $70.39$ & $71.71$ & $8.56$ & $7.88$ & $15.13$ & $13.67$ & $98.15$ & $99.10$  \\
+        \textsc{Copy} & $2.04$ & $1.99$ & $2.54$ & $2.28$ & $14.77$ & $12.30$ & $9.48$ & $8.57$ & $9.33$ & $8.90$ & $30.36$ & $27.81$ \\
+        \textsc{Ours} & $0.92$ & $\boldsymbol{0.80}$ & $\boldsymbol{1.66}$ & $1.70$ & $\boldsymbol{7.75}$ & $8.44$ & $5.75$ & $\boldsymbol{5.19}$ & $\boldsymbol{7.46}$ & $7.51$ & $\boldsymbol{20.95}$ & $21.33$ \\
+    \bottomrule
+    \end{tabular}
+    \caption{Our method improves performance over all baselines (10-fold cross-validation averaged over five randomly seeded runs). We present multi- and single-source variants and \textbf{highlight} the best model for each language.}
+    \label{tab:cer}
+\end{table*}
+
+This section discusses our experimental setup and the post-correction performance on the three endangered languages on our dataset.
+
+\subsection{Experimental Setup}
+\smallskip
+\paragraph{Data Splits}
+We perform 10-fold cross-validation for all experimental settings because of the small size of the datasets. For each language, we divide the transcribed data into 11 segments --- we use one segment for creating the \emph{denoising rules} described in the previous section and the remaining ten as the folds for cross-validation. In each cross-validation fold, eight segments are used for training, one for validation and one for testing.
+
+We divide the dataset at the page-level for the Ainu and Griko documents, resulting in 11 segments of three pages each. For the Yakkha documents, we divide at the paragraph-level, due to the small size of the dataset. We have 33 paragraphs across the three books in our dataset, resulting in 11 segments that contain three paragraphs each. The multi-source results for Yakkha reported in \autoref{tab:cer} use the English translations. Results with Nepali are similar and are included in \autoref{sec:appendix}.
+
+\paragraph{Metrics}
+We use two metrics for evaluating our systems: character error rate (CER) and word error rate (WER). Both metrics are based on edit distance and are standard for evaluating OCR and OCR post-correction~\cite{berg-kirkpatrick-etal-2013-unsupervised,schulz-kuhn-2017-multi}. 
+CER is the edit distance between the predicted and the gold transcriptions of the document, divided by the total number of characters in the gold transcription. WER is similar but is calculated at the word level.
+
+\paragraph{Methods}
+In our experiments, we compare the performance of our proposed method with the first pass OCR and with two systems from recent work in OCR post-correction. All the post-correction methods have two variants -- the single-source model with only the endangered language encoder and the multi-source model that additionally uses the high-resource translation encoder.
+\begin{itemize}
+    \item \textsc{Fp-Ocr}: The first pass transcription obtained from the Google Vision OCR system.
+    \item \textsc{Base}: This system is the base sequence-to-sequence architecture described in \autoref{sec:base}. Both the single-source and multi-source variants of this system are used for English OCR post-correction in~\citet{dong-smith-2018-multi}. 
+    \item \textsc{Copy}: This system is the base architecture with a copy mechanism as described in \autoref{sec:recipe1}. The single-source variant of this model is used for OCR post-correction on Romanized Sanskrit in \citet{krishna-etal-2018-upcycle}.\footnote{Although~\citet{krishna-etal-2018-upcycle} use BPE tokenization, preliminary experiments showed that character-level models result in much better performance on our dataset, likely due to the limited data available for training the BPE model.}
+    \item \textsc{Ours}: The model with all the adaptations proposed in \autoref{sec:recipe1} and \autoref{sec:recipe2}.
+\end{itemize}
+
+\paragraph{Implementation} The post-correction models are implemented using the DyNet neural network toolkit~\cite{dynet}, and all reported results are the average of five training runs with different random seeds. We assume knowledge of the entire alphabet of the endangered language for all the methods, which is straightforward to obtain for most languages. The decoder's vocabulary contains all these characters, irrespective of their presence in the training data, with corresponding randomly-initialized character embeddings.
+
+\subsection{Main Results}
+\label{sec:results}
+\input{images/figure4}
+\begin{figure}[t]
+    \input{images/newbar}
+    \caption{WER with model component ablations on the best model setting in \autoref{tab:cer}. ``all" includes all the adaptations we propose. Each ablation removes a single component from the ``all" model, e.g. ``-pretr.~s2s" removes the seq-to-seq model pretraining.}
+    \label{fig:ablation}
+\end{figure}
+
+\autoref{tab:cer} shows the performance of the baselines and our proposed method for each language. Overall, our method results in an improved CER and WER over existing methods across all three languages. 
+
+The \textsc{Base} system does not improve the recognition rate over the first pass transcription, apart from a small decrease in the Griko WER. The performance on Yakkha, particularly, is significantly worse than \textsc{Fp-Ocr}: likely because the data size of Yakkha is much smaller than that of Griko and Ainu, and the model is unable to learn a reasonable distribution. However, on adding a copy mechanism to the base model in the \textsc{Copy} system, the performance is notably better for both Griko and Yakkha. This indicates that adaptations to the base model that cater to specific characteristics of the post-correction task can alleviate some of the challenges of learning from small amounts of data.
+
+The single-source and the multi-source variants of our proposed method improve over the baselines, demonstrating that our proposed model adaptations can improve recognition even without translations. We see that using the high-resource translations results in better post-correction performance for Griko and Yakkha, but the single-source model achieves better accuracy for Ainu. We attribute this to two factors: the very low error rate of the first pass transcription for Ainu and the relatively high error rate (based on manual inspection) of the OCR on the Japanese translation. Despite being a high-resource language, OCR is difficult due to the complexity of Japanese characters and low scan quality. The noise resulting from the Japanese OCR errors likely hurts the multi-source model.
+
+
+
+\subsection{Ablation Studies}
+
+
+Next, we study the effect of our proposed adaptations and evaluate their benefit to the performance of each language. \autoref{fig:ablation} shows the word error rate with models that remove one adaptation from the model with all the adaptations (``all").
+
+For Ainu and Griko, removing any single component increases the WER, with the complete (\ba\ba all'') method performing the best. There is little variance in the Ainu ablations, likely due to the high-quality first pass transcription. 
+
+Our proposed adaptations add the most benefit for Yakkha, which has the fewest training data and relatively less accurate first pass OCR. The copy mechanism is crucial for good performance, but removing the decoder pretraining (\ba\ba pretr.~dec'') leads to the best scores among all the ablations. The denoising rules used to create the pseudo-target data for Yakkha are likely not accurate since they are derived from only three paragraphs of annotated data. Consequently, using it to pretrain the decoder leads to a poor language model.
+
+\subsection{Error Analysis}
+
+
+We systematically inspect all the recognition errors in the output of our post-correction model to determine the sources of improvement with respect to the first pass OCR. We also examine the types of errors introduced by the post-correction process.
+
+We observe a \emph{91\% reduction} in the number of errors due to mixed scripts and a \emph{58\% reduction} in the errors due to uncommon characters and diacritics (as defined in \autoref{sec:analysis}). Examples of these are shown in \autoref{fig:error_examples} (a) and (b): mixed script errors such as the $\bm{\chi}$ character in Griko and the glottal stop \textbf{\textipa{\textglotstop}} in Yakkha are successfully corrected by the model. The model is also able to correct uncommon character errors like \textbf{\d{d}} in Griko and {\raisebox{-2.65pt}{\includegraphics[height=9.5pt]{images/dev_char.pdf}}} in Yakkha.
+
+Examples of errors introduced by the model are shown in \autoref{fig:error_examples} (c) and (d). Example (c) is in Griko, where the model incorrectly adds a diacritic to a character. We attribute this to the fact that the first pass OCR does not recognize diacritics well; hence, the model learns to add diacritics frequently while generating the output. Example (d) is in Yakkha. The model inserts several incorrect characters, and can likely be attributed to the lack of a good language model due to the relatively smaller amount of training data we have in Yakkha.  

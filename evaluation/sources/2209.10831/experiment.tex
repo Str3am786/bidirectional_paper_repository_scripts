@@ -1,0 +1,112 @@
+\section{Experiments}
+\label{sec:experiments}
+\begin{figure}[t]
+    \centering
+    \begin{tabular}{cc}
+        \begin{minipage}[t]{0.45\hsize}
+            \centering
+            \includegraphics[keepaspectratio, scale=0.5]{figure/paper_curve.pdf}
+        \end{minipage}
+        &
+        \begin{minipage}[t]{0.45\hsize}
+            \centering
+            \includegraphics[keepaspectratio, scale=0.5]{figure/paper_test.pdf}
+        \end{minipage}
+    \end{tabular}
+    \caption{%
+        Comparison of the algorithm for the 0-th fold of %
+        Ringnorm dataset with parameters $\epsilon = 0.01$ %
+        and $\nu = 0.1m$. %
+        \emph{Left:} %
+        soft margin objective value vs. computation time (seconds). %
+        \emph{Right:} %
+        test error vs. computation time (seconds). %
+    }
+\end{figure}
+We compare LPBoost, ERLPBoost, and our scheme 
+on Gunnar R{\"{a}}tsch's benchmark dataset~\footnote{%
+    Datasets are obtained from %
+    \url{http://theoval.cmp.uea.ac.uk/~gcc/matlab/default.html\#benchmarks}. %
+    \label{fnote:benchmark}%
+}.
+We use a server with 
+Intel Xeon Gold 6124 CPU 2.60GHz processors. 
+We call our scheme with secondary Algorithm~\ref{alg:lpb_subroutine} 
+as MLPBoost. MLPB.~(SS) and MLPB.~(PFW) are MLPBoosts 
+with FW algorithms~\ref{alg:ss_rule} and~\ref{alg:pairwise_rule}, 
+respectively. 
+The gradient boosting algorithms, 
+like XGBoost~\citep{tianqi+:kdd16} or LightGBM~\citep{ke+:nips17}, 
+solve different problems, 
+so we do not compare our work to them. 
+Note that the FW column corresponds to C-ERLPBoost. 
+
+In order to solve the sub-problems of 
+LPBoost, ERLPBoost, and MLPBoost, 
+we use the Gurobi optimizer 9.0.1~\footnote{%
+    We use the Gurobi optimizer. See %
+    \url{https://www.gurobi.com/}. %
+}. 
+\paragraph{Settings.} 
+We set the capping parameters 
+$\nu \in N := \{pm \mid p = 0.1, 0.2, \dots, 0.5\}$ 
+and the tolerance parameter $\epsilon = 0.01$, 
+where $m$ is the number of training instances. 
+We use the weak learner that 
+returns the best decision tree of depth 2. 
+\paragraph{Computation time.} 
+We measure the CPU time and the System time using 
+\texttt{/usr/bin/time -v} command. 
+Some algorithms do not converge in a few days, 
+so we abort the experiment by \texttt{timeout 20000s} command. 
+We measure the running time with capping parameters 
+over $N$ for each dataset and took their average. 
+Table~\ref{table:time} shows the results.
+The FW column is the FW algorithm with short-steps, 
+and PFW is the Pairwise FW algorithm. 
+As the table shows, MLPB.~(SS) and MLPB.~(PFW) terminates 
+much faster than FW and PFW, respectively. 
+These results indicate that 
+LPBoost rule $\secalg$, shown in Algorithm~\ref{alg:lpb_subroutine}, 
+significantly improves the objective. 
+See the appendix for further comparisons. 
+\begin{table}[h]
+    \caption{ %
+        Comparison of the computation time (seconds). %
+        Each cell is the average computation time over %
+        the capping parameters over $N$. %
+        Some algorithm does not terminate in a few hours %
+        so we abort them within some appropriate time. %
+    }
+    \label{table:time}
+    \centering
+    \input{table/time.tex}
+\end{table}
+\paragraph{The worst case for LPBoost.} 
+Although LPBoost outperforms the running time 
+in Table~\ref{table:time}, 
+it takes $m/2$ iterations for the worst case~\citep{warmuth+:nips07}. 
+Even in this case, MLPBoost and ERLPBoost terminate in 2 iterations. 
+\paragraph{Test errors.} 
+For each dataset in the benchmark datasets, 
+we first split them into train/test sets. 
+Then, we perform the $5$-fold cross-validation over the training set, 
+varying the capping parameter $\nu \in N$ to find the best one. 
+Finally, train the algorithm using the whole training set 
+with the best parameter and measure the test error with the test set. 
+Table~\ref{table:cv5fold} summarizes the result. 
+Since all the variants of MLPBoost solve the same problem, 
+we only show MLPB.~(SS) for comparison. 
+As the table shows, MLPBoosts achieve small test errors 
+for most datasets. 
+\begin{table}[h]
+    \caption{%
+        Test errors for $5$-fold cross validation %
+        for the best parameters. 
+    }
+    \label{table:cv5fold}
+    \bigskip
+    \centering
+    \input{table/cv5fold.tex}
+\end{table}
+

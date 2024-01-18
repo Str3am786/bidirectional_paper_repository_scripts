@@ -1,0 +1,40 @@
+\subsubsection{\secuint\ to \secmod{}}\label{sss:secuint2secmod}
+
+For performance reasons, it is desirable to execute the entire computation in modular arithmetic, since it is much faster than bit-level. If however, a program requires an operation not supported in modular arithmetic (e.g., comparison), then, without Bridging, the whole program must perform all computations using bit-level arithmetic, severely degrading performance. 
+In effect, Bridging enables the isolation of the parts of the computation requiring bit-level arithmetic.
+For example, the expression "{\tt{}c+=(a<b)*a}" can use bit-level arithmetic for the comparison only.
+The variables required by the comparison (i.e., \texttt{a} and \texttt{b}) must be of integral type. Nevertheless, the operands of the multiplication can be cast to our modular type, allowing multiplication and addition to be executed in modular arithmetic, resulting in a variable {\tt{}c} of modular type.
+
+\input{list/fib_e3_mixed.tex}
+
+Listing~\ref{list:fibm} demonstrates the code of the Fibonacci function of Listing~\ref{list:fibs} with \emph{Bridged} arithmetic: Only the input \texttt{in} and counter \texttt{i} are declared as integral type \secuint{}, while the others are replaced with the faster \secmod\ type. 
+Line 8 does implicit conversion from \secuint\ to \secmod;
+in this way, bit-level multiplication (which is slow) is not executed. Instead, only the native (much faster) multiplication of ciphertexts is needed.
+Specifically, the comparison between {\tt i} and {\tt in} is the slowest operation in the program, and its result is one encrypted bit which can naturally be casted to \secmod, since the set $\{0,1\}$ is a subset of the plaintext range.
+The operation for casting an integral type (bit-level) into modular (FHE native) is a summation of the encrypted bits of the integral type. 
+In fact, the binary representation of a value $X$ can be reorganized by {\it Horner's scheme} in a set of additions over its $s$ bits $x_i$:
+\begin{equation*}
+\begin{split}
+X & = 2^{s-1}x_{s-1} +2^{s-2}x_{s-2} + ... + 2x_1+x_0 = \\
+& =(...((x_{s-1})\cdot 2+x_{s-2})\cdot 2+...+x_1)\cdot 2+x_0
+\end{split}
+\end{equation*}
+
+Evaluating the right hand side of the above equation yields the value corresponding to the bit sequence. This evaluation is an efficient way to convert a program variable of type \secuint{} into a \secmod{} value.
+Listing~\ref{list:secuint2secmod} shows the C++ implementation of such casting.
+We emphasize that this conversion requires no ciphertext multiplications, only additions. Specifically, $2 \cdot (s - 1)$ ciphertext additions with a maximum additive depth of $s-1$, where $s$ is the number of encrypted bits.
+
+\input{list/SecureUint_to_SecureMod}
+\input{list/SecureInt_to_SecureMod}
+
+Line 8 of Listing~\ref{list:fibm} does implicit conversion of \secbool{} to \secmod{}. Note that \secbool\ is a derived class from \secuint\texttt{<1>}. To observe a more complex scenario, consider the expression "{\tt{}c+=(a==b)*a}" that actually requires conversion of \secuint{}.
+Comparison between \texttt{a} and \texttt{b} must be evaluated in bit-level. This implies that types of \texttt{a} and \texttt{b} must be \secuint{}. The comparison is done on a bit-by-bit manner using homomorphic gates following the gate equations described in Section \ref{ss:modcom}.
+The gates correspond to normal logic gates, but operating on ciphertexts instead of ordinary bits. The result of the comparison is one encrypted bit represented by type \secbool.
+Multiplication between a \secbool\ and a \secuint\ is evaluated as a multiplexer operation with $s$ \texttt{AND} gates, where $s$ is the number of encrypted bits in the \secuint\ variable, resulting in a \secuint{} type.
+The type of variable \texttt{c} can be chosen as \secmod{}. The addition in the expression is then performed on variables of \secmod{} and \secuint{} types: "{\tt{}c=c+t}", where "{\tt{}t=(a==b)*a}". Implicit conversion evokes our function of Listing \ref{list:secuint2secmod} from the constructor of \secmod{} type out of \secuint{}.
+Then the addition operation follows on two variables, both of the \secmod{} type.
+
+It should be noted that all these conversions and evaluations are done obliviously to the user and do not require special attention; the user writes only "{\tt{}c+=(a==b)*a}".
+A more efficient way to perform this computation is to explicitly convert argument \texttt{a}  in this expression to \secmod. In such case, the multiplication is done in modular arithmetic which is around $s$ times faster than a multiplication between \secbool{} and \secuint{} (and many more times faster than multiplying two \secuint{}s).\footnote{The exact speed-up compared to multiplying two \secuint s depends on the variables' bit size.} The corresponding expression becomes \mbox{"{\tt{}c+=(a==b)*\secmod(a)}"}.
+Same way as above, the constructor calls the conversion function (Listing~\ref{list:secuint2secmod}), this time one step earlier - before the multiplication - resulting in having a larger portion of the computation in modular arithmetic, hence improving the performance.
+It it worth noting that while there is automatic conversion from \secuint\ to \secmod, it is the programmer's task to define each variable's type and, in some cases, call conversion explicitly for better performance.

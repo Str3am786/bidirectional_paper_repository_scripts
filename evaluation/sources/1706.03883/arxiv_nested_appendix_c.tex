@@ -1,0 +1,114 @@
+In this appendix, we provide details on the algorithm for the Multilevel Wasserstein means with sharing (MWMS) 
+formulation (Algorithm \ref{alg:local_constraint_multilevels_Wasserstein_means}). Recall the MWMS objective function as follows
+\begin{eqnarray}
+\mathop {\inf }\limits_{\mathcal{S}_{K},G_{j} , \Hbold \in \mathcal{B}_{M,\mathcal{S}_{K}}}{\mathop {\sum }\limits_{j=1}^{m}{W_{2}^{2}(G_{j},P_{n_{j}}^{j})}+\dfrac{d_{W_{2}}^{2}(G_{j},\Hbold)}{m}} \nonumber
+\end{eqnarray}
+where  $\mathcal{B}_{M,\mathcal{S}_{K}}=\biggr\{G_{j} \in \mathcal{O}_{K}(\Theta), \ \Hbold=(H_{1},\ldots,H_{M}): 
+\text{supp}(G_{j})\subseteq \mathcal{S}_{K}\ \forall 1 \leq j \leq m \biggr\}$. 
+
+\setcounter{algorithm}{1}
+\begin{algorithm}[tbp]
+   \caption{Multilevel Wasserstein Means with Sharing (MWMS)}
+   \label{alg:local_constraint_multilevels_Wasserstein_means}
+\begin{algorithmic}
+   \STATE {\bfseries Input:} Data $X_{j,i}$, $K$, $M$.
+   \STATE {\bfseries Output:} global set $S_{K}$, local measures $G_{j}$, and elements $H_{i}$ of $\Hbold$.
+   \STATE Initialize $S_{K}^{(0)}=\left\{a_{1}^{(0)},\ldots,a_{K}^{(0)}\right\}$, elements $H_{i}^{(0)}$ of $\Hbold^{(0)}$, and $t = 0$.
+   \WHILE{$S_{K}^{(t)},G_{j}^{(t)},H_{i}^{(t)}$ have not converged}
+   \STATE 1. Update global set $S_{K}^{(t)}$:
+   \FOR{$j=1$ {\bfseries to} $m$}
+   \STATE $i_{j} \leftarrow \mathop {\arg \min}\limits_{1 \leq u \leq M}{W_{2}^{2}(G_{j}^{(t)},H_{u}^{(t)})}$.
+   \STATE $T^{j} \leftarrow$ optimal coupling of $G_{j}^{(t)}$, $P_{n}^{j}$ (cf. Appendix A).
+   \STATE $U^{j} \leftarrow$ optimal coupling of $G_{j}^{(t)}$, $H_{i_{j}}^{(t)}$.
+   \ENDFOR
+   \FOR{$i=1$ {\bfseries to} $M$}
+   \STATE $h_{i}^{(t)} \leftarrow$ atoms of $H_{i}^{(t)}$ with $h_{i,v}^{(t)}$ as v-th column.
+   \ENDFOR
+   \FOR {$i=1$ {\bfseries to} $K$}
+   \STATE $m D \leftarrow m \sum \limits_{u=1}^{m}{\sum \limits_{v=1}^{n_{i}}{T_{i,v}^{u}}}+\sum \limits_{u=1}^{m}{\sum \limits_{v \neq i}{U_{i,v}^{u}}}$.
+   \STATE $a_{i}^{(t+1)} \leftarrow \biggr(m \sum \limits_{u=1}^{m}{\sum \limits_{v=1}^{n_{i}}{T_{i,v}^{u}X_{u,v}}}+$\\
+$\sum \limits_{u=1}^{m}{\sum \limits_{v}{U_{i,v}^{u}h_{j_{u},v}^{(t)}}}\biggr)/mD$.
+	\ENDFOR
+	\STATE 2. Update $G_{j}^{(t)}$ for $1 \leq j \leq m$:
+	\FOR{$j=1$ {\bfseries to} $m$}
+	\STATE $G_{j}^{(t+1)} \leftarrow \mathop {\arg \min}\limits_{G_{j}: \text{supp}(G_{j}) \equiv \mathcal{S}_{K}^{(t+1)}}{W_{2}^{2}(G_{j},P_{n_{j}}^{j})}$ \\
+	$+W_{2}^{2}(G_{j},H_{i_{j}}^{(t)})/m$.
+	\ENDFOR
+   \STATE 3. Update $H_{i}^{(t)}$ for $1 \leq i \leq M$ as Algorithm \ref{alg:multilevels_Wasserstein_means}.
+   \STATE 4. $t \leftarrow t+1$.
+   \ENDWHILE
+\end{algorithmic}
+\end{algorithm}
+
+We make the following remarks regarding the initializations and updates of Algorithm \ref{alg:local_constraint_multilevels_Wasserstein_means}: 
+\begin{itemize}
+\item[(i)] An efficient way to 
+initialize global set $S_{K}^{(0)}=\biggr\{a_{1}^{(0)},\ldots,a_{K}^{(0)}\biggr\} \in 
+\mathbb{R}^{d \times K}$ is to perform $K$-means on the whole data set $X_{j,i}$ for $1 
+\leq j \leq m, 1 \leq i \leq n_{j}$; 
+\item[(ii)] The updates $a_{j}^{(t+1)}$ are indeed the solutions 
+of the following optimization problems
+\begin{eqnarray}
+\inf \limits_{a_{j}^{(t)}}\biggr\{\sum \limits_{l=1}^{m}{W_{2}^{2}(G_{l}^{(t)},P_{n}^{l})}+\dfrac{\sum \limits_{l=1}^{m}{W_{2}^{2}(G_{l}^{(t)},H_{i_{l}}^{(t)})}}{m}\biggr\}, \nonumber
+\end{eqnarray}
+which is equivalent to find $a_{j}^{(t)}$ to optimize 
+\begin{eqnarray}
+m \sum \limits_{u=1}^{m}{\sum \limits_{v=1}^{n_{j}}{T_{j,v}^{u}\|a_{j}^{(t)}-X_{u,v}\|^{2}}} \nonumber \\
++\sum \limits_{u=1}^{m}{\sum \limits_{v}{U_{j,v}^{u}\|a_{j}^{(t)}-h_{i_{j},v}^{(t)}||^{2}}}.\nonumber
+\end{eqnarray}
+where $T^{j}$ is an optimal coupling of $G_{j}^{(t)}$, $P_{n}^{j}$ and $U^{j}$ is an optimal coupling of $G_{j}^{(t)}$, $H_{i_{j}}^{(t)}$. By taking the first order derivative of the above function with respect to $a_{j}^{(t)}$, we quickly achieve $a_{j}^{(t+1)}$ as the closed form minimum of that function;
+\item[(iii)] Updating the local weights of $G_{j}^{(t+1)}$ is equivalent to updating $G_{j}^{(t+1)}$ as 
+the atoms of $G_{j}^{(t+1)}$ are known to stem from $S_{K}^{(t+1)}$. 
+\end{itemize}
+Now, similar to 
+Theorem 3.1 in the main text, we also have the following theoretical 
+guarantee regarding the behavior of Algorithm \ref{alg:local_constraint_multilevels_Wasserstein_means} as follows
+\begin{customthm}{C.1} \label{theorem:local_convergence_local_constraint_Kmeans} Algorithm 
+\ref{alg:local_constraint_multilevels_Wasserstein_means} monotonically decreases the 
+objective function of  
+the MWMS formulation.
+\end{customthm}
+\begin{proof}
+The proof is quite similar to the proof of Theorem \ref{theorem:local_convergence_multilevel_Kmeans}. In fact, recall from the proof of Theorem \ref{theorem:local_convergence_multilevel_Kmeans} that for any $G_{j} \in \mathcal{E}_{k_{j}}(\Theta)$ and $\Hbold =(H_{1},\ldots,H_{M})$ we denote the function 
+\begin{eqnarray}
+f(\vec{G}, \Hbold)=\mathop {\sum }\limits_{j=1}^{m}{W_{2}^{2}(G_{j},P_{n}^{j})}+\dfrac{d_{W_{2}}^{2}(G_{j},\Hbold)}{m} \nonumber
+\end{eqnarray}
+where $\vec{G}=(G_{1},\ldots,G_{m})$. Now it is sufficient to demonstrate for any $t \geq 0$ that
+\begin{eqnarray}
+f(\vec{G}^{(t+1)},\Hbold^{(t+1)}) \leq f(\vec{G}^{(t)},\Hbold^{(t)}). \nonumber
+\end{eqnarray}
+where the formulation of $f$ is similar as in the proof of Theorem \ref{theorem:local_convergence_multilevel_Kmeans}. %\ref{theorem:local_convergence_multilevel_Kmeans}.
+Indeed, by the definition of Wasserstein distances, we have
+\begin{eqnarray}
+E = m f(\vec{G}^{(t)},\Hbold^{(t)})  = \nonumber \\
+ \sum \limits_{u=1}^{m}{\sum \limits_{j,v}{mT_{j,v}^{u}\|a_{j}^{(t)}-X_{u,v}\|^{2}} +  U_{j,v}^{u}\|a_{j}^{(t)}-h_{i_{u},v}^{(t)}\|^{2}}. \nonumber
+\end{eqnarray}
+Therefore, the update of $a_{i}^{(t+1)}$ from Algorithm \ref{alg:local_constraint_multilevels_Wasserstein_means} %\ref{alg:local_constraint_multilevels_Wasserstein_means} 
+leads to
+\begin{eqnarray}
+E & \geq &  \sum \limits_{u=1}^{m}{\sum \limits_{j,v}{mT_{j,v}^{u}\|a_{j}^{(t+1)}-X_{u,v}\|^{2}}} \nonumber \\
+& + & U_{j,v}^{u}\|a_{j}^{(t+1)}-h_{i_{u},v}^{(t)}\|^{2} \nonumber \\
+& \geq & m \sum \limits_{j=1}^{m}{W_{2}^{2}(G_{j}^{(t)'},P_{n}^{j})}+\sum \limits_{j=1}^{m}{W_{2}^{2}(G_{j}^{(t)'},H_{i_{j}}^{(t)})} \nonumber \\
+& \geq & m \sum \limits_{j=1}^{m}{W_{2}^{2}(G_{j}^{(t)'},P_{n}^{j})}+\sum \limits_{j=1}^{m}{d_{W_{2}}^{2}(G_{j}^{(t)'},\Hbold^{(t)})} \nonumber \\
+& = & mf(\vec{G'}^{(t)},\Hbold^{(t)}) \nonumber
+\end{eqnarray}
+where $\vec{G'}^{(t)}=(G_{1}^{(t)'},\ldots,G_{m}^{(t)'})$, $G_{j}^{(t)'}$ are formed by replacing the atoms of $G_{j}^{(t)}$ by the 
+elements of $S_{K}^{(t+1)}$, noting that $\text{supp}(G_{j}^{(t)'}) \subseteq  \mathcal{S}_{K}^{(t+1)}$ as $1 \leq j \leq m$, and 
+the second inequality comes directly from the definition of Wasserstein distance. Hence, we obtain
+\begin{eqnarray}
+f(\vec{G}^{(t)},\Hbold^{(t)})\geq f(\vec{G'}^{(t)},\Hbold^{(t)}). \label{eqn:theorem_constraint_Wasserstein_means_first}
+\end{eqnarray}
+From the formation of $G_{j}^{(t+1)}$ as $1 \leq j \leq m$, we get
+\begin{eqnarray}
+\sum \limits_{j=1}^{m}{d_{W_{2}}^{2}(G_{j}^{(t+1)},\Hbold^{(t)})} \leq \sum \limits_{j=1}^{m}{d_{W_{2}}^{2}(G_{j}^{(t)'},\Hbold^{(t)})}. \nonumber
+\end{eqnarray}
+Thus, it leads to 
+\begin{eqnarray}
+f(\vec{G'}^{(t)},\Hbold^{(t)}) \geq f(\vec{G}^{(t+1)},\Hbold^{(t)}). \label{eqn:theorem_constraint_Wasserstein_means_second}
+\end{eqnarray}
+Finally, from the definition of $H_{1}^{(t+1)},\ldots,H_{M}^{(t+1)}$, we have
+\begin{eqnarray}
+f(\vec{G}^{(t+1)},\Hbold^{(t)}) \geq f(\vec{G}^{(t+1)},\Hbold^{(t+1)}). \label{eqn:theorem_constraint_Wasserstein_means_third}
+\end{eqnarray}
+By combining \eqref{eqn:theorem_constraint_Wasserstein_means_first}, \eqref{eqn:theorem_constraint_Wasserstein_means_second}, and \eqref{eqn:theorem_constraint_Wasserstein_means_third},  we arrive at the conclusion of the theorem.
+\end{proof}

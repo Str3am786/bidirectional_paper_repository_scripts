@@ -1,0 +1,116 @@
+\section{Experiment}
+\label{sec:experiment}
+
+In this section, we show the experimental results to answer the following research questions.
+\begin{itemize}[leftmargin=*]
+\item \textbf{RQ1} How effective is EIGV in discovering the causal pattern and improving the model generalization across different settings?
+\item \textbf{RQ2} How does the sub-module and feature setting contribute to the performance?
+\item \textbf{RQ3} What pattern does EIGV capture in rationale discovery?
+\end{itemize}
+
+\subsection{Settings}
+
+\vspace{5pt}
+\noindent \textbf{Datasets.} We conduct experiments on three benchmark datasets that challenge the model's reasoning capacity from different aspects: 
+\textbf{MSVD-QA}  \cite{DBLP:conf/mm/XuZX0Z0Z17} and \textbf{MSRVTT-QA} \cite{DBLP:conf/mm/XuZX0Z0Z17} mainly emphasize the recognition ability by asking the descriptive questions, where 50K and 243K question-answer pairs are automatically generated from the human-labeled video captions, respectively.
+\textbf{NExT-QA} \cite{DBLP:conf/cvpr/XiaoSYC21} pinpoints the causal and temporal relations among objects in the video. It contains 47.7K questions with answers in the form of multi-choice, which are manually annotated from 5.4K videos.
+
+\vspace{5pt}
+\noindent\textbf{Baseline.} We validate the effectiveness of EIGV across backbone VideoQA models of three kinds: 
+1) \textbf{Memory-based} methods that foster a storage of input sequence via auxiliary memory design, such as AMU \cite{DBLP:conf/mm/XuZX0Z0Z17}, HME \cite{fan2019heterogeneous} and Co-Mem \cite{gao2018motionappearance}.
+2) \textbf{Graph-based} methods that leverage the expressiveness of graph network to model the interaction between visual and language elements, which involves methods like L-GCN \cite{huang2020locationaware}, B2A  \cite{park2021bridge} and HGA \cite{jiang2020reasoning}. 
+3) \textbf{Hierarchy-based} methods include HCRN \cite{le2021hierarchical}, PGAT \cite{DBLP:conf/mm/PengYBW21}, HOSTR \cite{dang2021hierarchical}, MSPAN \cite{DBLP:conf/acl/GuoZJ0L20} and HQGA \cite{xiao2021video}. In common, they exploit the multi-granularity nature of visual elements and realize the hierarchical reasoning via bottom-up architecture. 
+In Specific, we test the generalization of EIGV by marrying our learning principles to three backbones of different categories: memory-based Co-Mem \cite{gao2018motionappearance}, graph-based HGA \cite{jiang2020reasoning} and hierarchy-based MSPAN \cite{DBLP:conf/acl/GuoZJ0L20}. 
+
+\vspace{5pt}
+\noindent \textbf{Implementation Detail.} 
+For input representation, we encode the video instance as a sequence of $K$=16 clips, where each clip is represented as a combination of appearance and motion features extracted from the pre-trained ResNet-152 and 3D ResNeXt-101. For the linguistic feature, we follow \cite{DBLP:conf/cvpr/XiaoSYC21} and obtain the contextualized word representation using the fine-tuned BERT model. In the hyper-parameters setting, we set $d=512$ for cross-modal alignment, then train the model for 80 epochs with an initial learning rate of 5e-5.  During optimization, EIGV is trained with Adam optimizer and we decay the learning rate when validation stops improving for 5 epochs. The balance ratio $\beta$ is set to 0.75.
+%for open-set QA and 0.025 for multi-choice QA. 
+
+\subsection{Main Result (RQ1)}
+\input{tab/main}
+
+Table \ref{tab:main} shows the overall result of our method and the SoTAs on three benchmark datasets: MSVD-QA, MSRVTT-QA and NExT-QA. Our observations are summarized as follows:
+
+\begin{itemize}[leftmargin=*]
+\item Across all three benchmark datasets, the proposed EIGV outperforms SoTA by a distinct margin (+1.2\%$\sim$2.3\%). Such prevailing performance indicates the overall effectiveness of our design, which underpins the theoretical soundness of the equivariant and invariant principles. 
+
+\item Narrowing the inspection to each of the three backbones, EIGV brings each backbone model a sharp gain across all benchmark datasets (+1.3\%$\sim$5.2\%), which evidences its model-agnostic property. 
+%
+Nevertheless, we notice that the improvements fluctuate across the backbones. As a comparison, on MSVD-QA and MSRVTT-QA benchmarks, EIGV acquires more favorable gains with backbone Co-Mem and HGA than it does with MSPAN. This is because the multi-granularity hierarchy empowers the MSPAN with robustness, especially to questions of the descriptive type. Therefore, it achieves stronger backbone performances on benchmarks that focus on the descriptive question (\ie MSVD-QA and MSRVTT-QA), which, in turn, account for the contribution of EIGV to some extent, thus makes improvement of MSPAN less remarkable.
+% However, this advantage can account for the contribution of EIGV to some extent, thus makes the . 
+In contrast, when it comes to the causal and temporal question (\ie NExT-QA) where the inherit advantage of MSPAN backbone vanishes,  EIGV shows equivalent improvements on all three backbones (+2.2\%$\sim$3.7\%). 
+%
+% In contrast, it promotes the Co-Mem --- the most unappreciated baseline to a SoTA level. Apart from the overall improvement, 
+
+\item Comparing the average improvement across different benchmarks, we notice that EIGV achieves the best improvement on MSVD-QA (+2.3\%$\sim$5.2\%) while relatively moderate gains on MSRVTT-QA (+1.3\%$\sim$1.9\%) and NExT-QA (+2.2\%$\sim$3.7\%).
+% , even if two datasets share the same question type and similar video length. 
+The reason for such discrepancy is that MSVD-QA is relatively small in size,
+which constrains the reasoning ability of the backbone models by limiting their exposure to training instances.
+As a comparison, MSVD-QA is five-time smaller than MSRVTT-QA in terms of QA pairs (43K vs 243K), and three-time smaller than NExT-QA in terms of video instances (1970 vs 5440).
+However, such deficiency caters to the focal point of EIGV that develops better in a less generalized situation, thus leading to more preferable growth on MSVD-QA.
+% As a comparison, MSRVTT-QA is five times larger in terms of QA pairs (43K vs 243K), NExT-QA involves three times more videos (1970 vs 5440). 
+% This constrains the reasoning ability of the backbone model by limit exposing of training instance, which, in turn, caters to the focal point of EIGV and lead to preferable growth on MSVD-QA. 
+\end{itemize}
+
+\input{tab/ablation}
+
+
+\subsection{In-Depth Study (RQ2)}
+\vspace{5pt}
+\subsubsection{\textbf{What are the effect of EIGV's components?}}
+
+To comprehensively understand the reasoning mechanism of EIGV, we poke its structure with careful scrutiny. Specifically, we explore the effectiveness of the proposed intervener and disruptor by analyzing their performance with different backbones on two benchmarks. We report the corresponding performances in Table \ref{tab:ablation} and summarize our findings as follows:
+\begin{itemize}[leftmargin=*]
+
+\vspace{5pt}
+\item \noindent \textbf{Effectiveness of Intervener.} \label{exp:intervener}
+We first testify the substantial efficacy of the intervener by comparing its permanence ( ``$+$Intervener'' ) to the backbone. This brings constant gains across different settings (+1.2\%$\sim$3\%), which demonstrates the stability of our design. Then, we compare the result of the intervener with the conventional mixup augmentation \cite{DBLP:conf/iclr/ZhangCDL18}, which can be considered as a simplified case of the interventer that only applies the equivariant intervention to the entire training video. The result shows that our design outperforms the conventional mixup in all cases. This manifests that the benefit of invariant intervention is fundamental, and the functionality of invariance and equivariance principle are mutually reinforced.
+
+\vspace{5pt}
+\item \noindent \textbf{Effectiveness of Disruptor.} 
+We validate the disruptor design by investigating its components --- the substitution on video (``$+$Disrupt-V'') and the permutation on question (``$+$Disrupt-Q''), respectively. 
+Albeit moderate, improvement on (``$+$Disrupt-V'') shows that stressing causal scene can benefit visual robustness.
+A similar trend also applies to ``$+$Disrupt-Q'' as well, the constant improvement in all settings shows that acknowledging artificial corrosion in ($v,q$) matching can strengthen vision-language alignment, which is in line with the current finding in the cross-model pre-train literature \cite{DBLP:conf/icml/RadfordKHRGASAM21}. 
+Furthermore, the overall result on ``$+$Disrupt'' shows that the advancement of ``$+$Disrupt-V'' and ``$+$Disrupt-Q'' can be amplified by further integration. 
+\end{itemize}
+
+
+\input{tab/unifeat}
+
+\subsubsection{\textbf{What are the effects of different feature settings?}}
+To answer this question, we perform uni-feature tests for the visual representation. Concretely, instead of combining the appearance and motion features together and then manipulating them as a whole, we run ablative experiments on each of them solely.  
+%
+As shown in Table \ref{tab:unifeat}, under all circumstances, EIGV can improve models trained with appearance and motion features in equivalent magnitude, even though the appearance feature is demonstrated to be more visually informative in backbone comparison. This verifies that our improvement is ascribed to both feature modes rather than accessing only one of them.
+
+% Although, as manifested in baseline comparison, appearance feature are more visually informative, EIGV is able to improve APP and MOT in equivalent magnitude under all circumstances. This verifies that our improvement is ascribed to both feature modes rather than accessing only one of them. 
+% %
+% Such observation also reveals the possibility that EIGV can mitigate the model's overly reliance on appearance feature \cite{DBLP:conf/iccv/JenniJ21} by balancing the feature exploitation to a commensurate rate, so as to avoid overlooking the visual dynamics in motion feature. 
+
+
+
+\subsubsection{\textbf{What are the effects of hyper-parameters?}}
+Justifying a reliable design requires a sensitivity test on its hyper-parameters. As shown in Figure \ref{fig:neg}, we probe the potency of EIGV by investigating the distribution of the equivariance mixing ratio and the number of negative samples. Our observations are as follows:
+
+\begin{itemize}[leftmargin=*]
+\item Figure \ref{fig:neg}a shows how EIGV performs compared to the SoTA backbone and the conventional mixup augmentation. Specifically, we adjust $\alpha$ to vary the distribution that the equivariant mixing ratio $\lambda_0$ draws from, and cross-check the performance of EIGV (``+EIGV'') against its counterparts (``SoTA Backbone'' and ``+HGA'') on two backbone models. Mixup, despite some improvement, its generalization is limited by the choice of the backbone. For MSPAN backbone, even the heavily tuned $\alpha$ fails to make a reasonable improvement. In contrast, EIGV successively outperforms mixup augmentation and backbone methods in every $\alpha$ setting, which recalls our finding in Section \ref{exp:intervener} and justifies the necessity of the environment-invariance principle.      
+
+\item Figure \ref{fig:neg}b demonstrates how the performance of EIGV varies as the number of negative sample increase. We notice that the predictive curves keep rising until $N$ reaches around five, which indicates that EIGV learns distinctive grounding rationale as more negative samples are considered. This is in line with the finding in the contrastive learning community that additional negative pairs bring about more desirable outcome \cite{he2019moco}. 
+%However, we also observe a slight drop as $N$ keep growing large than 5, which since the overwhelming of simple negative sample might compromise the contribution of hard negative and turn to a uniformity if the contrastive temperature $\tau$ is not carefully tuned [], 
+\end{itemize}
+
+
+
+\subsection{Quantitative Study (RQ3)}
+By nature, EIGV is equipped with intrinsic visual interpretability. To capture the learning insight of EIGV, we inspect the predictive answer of some video instances along with their grounded interpretations and show the visualization in Figure \ref{fig:case-study}, where each row provides a video instance and two questions that emphasize the visual content in different temporal spans. Notably, even for the same video instance, EIGV is able to accredit different scenes for the different questions. Nonetheless, we also observe the insufficient grounding result in Row 3 Q1, where the grounding result partially covers the dog swimming scene, while the whole video is answerable to the question.
+
+
+\begin{figure}[t]
+\centering
+\includegraphics[scale=0.35]{fig/fig5.pdf}
+\vspace{-10pt}
+\caption{Hyperparameter analysis. (a) Study of $\alpha$ on MSVD-QA, which controls the equivariant mixing ratio by $\lambda_0\sim\text{Beta}(\alpha,\alpha)$. Performance of two EIGV enhanced models --- HGA (top) and MSPAN (bottom) are reported, alongside the SoTA backbone and mixup augmented performances.  
+(b) Study on the impact of the negative sample number N, where EIGV with two backbones (\ie MSPAN and HGA) on two benchmark datasets (NExT-QA and MSVD-QA) are reported.}
+\vspace{-10pt}
+\label{fig:neg}
+\end{figure}

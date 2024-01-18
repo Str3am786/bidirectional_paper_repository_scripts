@@ -1,0 +1,21 @@
+\subsubsection{\secint\ to \secmod{}}\label{sss:secint2secmod}
+
+So far, we have discussed unsigned numbers. However, bit-level arithmetic also supports signed numbers following the two's complement arithmetic.
+On the other hand, modular arithmetic only supports numbers in $\mathbb{Z}_t$, where $t$ is the plaintext modulus.
+Nevertheless, it is possible to emulate negative numbers in modular arithmetic in the programmer's domain as in Cryptoleq \cite{cryptoleq}, where lower values are considered positive and large values are interpreted as negative numbers.
+In this case, the conversion from a signed bit-level arithmetic type \secint\ to \secmod\ is defined as:
+\begin{equation}
+  X=\begin{cases}
+    t - 2^s + \sum_{i=0}^{s-1}{(2^i \cdot x_i)}, & \text{if $x<0$}.\\
+    \sum_{i=0}^{s-1}{(2^i \cdot x_i)}, & \text{otherwise}.
+  \end{cases}
+\end{equation}
+where $s$ is the number of bits and $x_i$ is the bit of $x$ at position $i$. The condition $x < 0$ is determined by the most significant bit of $x$; thus, we can use it as a multiplexer between the two cases.
+Listing \ref{list:secint2secmod} presents the algorithm for converting a \secint\ into a \secmod. First, the \secint\ is interpreted as a \secuint\ (line 4). In line 5, this value is converted into a \secmod\ using the algorithm of Listing \ref{list:secuint2secmod}.
+Then in line 7, we perform the subtraction of plaintexts $t$ and \texttt{max} (i.e. $2^s$), and then do a ciphertext addition with the \secmod\ variable \texttt{pos}. At this point, we have generated two \secmod\ variables: \texttt{pos}, representing the value in case it is positive, and \texttt{neg} containing the value in case it is a negative number. This totals $2s - 1$ ciphertext additions with a additive depth of $s$.
+Finally, we select between \texttt{neg} and \texttt{pos} using the most significant bit of the \secint\ input (lines 8-9). If the bit is one, it means it is a negative number; thus, we select \texttt{neg}; otherwise, we select \texttt{pos}.
+For selection we need ciphertext multiplications.
+The entire conversion from \secint\ to \secmod\ requires two ciphertext multiplications and $2s + 1$ ciphertext additions with a multiplicative depth equal to one.
+By comparing Listings \ref{list:secuint2secmod} and \ref{list:secint2secmod}, we can see that converting signed numbers to \secmod\ is less efficient than converting unsigned numbers to \secmod. Furthermore, $t$ must be large enough ($t \geq 2^s$) to accommodate the converted value.
+
+% \innersection{Why not signed and unsigned \secmod{}} \secmod{} types can only participate in addition, subtraction, and multiplication operations. The values of this type are elements of the corresponding mathematical ring. The programmer can choose to interpret a subset of the number space as negative, but there would be no difference in these computations. For this reason, there is no differentiation between the signed and unsigned versions for \secmod{} type.

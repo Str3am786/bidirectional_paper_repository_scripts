@@ -1,0 +1,181 @@
+
+% Writes content to temp file
+\begin{filecontents*}{\jobname.return.1.aux}
+411957: pop  r14
+411959: pop  r15
+41195b: jmp  2016b59
+\end{filecontents*}
+
+\begin{filecontents*}{\jobname.return.2.aux}
+2016b59: mov BYTE PTR [rip+0x3a1a63],1
+2016b60: pop rbp
+2016b61: ret 
+\end{filecontents*}
+
+% original  13165fd:       call   QWORD PTR [rip+0xcfa805]        # 2010e08 <ff_rgb24toyv12>
+\begin{filecontents*}{\jobname.long-call.1.aux}
+13165fd: nop
+13165fe: call 23a1257
+\end{filecontents*}
+
+\begin{filecontents*}{\jobname.long-call.2.aux}
+23a1257: mov BYTE PTR [rip+0x4e5e2],1
+23a125e: jmp QWORD PTR [rip-0x39045c]
+\end{filecontents*}
+
+\begin{filecontents*}{\jobname.short-call.1.aux}
+411f84: mov  rsi,r15
+411f87: call 2016f08 
+\end{filecontents*}
+
+\begin{filecontents*}{\jobname.short-call.2.aux}
+2016f08: mov BYTE PTR [rip+0x3a16f0],1
+2016f0f: mov rdx, rbp
+2016f12: jmp rax
+\end{filecontents*}
+
+\begin{filecontents*}{\jobname.long-jump.1.aux}
+408449: jmp  2012d66
+40844e: nop
+40844f: nop
+\end{filecontents*}
+
+\begin{filecontents*}{\jobname.long-jump.2.aux}
+2012d66: mov BYTE PTR [rip+0x3a547c],1
+2012d6d: jmp QWORD PTR [rcx*8+0x136a0f0]
+\end{filecontents*}
+
+\begin{filecontents*}{\jobname.jump-tab.1.aux}
+408579: cmp al,0x73
+40857b: jne 4085f0 
+\end{filecontents*}
+
+\begin{filecontents*}{\jobname.jump-tab.2.aux}
+2012c33: mov BYTE PTR [rip+0x3a559b],1
+2012c3a: jmp 0x408579    
+\end{filecontents*}
+
+\begin{filecontents*}{\jobname.short-jump.1.aux}
+42550e: movsxd rdi,edi
+425511: jmp    201ee2a 
+\end{filecontents*}
+
+\begin{filecontents*}{\jobname.short-jump.2.aux}
+201ee2a: mov BYTE PTR [rip+0x399fed],1
+201ee31: add r13, rdi
+201ee34: jmp 0x425569
+\end{filecontents*}
+
+\begin{filecontents*}{\jobname.internal.1.aux}
+407a41: jmp 2012648 
+407a46: nop
+407a47: inc rbp
+\end{filecontents*}
+
+\begin{filecontents*}{\jobname.internal.2.aux}
+2012648: mov BYTE PTR [rip+0x3a5b23],1
+201264f: mov eax,DWORD PTR[rip-0x7f4bd5]
+2012655: jmp 0x407a47  
+\end{filecontents*}
+
+
+\begin{filecontents*}{\jobname.long-cond.1.aux}
+4058db: test rsi,rsi
+4058de: jmp  20113e7 
+4058e3: nop    
+\end{filecontents*}
+
+\begin{filecontents*}{\jobname.long-cond.2.aux}
+20113e7: mov BYTE PTR [rip+0x39cc6b],1
+20113ee: jne 0x405992
+20113f4: jmp 0x4058e4
+\end{filecontents*}
+
+\begin{filecontents*}{\jobname.short-cond.1.aux}
+405f14: add rax,rcx
+405f17: nop
+405f18: jmp 2011895
+\end{filecontents*}
+
+\begin{filecontents*}{\jobname.short-cond.2.aux}
+2011895: mov BYTE PTR [rip+0x39c802],1
+201189c: mov QWORD PTR [r13+8],rax
+20118a0: jns 0x405f7c
+20118a6: jmp 0x405f1d
+\end{filecontents*}
+
+
+\begin{table*}[t!]
+    \centering
+    \small
+    \setlength\tabcolsep{1.2pt}
+    \renewcommand{\arraystretch}{1}   
+    \begin{tabularx}{\textwidth}[t]{@{}lp{3.9cm}p{7.1cm}p{5.1cm}@{}}        
+        \textbf{Type} & 
+        \textbf{Patched code} &
+        \textbf{Trampoline} &
+        \textbf{Notes} \\ 
+        \toprule
+        \textsf{return}   & 
+        \asmcell{\jobname.return.1.aux} & 
+        \asmcell{\jobname.return.2.aux} & 
+        Three padding bytes are overwritten after the original \texttt{ret}.
+        Relocating two instructions to \texttt{0x2016b60} costs only 2 bytes.\\ \midrule
+        
+        \textsf{long-jump}   & 
+        \asmcell{\jobname.long-jump.1.aux} & 
+        \asmcell{\jobname.long-jump.2.aux} & 
+        Original \texttt{jmp} at \texttt{0x408449} is relocated to \texttt{0x2012d6d} which costs 7 bytes.
+        Remaining space in patched code is padded. \\ \midrule
+        
+        \textsf{long-call}   & 
+        \asmcell{\jobname.long-call.1.aux} & 
+        \asmcell{\jobname.long-call.2.aux} & 
+        Original \texttt{call} at \texttt{0x13165fd} is replaced with a \texttt{call} detour and a matching \texttt{jmp} at \texttt{0x23a125e} where \texttt{rip} offset is fixed.\\ \midrule
+        
+        \textsf{jump-tab}   & 
+        \asmcell{\jobname.jump-tab.1.aux} & 
+        \asmcell{\jobname.jump-tab.2.aux} & 
+        Original code is unmodified.
+        Jump table data is patched to target the trampoline. \\ \midrule
+        
+        \textsf{short-call} &
+        \asmcell{\jobname.short-call.1.aux} & 
+        \asmcell{\jobname.short-call.2.aux} & 
+        Instruction preceding the original \texttt{call} is relocated to \texttt{0x2016f0f}. 
+        \texttt{call} is rewritten to a matching \texttt{jmp} at \texttt{0x2016f12}. \\ \midrule
+        
+        
+        \textsf{short-jump}   & 
+        \asmcell{\jobname.short-jump.1.aux} & 
+        \asmcell{\jobname.short-jump.2.aux} & 
+        To free space for a detour, the preceding instruction is relocated to \texttt{0x201ee31}. 
+        That is followed by a matching long \texttt{jmp}.  \\ \midrule
+        
+        
+        \textsf{internal}   & 
+        \asmcell{\jobname.internal.1.aux} & 
+        \asmcell{\jobname.internal.2.aux} & 
+        Inner instruction relocated to \texttt{0x201264f}, where \texttt{rip} offset is fixed,
+        followed by \texttt{jmp} to next instruction.
+        Total cost is 11 bytes.\\ \midrule
+        
+        \textsf{long-cond}   & 
+        \asmcell{\jobname.long-cond.1.aux} & 
+        \asmcell{\jobname.long-cond.2.aux} & 
+        Original \texttt{jne} (6 bytes) is rewritten to an equivalent instruction sequence at \texttt{0x20113ee} which has a fixed relocation cost of 11 bytes.\\
+        
+        \textsf{short-cond}   & 
+        \asmcell{\jobname.short-cond.1.aux} & 
+        \asmcell{\jobname.short-cond.2.aux} & 
+        Similar to \textsf{long-cond} except that an extra instruction is relocated to \texttt{0x201189c} in order to free enough space for a detour.\\
+        
+        \bottomrule
+    \end{tabularx}
+    
+    \caption{Examples of patching different basic block types. Types are shown in ascending order based on expected relocation overhead. Examples taken from a patched \textsf{ffmpeg} v4.1.3 binary compiled with \textsf{clang} v5.0. For each \textit{long} type there is a corresponding \textit{short}, e.g. short-call, where the size of exit instruction is < 5 bytes.
+    Both are similarly patched. 
+    However, one or more instructions preceding the exit instruction must be relocated in the short BB types.}
+    \label{tab:probe-types}
+\end{table*}
+

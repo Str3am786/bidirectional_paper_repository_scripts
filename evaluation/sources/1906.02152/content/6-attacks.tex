@@ -1,0 +1,51 @@
+\section{Stablecoin Attacks}\label{sec:attacks}
+
+Attacking a DStablecoin is different than traditional currency attacks. The focus is not on breaking the willingness of the central bank to maintain a peg. It instead involves manipulating the interaction of agents. We show that stablecoin design can enable profitable trades against stability that attack the system. These come from the existence of profitable trades around liquidations and the ability of miners to reorder and censor transactions to extract value.
+
+\subsection{Expanded Model: Adding an Attacker}
+
+We consider an expanded model under the fixed outside demand setting of the previous section. In the expansion, we consider an attacker, who can speculatively enter/exit the DStablecoin market. The attacker can buy $\delta$ dollar-value of DStablecoin at some time $t$ with the goal of selling it at a later time $s$ for $\delta + \varepsilon$. These occurrences change the demand structure: $\mathcal{D}_t = \mathcal{D} + \delta$, $\mathcal{D}_s = \mathcal{D} - (\delta + \varepsilon)$.
+
+
+
+
+
+
+\subsection{Profitable bets on liquidations}
+
+Table~\ref{table:attack} illustrates an example scenario for a profitable bet on liquidations. The attacker injects $\delta = 1$ in demand at $t=1$, which acquires $1.0008$ DStablecoins at $p_1^D$. In $t=3$, after the liquidation, the attacker is then able to extract $\delta +\varepsilon = 1.083$ from selling the DStablecoin. This yields a return of $8.3\%$. This is akin to a short squeeze on existing speculators. It takes advantage of the fact that liquidations occur at DStablecoin market rate, which in turn affects the market rate.
+\begin{table}
+	\centering
+	\begin{tabular}{c|c|c|c|c|c|c|c}
+		$t$ & $p_t^E$ & $\delta + \varepsilon$ & $\mathcal{D}_t$ & $\Delta_t$ & $\mathcal{L}_t$ & $p_t^D$ & $n_t$ \\
+		\hline
+		$0$ & $85$ & & $100$ & & $100.583$ & $0.994$ & $1.8$ \\
+		$1$ & $85$ & $+1$ & $101$ & $0.502$ & $101.085$ & $0.999$ & $1.806$ \\
+		$2$ & $82$ & & $101$ & $-8.716$ & $92.369$ & $1.093$ & $1.690$ \\
+		$3$ & $82$ & $-1.083$ & $99.917$ & & $92.369$ & $1.082$ & $1.689$ \\
+	\end{tabular}
+	\caption{Example scenario of a profitable bet on liquidations.}\label{table:attack}
+\end{table}
+
+The attacker can do better by choosing $\delta,\varepsilon$ to maximize $\varepsilon$ subject to $\frac{\delta + \epsilon}{p_2^D} \leq \frac{\delta}{p_o^D}$. Choosing $\delta=4.5, \varepsilon=0.59$ (not optimal) yields a return of $13\%$. The attacker could also spread out $\delta$ over a longer period of time to achieve lower purchase prices.
+
+From a practical perspective, the optimization is sensitive to misestimation of demand elasticity. While Dai has hit prices as high as \$1.37 historically (source: coinmarketcap), it hasn't typically reached prices above \$1.09. Thus smaller bets (relative to supply) may be safer. Regardless, these can be large opportunities in large systems. In addition, outside of this model, real implementations create arbitrage of $5-13\%$ to automate liquidations.
+
+
+
+
+
+\subsection{Attacks}
+
+\paragraph{Attack 1:} An attacker bets on an ETH decline and manipulates the market to trigger and profit from spiraling liquidations. This uses the short squeeze-like trades in the previous example. It can also be supplemented with a bribe to miners to freeze collateral top-ups. The attacker could also enter as a new speculator at the high DStablecoin prices after the attack and thus leverage up at a discount. Outside of the model, the attack may have a negative effect on the long-term DStablecoin demand due to the induced volatility. This can be further beneficial to the attacker, who can then also deleverage in the future at a discount.
+
+\paragraph{Attack 2:} The attacker is also a miner and reorganizes the recent transaction history (such as by initiating a fork) to be on the receiving end of arbitrage oppotunities from liquidations. For instance, following an ETH decline, the miner could trigger and profit from spiraling liquidations. In a fork, the attacker creates a new timeline that inherits the ETH price trajectory (via oracle transactions). The attacker can then censor speculator transactions (e.g., collateral top-ups) to trigger new liquidations and extract profit around all liquidations, which are guaranteed in the timeline. If the stablecoin system is large, the miner extractable value can be large (and is additive with other sources of extractable value). This creates the perverse incentive for miners to perform this attack if the attack rewards are greater than lost mining rewards. This is similar to the time-bandit attack in \cite{daian2019}.
+
+\vspace{0.3cm}
+In Attack 1, the attacker takes on market risk as the payoff relies on a future ETH decline and liquidation. It is a speculative attack that can induce volatility in the stablecoin. In Attack 2, the attacker's payoffs are guaranteed if the attack fork is successful. These payoffs incentivize blockchain consensus attack. A possible equilibrium is for miners to collude and share this value.
+
+These attacks occur in a permissionless setting, in which agents can enter/exit at any time with a degree of anonymity. While in traditional finance, market manipulation rules can be enforced legally, in decentralized finance, enforcement is only possible to the extent that it can be codified within the protocol and incentive structure. We leave to future study a full exploration of these incentive structures in a game theoretic setting based on foundations for blockchain forking models set in, e.g., \cite{biais2018}.
+
+Since the initial release of this paper, this attack surface around stablecoin liquidations was exploited in related ways to Attack 2. In Attack 2, a miner reorganizes the recent history to extract profit from arbitrage opportunities from liquidations. In reality on Black Thursday, mempool manipulation contributed to the clearing of \$8m of Dai liquidation auctions at near zero prices \cite{blocknative2020}.
+
+\paragraph{Mitigations.} We discuss some preliminary ideas toward mitigating attack potential. Liquidations could be spread over a longer time period. This could potentially lessen deleveraging spirals by smoothing demand and increase the costs to a forking attack. However, it presents a trade-off in that slow liquidations come with higher risks to the stablecoin becoming under-collateralized. We also suggest tying oracle prices and DEX transactions to recent block history so that a reorganization attack can't easily inherit price and exchange history. Practically, however, this may be difficult to tune in a way that's not disruptive as small forks happen normally.

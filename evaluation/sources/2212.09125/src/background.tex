@@ -1,0 +1,34 @@
+\section{Background}
+\subsection{Problem Definition}
+Given an entity mention $m_i$ within its context sentence $c_i$, ultra-fine entity typing (UFET) aims to predict its correct types $y^g_i \subset \mathcal{Y}$, where $y_i^g$ is the gold types of the $i$-th mention and is a subset of a large type set $\mathcal{Y}$ ($|\mathcal{Y}|$ can be larger than 10$k$). As $|y_i| > 1$ in most cases, UFET can be categorized as a multi-label classification problem. We show statistics of two UFET datasets: {\bf \textsc{UFET}} \cite{ufet} and {\bf \textsc{CFET}}\footnote{As there is no official split available for {\bf \textsc{CFET}}, we split it by ourselves and will release our split in our code.} \cite{cfet} in Table \ref{tab:stat}.
+
+\begin{table}[t]
+\scalebox{0.9}{
+\centering
+\begin{tabular}{ccccc} 
+\toprule
+dataset & $\vert \mathcal{Y} \vert$      & $\text{avg}(\vert y_i^g \vert)$ & train/dev/test & Lang \\ \midrule
+{\bf \textsc{UFET}}   & 10331       & 5.4   & 2k/2k/2k     & EN      \\
+{\bf \textsc{CFET}}  & 1299          & 3.5   &   3k/1k/1k & ZH            \\ \bottomrule
+\end{tabular}}
+\caption{$\text{avg}(\vert y_i^g \vert)$ denotes the average number of gold types per instance, ZH for Chinese.}
+\label{tab:stat}
+\end{table}
+
+\subsection{Multi-label Classification Model for UFET}
+\label{sec:mlc}
+Multi-label classification models are widely adopted as backbones for UFET \cite{ufet, onoe-durrett-2019-learning, box4types}. They use an encoder to obtain the mention representation and use a decoder (e.g., MLP) to score types simultaneously. Figure \ref{fig:mlc_ce}(a) shows a representative multi-label classification model adopted by recent methods \cite{npcrf,mlmet}. The contextualized mention representation is obtained by feeding $c_i$ and $m_i$ into the pretrained language models (PLM), and taking the last hidden state of {\tt [CLS]}, $h_{cls}$. The mention representation is then fed into an MLP layer to concurrently obtain all type scores $s_1, \cdots s_N, N=|\mathcal{Y}|$. We call this model MLC and describe its inference and training below. 
+\paragraph{MLC Inference} For inference, types with probability higher than a threshold $\tau$ are predicted: $\mathcal{Y}_i = \{y_j | \sigma(s_j) > \tau \}$, $\sigma$ is the sigmoid function. The threshold is tuned on the development set.
+\paragraph{MLC Training} Binary Cross-Entropy (BCE) loss between the predicted scores and the gold types are used to train the MLC model: $\mathcal{L}_i = -\frac{1}{N} \sum_{j=1}^N  \alpha \cdot I_{j} \log \sigma(s_j) + (1-I_{j}) \log (1-\sigma(s_j)) $, where $I_j$ is the indicator of $y_j$ being one of the gold types ($y_j \in y_i^g$), and $\alpha$ is a hyper-parameter balancing the loss of positive and negative types. MLC is very efficient in inference. However, the interactions between mention and types in MLC are weak, and the correlations between types are ignored \cite{box4types,xiong-etal-2019-imposing,npcrf}. MLC also has difficulty in integrating type semantics \cite{lite}.
+
+\subsection{Vanilla Cross-Encoders for UFET}
+\label{sec:vanilla_ce}
+\citet{lite} first proposed to use Cross-Encoder (CE) for UFET. As shown in Figure \ref{fig:mlc_ce}(b), CE concatenates $m_i, c_i, y_j$ together and feeds them into a PLM to obtain the {\tt [CLS]} embedding, then an MLP layer is used to obtain the score of $y_j$ given $m_i, c_i$.
+\begin{align}
+        \bm{h}_{cls, i} &= \texttt{PLM}(\texttt{[CLS]} \ c_i \ \texttt{[SEP]}\  m_i \ \texttt{[SEP]} \ y_j\ ) \\
+        s_j &= \texttt{MLP}(\bm{h}_{cls, i})
+\end{align}
+The concatenation allows deeper interaction between mention, context, and types (modeled by the multi-head self-attention in PLMs), and also incorporates type semantics.
+\paragraph{CE Inference} CE predicts types of a single input $(m_i, c_i)$ by concatenating the input with all possible types $y_j \in \mathcal{Y}$ one by one to predict the scores $s_1, \cdots, s_j$ for each type. Similar to MLC, types that have a higher probability than a threshold are predicted $\mathcal{Y}_i = \{y_j | \sigma(s_j) > \tau \}$. CE requires $N$ forward passes to infer types of a single mention, its inference speed is very slow when $N$ is large.
+\paragraph{CE Training} CE is typically trained with marginal ranking loss \cite{lite}. A positive type $y_+ \in y^g_i$ and a negative type $y_{-} \not \in y^g_i$ are sampled from $\mathcal{Y}$ for each data point $(m_i, c_i)$. The loss is computed as:
+$$ L_i = \max(\sigma(s_{-}) - \sigma(s_{+}) + \delta, 0) $$ where $s_{+}, s_{-}$ are scores of the sampled positive and negative types, and $\delta$ is the margin tuned on the development set determine how the positive and negative samples should be separated.

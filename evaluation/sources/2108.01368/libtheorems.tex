@@ -1,0 +1,78 @@
+% Code for theorems in multiple places
+% Originally by Eric Price, placed in the public domain
+%
+% This lets you write the statement of a theorem/lemma in one place
+% and insert it in multiple parts of a document.  This lets you
+% include the statement of Lemma 3.2 in both the introduction and the
+% place that it's proven, and the numbering can refer to the place
+% where it's proven.
+%
+% Usage:
+%
+%  \define[optional title]{thm:main}{Theorem}{We show \[ x^2 + y^2 \geq 2xy \].}
+%     Before you use it.
+%
+%  \state{thm:main}
+%     in the place where you want the label to be generated
+%
+%  \restate{thm:main}
+%     elsewhere.
+%
+%  To have consistent equation labels, use $\thmlabel{eq:1}$ rather
+%  than $\label{eq:1}$.
+%
+%
+%%%%% Begin code
+\usepackage{etoolbox}
+
+\makeatletter
+
+% Define the various variables to be used in \state/\restate
+\newcommand{\define}[4][ignore]{%
+  \ifstrequal{#1}{ignore}{}{
+  \@namedef{thmtitle@#2}{#1}}%
+  \@namedef{thm@#2}{#4}%
+  \@namedef{thmtypen@#2}{lemma}%
+  \newtheorem{thmtype@#2}[theorem]{#3}%
+  \newtheorem*{thmtypealt@#2}{#3~\ref{#2}}%
+}
+
+% State the theorem, generating the proper number.
+\newcommand{\state}[1]{%
+  \@namedef{curthm}{#1}
+  \@ifundefined{thmtitle@#1}{
+  \begin{thmtype@#1}
+    }{
+  \begin{thmtype@#1}[\@nameuse{thmtitle@#1}]
+  }
+    \label{#1}
+    \@nameuse{thm@#1}
+  \end{thmtype@#1}
+  \@ifundefined{thmdone@#1}{
+  \@namedef{thmdone@#1}{stated}%
+  }{}
+}
+
+% Include the theorem, with the original numbering
+\newcommand{\restate}[1]{%
+  \@namedef{curthm}{#1}
+  \@ifundefined{thmtitle@#1}{
+    \begin{thmtypealt@#1}
+    }{
+  \begin{thmtypealt@#1}[\@nameuse{thmtitle@#1}]
+  }
+    \@nameuse{thm@#1}
+  \end{thmtypealt@#1}
+  \@ifundefined{thmdone@#1}{
+  \@namedef{thmdone@#1}{stated}%
+  }{}
+}
+
+% For equations, this generates a new number if this is the first time
+% the theorem is included, and reuses the old number otherwise.
+\newcommand{\thmlabel}[1]{
+  \@ifundefined{thmdone@\@nameuse{curthm}}{\label{#1}
+    }{\tag*{\eqref{#1}}}
+}
+\makeatother
+%%%%% End code

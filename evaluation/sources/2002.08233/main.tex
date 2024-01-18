@@ -1,0 +1,1096 @@
+\documentclass{vgtc}
+% The preceding line is only needed to identify funding in the first footnote. If that is unneeded, please comment it out.
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithm}
+\usepackage[noend]{algpseudocode}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{textcomp}
+%\usepackage{subcaption}
+\usepackage[colorlinks=true,linkcolor=blue]{hyperref}%
+\algblock{ParFor}{EndParFor}
+% customising the new block
+\algnewcommand\algorithmicparfor{\textbf{for}}
+\algnewcommand\algorithmicpardo{\textbf{do in parallel}}
+\algnewcommand\algorithmicendparfor{}
+\algrenewtext{ParFor}[1]{\algorithmicparfor\ #1\ \algorithmicpardo}
+\algrenewtext{EndParFor}{\textbf{end parallel for}}
+
+
+\makeatother
+\usepackage{float}
+\usepackage{mathtools} 
+\usepackage{mathtools}
+\usepackage{graphics}
+\usepackage{placeins}
+\usepackage{hyperref}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{enumitem}
+ \usepackage{color}
+ \definecolor{codegreen}{rgb}{0,0.5,0.0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+
+\newcommand{\osum}[2]{\mathop{\sum{#2}}_{#1}}
+\newcommand*{\myfont}{\fontfamily{lmtt}\selectfont}
+\newcommand*{\toolnamefont}{\fontfamily{lmdh}\selectfont}
+
+\newcommand{\commentKhaled}[1]{{\color{black}{#1}}}
+
+%\newcolumntype{M}[1]{>{\centering\arraybackslash}m{#1}}
+
+\newcommand{\toolname}{{BatchLayout}}
+\newcommand{\toolnameBH}{{BatchLayoutBH}}
+
+\makeatletter
+\def\BState{\State\hskip-\ALG@thistlm}
+\makeatother
+
+\makeatletter
+\newcommand\fs@norules{\def\@fs@cfont{\bfseries}\let\@fs@capt\floatc@ruled
+  \def\@fs@pre{}%
+  \def\@fs@post{}%
+  \def\@fs@mid{\kern3pt}%
+  \let\@fs@iftopcapt\iftrue}
+\makeatother
+\floatstyle{norules}
+\restylefloat{algorithm}
+
+\ifpdf%                                % if we use pdflatex
+  \pdfoutput=1\relax                   % create PDFs from pdfLaTeX
+  \pdfcompresslevel=9                  % PDF Compression
+  \pdfoptionpdfminorversion=7          % create PDF 1.7
+  \ExecuteOptions{pdftex}
+  \usepackage{graphicx}                % allow us to embed graphics files
+  \DeclareGraphicsExtensions{.pdf,.png,.jpg,.jpeg} % for pdflatex we expect .pdf, .png, or .jpg files
+\else%                                 % else we use pure latex
+  \ExecuteOptions{dvips}
+  \usepackage{graphicx}                % allow us to embed graphics files
+  \DeclareGraphicsExtensions{.eps}     % for pure latex we expect eps files
+\fi%
+
+%% it is recomended to use ``\autoref{sec:bla}'' instead of ``Fig.~\ref{sec:bla}''
+\graphicspath{{figures/}{pictures/}{images/}{./}} % where to search for the images
+
+\usepackage{microtype}                 % use micro-typography (slightly more compact, better to read)
+\PassOptionsToPackage{warn}{textcomp}  % to address font issues with \textrightarrow
+\usepackage{textcomp}                  % use better special symbols
+\usepackage{mathptmx}                  % use matching math font
+\usepackage{times}                     % we use Times as the main font
+\renewcommand*\ttdefault{txtt}         % a nicer typewriter font
+\usepackage{cite}                      % needed to automatically sort the references
+\usepackage{tabu}                      % only used for the table example
+\usepackage{booktabs}                  % only used for the table example
+%% We encourage the use of mathptmx for consistent usage of times font
+%% throughout the proceedings. However, if you encounter conflicts
+%% with other math-related packages, you may want to disable it.
+
+
+%% If you are submitting a paper to a conference for review with a double
+%% blind reviewing process, please replace the value ``0'' below with your
+%% OnlineID. Otherwise, you may safely leave it at ``0''.
+\onlineid{0}
+
+%% declare the category of your paper, only shown in review mode
+\vgtccategory{Research}
+
+\newcommand\correspondingauthor{\thanks{Corresponding author.}}
+
+%% allow for this line if you want the electronic option to work properly
+%\vgtcinsertpkg
+
+\usepackage{xcolor}
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+\begin{document}
+\setcounter{page}{1}
+\title{BatchLayout: A Batch-Parallel Force-Directed \\Graph Layout Algorithm in Shared Memory\\
+%{\footnotesize \textsuperscript{*}Note: Sub-titles are not captured in Xplore andshould not be used}
+%\thanks{Identify applicable funding agency here. If none, delete this.}
+}
+
+\author{Md. Khaledur Rahman\thanks{e-mail: morahma@iu.edu, Department of Computer Science}\\ 
+        \scriptsize Indiana University Bloomington %
+\and Majedul Haque Sujon\thanks{e-mail: msujon@iu.edu, Department of Intelligent Systems Engineering} \\ \scriptsize  Indiana University Bloomington
+\and Ariful Azad \correspondingauthor\; 
+\thanks{e-mail: azad@iu.edu, Department of Intelligent Systems Engineering}\\ 
+     \scriptsize  Indiana University Bloomington}
+
+
+\abstract{
+
+Force-directed algorithms are widely used to generate aesthetically-pleasing  layouts of graphs or networks arisen in many scientific disciplines.
+To visualize large-scale graphs, several parallel algorithms have been discussed in the literature.  
+\commentKhaled{However, existing parallel algorithms do not utilize memory hierarchy efficiently and often offer limited parallelism.}
+%There are also cluster-based or GPU-based faster implementations which are often complex and harder for non-technical researchers to use. 
+% AA: I don't think we have any evidence supporting this claim. We should not say anything without any supporting evidence.
+%Over the years, this interesting problem has not been studied much in shared memory parallel architecture which can generate layout of graphs using single machine with multiple cores.
+% AA:  ForceAtlas2 and OpenORD are shared-memory parallel. The gap is not that "this problem has not been studied much in shared memory parallel architecture". The gap is that current algorithms have limited parallelism and poor memory utilization. These limitations are already mentioned above. 
+This paper addresses these limitations with \toolname{}, an algorithm that groups vertices into minibatches and processes them in parallel. 
+\toolname{} also employs cache blocking techniques to utilize memory hierarchy efficiently.
+More parallelism and improved memory accesses coupled with force approximating techniques, better initialization, and optimized learning rate make \toolname{} significantly faster than other state-of-the-art algorithms such as ForceAtlas2 and OpenOrd.
+The visualization quality of layouts from \toolname{} is comparable or better than similar visualization tools.
+%Experimental results show that our algorithm is massively scalable and generates high quality layouts. \toolnameBH{} can generate high quality layout of a graph with 1.56 million vertices and 114.1 millions edges within minutes. 
+All of our source code, links to datasets, results and log files are available at \url{https://github.com/khaled-rahman/BatchLayout}.}
+
+%We map the core computational kernel of \toolname{} to the matrix-vector multiplication and employ cache blocking techniques to utilize memory hierarchy efficiently. We have also approximated force calculations using a quad-tree data structure, which significantly increases the speed and we have named this version \toolnameBH{}.
+
+\CCScatlist{
+  \CCScatTwelve{Human-centered computing}{Visu\-al\-iza\-tion}{Visu\-al\-iza\-tion techniques}{Graph drawings};
+  \CCScatTwelve{Human-centered computing}{Visu\-al\-iza\-tion}{Visu\-al\-iza\-tion
+  systems and tools}{Visualization toolkits}{}
+}
+\maketitle
+
+\section{Introduction}
+
+Networks or graphs are common representations of scientific, social and business data.
+In a graph, a set of vertices represents entities (e.g., persons, brain neurons, atoms) and a set of edges indicates relationships among entities (friendship, neuron synapses, chemical bonds).
+A key aspect of data-driven graph analytics is to visually study large-scale networks, such as biological and social networks, with millions or even billions of vertices and edges. \commentKhaled{In network visualization, the first step is to generate a layout in a 2D or 3D coordinate system which can be fed into visualization tools such as Gephi~\cite{bastian2009gephi} and Cytoscape~\cite{shannon2003cytoscape}}. 
+Therefore, the quality and computational complexity of network visualization are often dominated by the graph layout algorithms. 
+
+Force-directed layout algorithms are among the most popularly used techniques to generate the layout of a graph. Following the philosophy of the spring energy model, these algorithms calculate attractive and repulsive forces among vertices in a graph and iteratively minimize an energy function. Classical force-directed algorithms, such as the Fruchterman and Reingold (FR) algorithm~\cite{fruchterman1991graph}, 
+require $O(n^2)$ time per iteration where $n$ is the number of vertices in a graph. 
+By approximating the repulsive force between non-adjacent nodes, we can get a faster $O(n\log n)$ algorithm. 
+In this paper, we used the Barnes-Hut approximation~\cite{barnes1986hierarchical} based on the quad-tree data structure. 
+\commentKhaled{Even though the layout quality (measured by stress,  neighborhood preservation, and other well established quality metrics as shown in Table~\ref{tab:measures_st_np}) from the Barnes-Hut approximation can be worse than an exact $O(n^2)$ algorithm, the former is often used to visualize large-scale networks. 
+In this paper, we carefully analyzed the quality and runtime of both exact and approximate force-directed algorithms. 
+%Notably, parallel computation becomes significantly helpful for generating layout of large graphs some of which are briefly discussed in Section \ref{sec:relatedworks}. This paper presents a parallel algorithm for generating good-quality layouts quickly using parallel computers.
+}
+
+\commentKhaled{
+To visualize large graphs, several prior work discussed parallel algorithms for multicore processors~\cite{martin2011openord}, graphics processing unit (GPU)~\cite{jacomy2014forceatlas2, brinkmann2017exploiting}, and distributed clusters~\cite{arleo2017large,arleo2018distributed}. 
+While we summarize state-of-the-art algorithms and software in the Related Work section, our primary focus lies in parallel algorithms for multicore servers. 
+}
+\commentKhaled{Some state-of-the-art force-directed algorithms such as ForceAtlas2~\cite{jacomy2014forceatlas2} and OpenOrd~\cite{martin2011openord} have parallel implementations for multicore processors. 
+However, these algorithms do not utilize full advantage of present memory hierarchy efficiently and offer limited parallelism because they calculate forces for one vertex at a time. 
+We aim to improve these two aspects of parallel algorithms}. We develop a parallel algorithm called \emph{BatchLayout} that offers more parallelism by grouping vertices into minibatches and processing all vertices in a minibatch in parallel.
+This approach of increasing parallelism via minibatches is widely used in training deep neural networks in the form of minibatch Stochastic Gradient Descent (SGD) ~\cite{goyal2017accurate}. 
+We adapt this approach to graph layout algorithms for better parallel performance.
+%layout energies in minibatches of vertices. 
+
+Existing algorithms also access memory irregularly when processing sparse graphs with skewed degree distributions.
+Irregular memory accesses do not efficiently utilize multi-level caches available in current processors, impeding the performance of algorithms.       
+In BatchLayout, we regularized memory accesses by using linear algebra operations similar to matrix-vector multiplication and employing  ``cache blocking" techniques to utilize memory hierarchy efficiently.  
+\commentKhaled{More parallelism and better memory accesses made BatchLayout faster than existing  parallel force-directed algorithms}. 
+On average, the exact $O(n^2)$ version of BatchLayout is $15\times$ faster than ForceAtlas2.
+The Barnes-Hut approximation in BatchLayout is about $4\times$ and $2\times$ faster than ForceAtlas2 (with BH approximation) and OpenOrd, respectively (the quality of an OpenOrd layout is usually worse than BatchLayout and ForceAtlas2).
+
+BatchLayout attains high performance without sacrificing the quality of the layout. 
+We used \commentKhaled{three} aesthetic metrics to quantitatively measure the quality of layouts and also visualized the networks in Python for human verification. 
+According to all quality measures, BatchLayout generates similar or better-quality layouts than ForceAtlas2 and OpenOrd.
+
+
+Overall, BatchLayout covers all important aspects of force-directed layout algorithms. 
+We investigated four energy models, two initialization techniques, different learning rates and convergence criteria, various minibatch sizes, and \commentKhaled{three} aesthetic metrics to study the performance and quality of our algorithms.
+All of these options are available in an open source software that can be run on any multicore processor.  
+Therefore, similar to ForceAtlas2, BatchLayout provides plenty of options to users to generate a readable layout for an input graph. 
+
+In this paper, we present new insights on parallel force-directed graph layout algorithms. We summarize key contributions below:
+\begin{itemize}[leftmargin=*]
+    \setlength\itemsep{0.02em}
+    \item {\bf Improved parallelism:} We develop a class of exact and approximate parallel force-directed graph layout algorithms called \toolname{}. Our algorithms expose more parallel work to keep hundreds of processors busy.
+    \item {\bf Better quality layouts:}  \toolname{} generates layouts with better or \commentKhaled{similar} qualities (according to various metrics) compared to other force-directed algorithms. 
+    \item {\bf Comprehensive coverage:} \toolname{} provides multiple options for all aspects of force-directed algorithms. Especially, we cover new initialization techniques and four energy models.
+    \item {\bf High-performance implementation:} We provide an implementation of \toolname{} for multicore processors. 
+    \toolname{} improves data locality and decreases thread synchronizations for better performance. 
+    \item {\bf Faster than ForceAtlas2 and OpenOrd:} On a diverse set of graphs, \toolname{} is significantly faster than ForceAtlas2 and OpenOrd.  
+    
+\end{itemize}
+
+
+
+%To reproduce the results, we have made our datasets, tool and documentation publicly available which can be found at: \href{https://github.com/khaled-rahman/BatchLayout}{https://github.com/khaled-rahman/BatchLayout}. 
+
+\section{Background}
+\subsection{Notations}
+We present an unweighted graph by ${G=(V,E)}$ on the set of vertices $V$ and set of edges $E$. 
+The number of vertices and edges are denoted by $n$ and $m$, respectively.
+In this paper, we only considered undirected graphs, but directed graphs can be used by ignoring the directionality of the edges. 
+The degree of vertex $i$ is denoted by $deg(i)$.
+%We use $i \leftrightarrow j$ to represent the adjacency of two vertices in graph $G$, where $\{i,j\}\in V$. If two vertices $i$ and $j$ are not connected by an edge, we simply represent it by $i\neq j$. 
+%Without loss of generality, 
+We denote the coordinate of vertex $i$ with $c_i$, which represents $(x,y)$ Cartesian coordinate in a $2D$ plane. The distance between two vertices $i$ and $j$ is represented by $\parallel c_i - c_j \parallel$.
+
+In our algorithm, we used the standard Compressed Sparse Row (CSR) data structure to store the adjacency matrix of a sparse graph. 
+For unweighted graphs, the CSR format consists of two arrays: $rowptr$ and $colids$. $rowptr$, an array of length $n+1$, stores the starting indices of rows. $colids$ is an array of length $m$ that stores the column indices in each row. 
+Here, the CSR data structure is used for space and computational efficiency, but any other data structure would also work with our algorithm.
+
+
+
+% \subsection{Representation of Graph}
+% \label{subsec:representation}
+% \toolname{} reads input graph in matrix market format and stores in Compressed Sparse Row (CSR) format which has been found very effective for real-world graphs \cite{bulucc2009parallel,nagasaka2018high}. This format can be created by simply taking non-zero elements of an adjacent matrix in row-major approach. It has significant advantage over adjacent matrix format as it only stores non-zero (\emph{nnz)} entries and better performance over adjacent list as it can compute degree of a vertex in constant time. The CSR format consists of three arrays: an array of row pointers of length $n+1$, a column array of length $nnz$ and a value array of length $nnz$. The row pointers represent the starting index of a non-zero element in a row e.g., $r_i$ is the starting address of row (vertex) $i$. Thus, we can easily determine the degree of a vertex $i$ by $r_{i+1} - r_{i}$. %Though it is not required to store column indices in sorted format, a study shows that unsorted column indices have performance benefits \cite{nagasaka2018high}.
+
+
+\subsection{Force Calculations}
+Force-directed graph drawing algorithms compute \emph{attractive} forces between every pair of adjacent vertices and \emph{repulsive} forces between nonadjacent vertices. 
+In the spring-electrical model, a pair of connected vertices attract each other like a spring based on Hooke's law and a pair of nonadjacent vertices repulse each other like electrically charged particles based on Coulomb's law.
+Following this spring-electrical model, we define the attractive force $f_a(i,j)$ and the repulsive force $f_r(i,j)$ between vertices $i$ and $j$ as follows:
+\begin{equation*}
+    \vspace{-0.2cm}
+    f_a(i,j) = \frac{\parallel c_i - c_j \parallel^a}{K}, \text \  \ 
+    f_r(i,j) = \frac{-RK^2}{\parallel c_i - c_j \parallel^r}.
+    %\vspace{-0.1cm}
+\end{equation*}
+Here, $K$ acts as an optimal spring length and $R$ is considered as the regulator of relative strength of forces. Different values of $a$ and $r$ give different energy models, known as the $(a,r)$-energy model \cite{jacomy2014forceatlas2,noack2009modularity}. The combined force $f(i, c)$ of a vertex $i$ with respect to the current coordinates $c$ of all vertices is computed by:
+\vspace{-0.2cm}
+\begin{equation*}
+    f(i, c) = \sum_{\mathclap{(i,j) \in E}}f_a(i,j)\times \frac{c_j - c_i}{\parallel c_i-c_j \parallel} + \sum_{\mathclap{\substack{i\neq j \\ (i,j) \notin E} }} {f_r(i,j)} \times \frac{c_j - c_i}{\parallel c_i-c_j\parallel}.
+    \vspace{-0.3cm}
+\end{equation*}
+Here, $c$ is an array of coordinates of all vertices i.e., $c = \{c_i|i\in V\}$.
+We multiplied attractive and repulsive forces by a unit vector to get the direction of movement of vertex $i$. 
+Hence, following the spring-electrical model, the \emph{energy} of the whole graph will be proportional to $ \sum_{i\in V} f^2(i, c) $. 
+The goal of a force-directed algorithm is to minimize the energy so that the layout of the graph becomes stable, readable and visually appealing.
+%This is a minimization problem where our goal is to optimize the energy so that the layout of the graph becomes stable, readable and visually appealing. %In this paper, we minimize energy by minibatch updates technique which are commonly used in machine learning community.
+
+\begin{algorithm}[t]
+\caption{A Sequential Force-Directed Algorithm}\label{euclid}
+\hspace*{\algorithmicindent} \textbf{Input:} G(V, E) and an initial layout $c$
+\begin{algorithmic}[1]
+\State $Step = 1.0$ \Comment{initial step length}
+\State $Loop = 0$
+\While {$ Loop < MaxIteration$}
+\State $Energy = 0$
+\For{$i \leftarrow 0$ to $n -1$}
+    \State $f = 0$ \Comment{force initialization}
+        \For{$j \leftarrow 0$ to $n-1$}
+            \If{$(i,j)\in E$}
+                \State $f= f+ f_a(i,j)\times \frac{c_j - c_i}{\parallel c_i - c_j\parallel}$
+            \Else 
+                \State $f = f + f_r(i,j)\times \frac{c_j - c_i}{\parallel c_i - c_j\parallel}$
+            \EndIf
+        \EndFor
+        \State $c_i = c_i + Step \times \frac{f}{\parallel f\parallel}$ 
+        \State $Energy = Energy + \parallel f \parallel^2$
+    \EndFor
+\State $Step = Step \times 0.999$
+\State $Loop = Loop + 1$
+\EndWhile
+\State \Return the final layout $c$
+\end{algorithmic}
+\label{algo:sequential}
+\vspace{-0.7cm}
+\end{algorithm}
+
+
+\begin{figure*}[h]
+    \centering
+    \includegraphics[width=0.9\linewidth]{figures/Force_directeed_flow}
+    \vspace{-0.5cm}
+    \caption{Steps involved in a typical force directed graph layout algorithm. An algorithm starts with an initial layout (usually a random layout) and iteratively updates the layout by calculating attractive and repulsive forces among vertices. When a stopping criterion is satisfied, the graph is visualized using the generated layout and the quality of the layout is evaluated. Each step has various algorithmic options that impact the convergence speed, the quality of the final layout, and the runtime of the algorithm. We highlighted ``batch processing" in Step 2a since it is a required option for efficient parallel algorithms discussed in this paper. We explored many options within our parallel algorithm.}
+    \vspace{-0.4cm}
+    \label{fig:batchlayoutsystem}
+\end{figure*}
+
+
+
+
+\subsection{A Standard Sequential Algorithm}
+Algorithm~\ref{algo:sequential} describes a standard sequential force-directed graph layout algorithm. 
+We closely followed the notation of an Adaptive Cooling Scheme by Y. Hu~\cite{hu2005efficient}. 
+Algorithm~\ref{algo:sequential} starts with an initial layout and iteratively improves it by minimizing energy.
+In each iteration, vertices are chosen in a predefined order (line 5), and attractive and repulsive forces are calculated for a selected vertex with respect to all other vertices in the graph.
+Next, the relative position of the selected vertex is updated (line 12) and this updated position is used in processing the subsequent vertices. 
+\emph{Step} used in line 12 is a hyper-parameter that influences the convergence of the algorithm.  
+We will discuss possible values of this hyper-parameter in the experimental section.
+A working example of this algorithm is shown in Fig. S1 of the supplementary file. 
+%When attractive and repulsive forces are calculated for another vertex, updated position is considered for all previously updated vertices. 
+Each iteration of Algorithm~\ref{algo:sequential} computes $O(m)$ attractive forces and $O(n^2)$ repulsive forces, giving us a sequential $O(n^2)$ algorithm.
+Using the Barnes-Hut approximation~\cite{barnes1986hierarchical} of repulsive forces, Algorithm~\ref{algo:sequential} can easily be made into a sequential $O(n\log n)$ algorithm. 
+
+\section{The \toolname{} Algorithm}
+
+\subsection{Toward A Scalable Parallel Algorithm}
+Despite its simplicity, it is hard to yield high performance from Algorithm~\ref{algo:sequential}.
+A na\"ive parallelization of Algorithm~\ref{algo:sequential} can simply compute forces of a vertex in parallel by making line 7 of Algorithm~\ref{algo:sequential} a parallel loop. 
+However, for vertex $i$, this na\"ive parallel algorithm offers $O(n+deg(i))$ parallel work for the exact algorithm and $O(\log n+deg(i))$ parallel work for the approximate algorithm.
+To increase the parallel work, we followed the trend in training deep neural networks via SGD.
+In traditional SGD, the gradient is calculated for each training example, which is then used to update model parameters.
+Since SGD offers limited parallelism, most practical approaches use a batch of training examples (batch size varies from 256 to several thousands) to compute the gradient, an approach known as minibatch SGD.
+We follow a similar approach by calculating forces for a batch of vertices and updating their coordinates in parallel. 
+\toolname{} revolves around the batch processing of vertices and covers all other aspects of force-directed algorithms. 
+
+
+
+\subsection{Overview of \toolname}
+Figure~\ref{fig:batchlayoutsystem} shows the skeleton of a typical force-directed graph layout algorithm. 
+After starting with an initial layout, an algorithm iteratively minimizes energy by computing attractive and repulsive forces.
+Upon convergence, the final layout is drawn using a visualization tool. 
+Figure~\ref{fig:batchlayoutsystem} shows that different steps of the algorithm have various choices upon which the quality and runtime of the algorithm depend. 
+A comprehensive software such as ForceAtlas2 provides multiple options in each step. 
+Like ForceAtlas2, \toolname{} also provides multiple options in each of these steps.
+In particular, \toolname{} uses two initialization strategies, process vertices in different orders, considers four energy models, calculates exact and approximate repulsive forces, explores different learning rates and convergence conditions.
+We evaluated the impact of different options on the convergence and quality of the algorithm.
+We developed parallel algorithms for all options and evaluated their parallel performance. 
+
+
+\subsection{Batch processing of vertices}
+Since force calculations consume almost all computing time of our algorithm, we discuss parallel force calculation techniques first. 
+As mentioned before, calculating forces for a single vertex does not provide enough work to keep many processors busy.
+Hence, the \toolname{} algorithm selects a subset of vertices called a \emph{minibatch} and calculates forces for each vertex in the minibatch independently.
+After all vertices in a minibatch finish force calculations, we update their coordinates in parallel.
+Therefore, unlike Algorithm~\ref{algo:sequential}, the minibatch approach delays updating coordinates until all vertices in a minibatch finish their force calculations.
+Fig. \ref{fig:BatchLayoutfig} illustrates this approach with a minibatch size of 2.
+
+Batched force calculation has a benefit and a drawback. 
+As we process more vertices simultaneously, we can keep more processors busy by providing ample parallel work. 
+However, batch processing may slow down the convergence because the updated coordinates of a vertex cannot be utilized immediately. 
+In our experiment, we observed that the benefit of concurrent work is significantly more than the disadvantage caused by slower convergence. 
+Hence, batch processing makes a parallel algorithm significantly faster. 
+%To make it clear, we describe the steps by Fig.  where graph has 6 vertices and size of minibatch is 2. 
+%Similar to previous, we traverse graph sequentially i.e., we start from vertex $0$ and end in vertex $5$. Set of vertices in shaded region represents a minibatch (e.g. $\{0, 1\}$). At first, forces for vertex $0$ (green colored) are calculated and stored in a temporary variable. Similarly in next step, forces for vertex $1$ are calculated and stored in a temporary variable. Note that when forces for vertex $1$ are calculated, updated position of vertex $0$ is note considered as both $0$ and $1$ are in same minibatch of size 2. When computations of forces for all vertices in a minibatch are done, we update relative positions of each vertices as we did in next step represented by red colored vertices of $0$ and $1$. When we calculate forces for current subset of vertices (e.g., minibatch $\{2, 3\}$), we consider updated position of previous minibatches (e.g., minibatch $\{0, 1\}$) and this procedure goes on until all vertices are updated.
+
+\begin{figure}[!htb]
+    \centering
+    \includegraphics[width=\linewidth]{figures/smu.png}
+    \caption{Force calculation with minibatch size 2. We start from vertex $0$ and consider two consecutive vertices in a minibatch shown in shaded regions. 
+    This example finishes in three steps (each row in the figure), and each step processes a minibatch of two vertices.
+    Green color denotes a vertex whose force is currently being computed, and red denotes a vertex whose coordinate is being updated. 
+    In the first step (first row), vertex $0$ and vertex $1$ form a minibatch whose forces are first computed and then their coordinates are updated. 
+    Similarly, in the second step (second row, from right to left), we calculate forces for vertex $2$ and $3$, and then update their coordinates. 
+    Notice that in step 2, updated coordinates of the previous minibatch $\{0, 1\}$ are used.
+    %vertex $0$ and $1$ are used in force calculation.
+    %When we calculate forces for current subset of vertices (e.g., minibatch $\{2, 3\}$), we consider updated position of previous minibatches (e.g., minibatch $\{0, 1\}$) and this procedure goes on until all vertices are updated.
+    }
+    \vspace{-0.5cm}
+    \label{fig:BatchLayoutfig}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.7\linewidth]{figures/cacheblockingu.png}
+    \vspace{-0.2cm}
+    \caption{Computation of forces for the graph in Fig.~\ref{fig:BatchLayoutfig} using cache blocking technique. Here, the graph is stored as an adjacency matrix with `X' denoting edges between vertices. Vectors represents coordinates of vertices, and force calculations are viewed as a matrix-vector multiplication.
+    %in a cell indicates a neighboring vertex that are commonly used in matrix-matrix or matrix-vector multiplication. An `X' in a cell indicates a neighboring vertex.
+    }
+    \vspace{-0.3cm}
+    \label{fig:cacheblocking}
+\end{figure}
+
+\subsection{Improved Memory Accesses Via Cache Blocking}
+While batch processing of vertices provides ample parallel work, processors can still remain idle if they have to wait for data to be fetched from memory.  
+Memory stalling can happen if an algorithm does not utilize spatial and temporal locality in accessing data.
+We addressed this issue by using cache blocking, a technique frequently used in linear algebra operations to utilize the cache hierarchy available in modern processors. 
+
+%Notice that our problem is similar to sparse matrix-vector multiplication while calculating attractive force and dense matrix-vector multiplication while calculating repulsive force. 
+
+%A straight forward implementation of the above approach can be efficient but may not utilize full advantage of modern cache performance. 
+
+%Thus we further dig into the problem and deduce a highly scalable cache blocking version of \toolname{}. Cache blocking is a common technique in matrix-matrix or matrix-vector multiplication. 
+%Notice that our problem is similar to sparse matrix-vector multiplication while calculating attractive force and dense matrix-vector multiplication while calculating repulsive force.
+
+We noticed that force calculations can be viewed as a matrix-vector multiplication. 
+Fig. \ref{fig:cacheblocking} shows a simple example where the adjacency matrix of the graph used in Fig.~\ref{fig:BatchLayoutfig} is considered.
+The vector of current coordinates are shown twice in dense vectors A and B.
+$A'$ holds the updated coordinates.
+% A general intuition of cache blocking can be explained by a toy example as in Fig. \ref{fig:cacheblocking}. We assume that vectors $A$ and $B$ both hold the coordinates of a graph with 6 vertices, and $A'$ holds the updated coordinates as shown in Fig. \ref{fig:BatchLayoutfig}. 
+In our minibatch model,  we compute the forces for all vertices in a minibatch with respect to all other vertices in the graph.
+%where vectors $A$ and $B$ are literally same (i.e., $A = B$), though we show them separately for conceptual clearance. 
+Suppose, in batch $0$, we compute forces for vertices $0$ and $1$ with respect to vertices $0 \ldots 2$ (blue). When forces are calculated for vertex $0$, coordinates of vertices $0 \ldots 2$ are brought in from the main memory and stored in a CPU cache.
+%in L1 cache of the core, and 
+The cumulative sum of force calculations are stored in a temporary vector, $A'$. 
+When we compute forces for the next vertex $1$, all necessary coordinates are already available in cache (i.e., using data locality), which reduces the memory traffic. Batch $0$ gets a similar performance advantage when forces are computed with respect to vertices $3\ldots 5$ (green). 
+\toolname{} with the cache-blocking scheme is presented in Algorithm \ref{algo:cbBatchLayout}. 
+Here, {\myfont G.rowptr} and {\myfont G.colids} are two arrays which hold the row pointers and column IDs, respectively, of the graph in a CSR format. 
+$BS$ is the size of minibatch and $Step$ length is initialized to $1.0$. 
+In line $6$ of Algorithm \ref{algo:cbBatchLayout}, we iterate over a subset of vertices (minibatch) and in line $10$, we iterate over all vertices to calculate $f_a$ and $f_r$. 
+In line $14$, when two vertices are connected by an edge we calculate $f_a$; otherwise, we calculate $f_r$ (line $18$). After calculating forces for a vertex, we store it in a temporary location (see line $19$). 
+This temporary storage helps us to calculate forces in parallel. 
+Next, we iterate over all vertices in a minibatch to update relative position (see line $22$).  
+We provide a flexible rectangular cache blocking area which is bounded by variables $p$ and $q$. 
+This increases the data locality in the L1 cache of each core, improving the performance of our algorithm. 
+Loop counters $i$ and $j$ are increased by $p$ and $q$, respectively. 
+Variable $k_x$ holds the starting index of neighbors for $p$ vertices (see line $8$). After the loop completes, in line $24$, we update step length. 
+To keep Algorithm~\ref{algo:cbBatchLayout} simple, we assume that the number of vertices in a graph is multiple of $(b+1)*BS$.
+In our implementation, we incorporated other cases.
+%It can be easily seen that the number of vertices in a graph is not always a multiple of $(b+1)*BS$ and may introduce exceptions. For the sake of simplicity, we do not show such exception handling or conditional statements in Algorithm \ref{algo:cbBatchLayout}. 
+The overall running time of this procedure is same as Algorithm \ref{euclid} i.e., $O(n^2)$. However, the main advantage of this technique is in parallel computation of forces. 
+Note that Algorithm \ref{euclid} is a special case of Algorithm \ref{algo:cbBatchLayout} when the size of the minibatch is $1$.
+ 
+
+\begin{algorithm}
+\caption{Cache Blocking \toolname}
+\hspace*{\algorithmicindent} \textbf{Input:} G(V, E)
+\begin{algorithmic}[1]
+\State $Step = 1.0$ \Comment{initial step length}
+\State $Loop = 0$
+\While {$ Loop < MaxIteration$}
+\State $Energy = 0$
+\For{$b \leftarrow$ 0 to $\frac{n}{BS}-1$}
+    \ParFor{$i \leftarrow b * BS$ to $(b + 1) * BS-1$ \textbf{by} $p$}
+        \For{$x \leftarrow 0$ to $p-1$}
+            \State $k_{x} = G.rowptr[i+x]$
+			\State $ct_{i+x} = 0$
+        \EndFor
+        \For{$j \leftarrow 0$ to $n-1$ \textbf{by} $q$}
+            \For{$x \leftarrow 0$ to $p-1$}
+            \State $f = 0$
+                \For{$y \leftarrow 0$ to $q-1$}
+                \If{$j + y == G.colids[k_x]$}
+                    \State $f\;+= f_a(i,j)\times \frac{c_j - c_i}{\parallel c_i - c_j\parallel}$
+                    \State $k_x\;+=1$
+                \Else 
+                    \State $f\; += f_r(i,j)\times \frac{c_j - c_i}{\parallel c_i - c_j\parallel}$
+                \EndIf
+                \EndFor
+                \State $ct_{i+x} += f$ 
+            \EndFor
+        \EndFor
+    \EndParFor
+    \For{$i \leftarrow b * BS $ to $(b + 1) * BS - 1$}
+        \State $c_i\; += Step \times \frac{ct_i}{\parallel ct_i\parallel}$
+        \State $Energy\; += \parallel ct_i\parallel^2$
+    \EndFor
+\EndFor
+\State $Step = Step \times 0.999$
+\State $Loop += 1$
+\EndWhile
+\State \Return the final layout $c$
+\end{algorithmic}
+\label{algo:cbBatchLayout}
+\end{algorithm}
+
+
+\subsection{Repulsive Force Approximation}
+Exact repulsive force computations need $O(n^2)$ time per iteration, which is too expensive for large graphs. 
+Therefore, we have developed a parallel Barnes-Hut algorithm~\cite{barnes1986hierarchical} for approximating repulsive forces.
+Barnes-Hut takes $O(n\log n)$ time per iteration. 
+For 2D visualization, a quad-tree data structure is often used to approximate repulsive forces.
+An example is shown in Fig.~\ref{fig:quadtree}. 
+Given the coordinates of vertices in Fig.\ref{fig:quadtree}(a), a high-level block is divided into four equal blocks as shown in Fig. \ref{fig:quadtree}(b). 
+In this example, we split up to $2$ levels, creating $4^2 = 16$ small blocks in the 2D plane. 
+Empty blocks are merged with their adjacent nonempty blocks. 
+We show how the algorithm approximates the repulsive force $f_r$ for the green vertex.
+First, a centroid (shown in red) is calculated for each block by averaging the coordinates of all vertices in the block. 
+Next, an approximate repulsive force is computed with respect to the centroids, as shown by the dashed gray lines. 
+%Additionally,  solid lines show attractive force calculations with respect to adjacent vertices. 
+
+%For all other non-neighboring vertices (a block containing one vertex), $f_r$ is calculated as it is. Note that for the block located in right bottom corner, we can calculate $f_r$ with respect to only one centroid instead of four vertices individually which reduces running time in $f_r$ calculations. In this procedure, quad-tree data structure can help to store information of 2D space partitioning in efficient way.
+
+
+%calculations to minimize the running time \cite{barnes1986hierarchical} which asymptotically takes $O(n\log n)$ time, where $n$ is the number of objects (vertices in case of force-directed graph layout). 
+%Quad-tree (Oct-tree) structure is maintained for such approximation in 2D (3D). Most of the real-world graphs takes significant amount of time for repulsive force ($f_r$) calculations. Thus approximation of $f_r$ is a major advantage for running time though it sacrifices quality of the layout a little.
+
+%We have shown an example for repulsive force approximation in Fig. \ref{fig:quadtree}. In each split, a block is divided into four equal blocks as shown in Fig. \ref{fig:quadtree}(b). In this example, we split up to $2$ levels which creates $4^2 = 16$ small blocks in the 2D plane. Note that some adjacent blocks have been merged due to absence of any vertex. When we calculate $f_a$ and $f_r$ for green colored vertex located in upper left corner, we can approximate $f_r$ as following: a centroid is calculated for each block by averaging the coordinates of all vertices in the block. In Fig. \ref{fig:quadtree}(c), red colored points are centroids of corresponding blocks where there are more than one vertex in a block. Gray dotted line shows $f_r$ with respect to centroids. Blue solid line shows $f_a$ with respect to neighbors. For all other non-neighboring vertices (a block containing one vertex), $f_r$ is calculated as it is. Note that for the block located in right bottom corner, we can calculate $f_r$ with respect to only one centroid instead of four vertices individually which reduces running time in $f_r$ calculations. In this procedure, quad-tree data structure can help to store information of 2D space partitioning in efficient way.
+
+\begin{figure}[!t]
+    \centering
+    \includegraphics[width=\linewidth]{figures/quadtreeexampleu.png}
+    \vspace{-0.7cm}
+    \caption{(a) An example graph. (b) Calculating forces of the green vertex using a quad-tree. (c) Blue solid lines show attractive forces, and dashed gray lines denote approximate repulsive forces with respect to centroids (red).}
+    \vspace{-0.3cm}
+    \label{fig:quadtree}
+\end{figure}
+
+\begin{figure}[!t]
+    \centering
+    \includegraphics[width=\linewidth]{figures/hashedquadtree.png}
+    \vspace{-0.6cm}
+    \caption{(a) A quad-tree structure. (b) Morton order of traversal for 16 vertices in 16 different blocks.}
+    \vspace{-0.6cm}
+    \label{fig:hashedquadtree}
+\end{figure}
+
+Among several choices of quad-tree implementation~\cite{zhang2014design}, we adopted an approach based on Warren and Salmon \cite{warren1993parallel}. 
+Fig. \ref{fig:hashedquadtree}(a) shows that we define a drawing plane by bounding coordinates $(x_{max}, y_{max})$ and $(x_{min}, y_{min})$. 
+This bounding plane is the root of the quad-tree.
+Next, we split the bounding plane (root) into four equal blocks, each of which represents a child node (shown by a unique color) of the root. 
+%We implement quad-tree in similar way as done by Warren and Salmon \cite{warren1993parallel}. 
+We sort the positions of all vertices based on Morton code (also called Z-order curve)~\cite{morton1966computer} and obtain an ordered list of vertices.
+This ordering basically represents the Depth First Search (DFS) traversal of a quad-tree. 
+Fig. \ref{fig:hashedquadtree}(b) shows a possible Morton ordering of a graph with 16 vertices. % where each block of width $D$ contains one vertex. 
+From the Morton ordering, we recursively build the tree, where leaf nodes represent vertices in the graph, and an internal node stores its centroid which is computed from its children.
+
+Basically, nearer non-adjacent vertices contribute more than far vertices to $f_r$. For this reason, a threshold ($\theta$) is set to determine relative distance between two vertices while calculating $f_r$. 
+A Multipole Acceptance Criteria (MAC), $\theta > \frac{D}{\parallel c_i - c_j \parallel}$ is evaluated while traversing the tree for $f_r$ calculations. If MAC is {\myfont\textbf{true}} then two vertices are located at far enough distance such that the current centroid can approximate that repulsive force. In this way, $f_r$ calculation can be approximated in $O(\log n)$ time which has been discussed elaborately \commentKhaled{in \cite{hu2005efficient,hachul2004drawing}}, thus, the overall running time becomes $O(n\log n)$ per iteration. We use the term \toolnameBH{} to describe this version and provide full pseudo-code in supplementary file, Algorithm S3.
+
+
+%There are also hashed based implementation for distributed memory \cite{warren1993parallel,winkel2012massively} which have been found effective in Message Passing Interface (MPI). 
+%A general intuition of quad-tree is space partitioning. For example, we bound the drawing space exclusively by coordinates $(x_{max}, y_{max})$ and $(x_{min}, y_{min})$. Then we equally split the bounding space (root) into four equal blocks as shown in Fig. \ref{fig:hashedquadtree}(a) each of which represents a child node (unique color) of the root. We implement quad-tree in similar way as done by Warren and Salmon \cite{warren1993parallel}. At first, we sort the positions of all vertices based on Morton code \cite{morton1966computer} and get an ordered list of vertices which basically represents the DFS traversal of quad-tree. In Fig. \ref{fig:hashedquadtree}(b), we show a possible morton ordering of a graph with 16 vertices where each block of width $D$ contains one vertex. After that, we recursively build the tree. The leaf nodes of the tree represents vertices in the graph and each internal node of the tree calculates centroid based on its children. Basically, nearer non-adjacent vertices contribute more than far vertices to $f_r$. For this reason, a threshold ($\theta$) is set to determine relative distance between two vertices while calculating $f_r$. A Multipole Acceptance Criteria (MAC), $\theta > \frac{D}{\parallel c_i - c_j \parallel}$ is evaluated while traversing the tree for $f_r$ calculations. If MAC is {\myfont\textbf{true}} then two vertices are located at enough distant such that current centroid can approximate that repulsive force. In this way, $f_r$ calculation can be approximated in $O(\log n)$ time which has been discussed elaborately by Yifan Hu \cite{hu2005efficient} and thus the overall running time becomes $O(n\log n)$ per iteration. We term this version as \toolnameBH{}.
+
+%In this paper, we calculate $f_r$ based on the sorted order of vertices which become more cache friendly.
+
+
+
+\subsection{Initialization}
+The initial layout plays an important role in the convergence and visualization quality of the final layout.
+\commentKhaled{Many existing algorithms start with random layouts where vertex positions are assigned randomly~\cite{hu2005efficient}.}
+%Generally, an algorithm starts with a random layout where vertex positions are assigned randomly~\cite{hu2005efficient}. 
+%Some methods also assign initial coordinates to zero \cite{martin2011openord}.
+%This part is independent of optimizing combined force that we discussed in Algorithm \ref{algo:cbBatchLayout}; however, it may play important role in faster convergence. 
+In addition to random initial layouts, we developed a novel greedy initialization technique as shown in Algorithm \ref{algo:greedy}. 
+We maintain a \emph{stack} $S$ to keep track of visited vertices.
+The algorithm starts with a randomly selected vertex $V_0$, and $(0,0)$ is used as its coordinate. 
+In every iteration, the algorithm extracts a vertex $U$ from the stack and places $U$'s neighbors on a unit circle centered at $U$ (line $10-14$ in Algorithm \ref{algo:greedy}).
+Additionally, the distance between every pair of $U$'s neighbors is also equal.
+In line $12$, $PI$ is a constant whose value is $3.1416$. 
+In section \ref{subsec:uel}, we will discuss that uniform edge length is a good aesthetic metric for assessing the quality of a layout. 
+Hence, we consider this unit-radius approach  to be a better initializer.
+Our experimental results does show that the greedy initialization indeed converge faster than the random initialization. 
+The greedy approach is similar to a DFS with $O(n+m)$ complexity.
+
+
+
+%We then iterate over neighbors of that vertex (line $10$ in Algorithm \ref{algo:greedy}) to initialize in a circular way around it with unit radius and equal distant. 
+
+
+\begin{algorithm}[!t]
+\caption{Greedy Initialization}
+\hspace*{\algorithmicindent} \textbf{Input:} G(V, E)
+\begin{algorithmic}[1]
+\State $S = \emptyset $ \Comment{initial empty stack}
+\State $visited = [False, \ldots, False]$
+\State $V_0 = (0, 0)$ \Comment{$V_{0x} = 0, V_{0y} = 0$}
+\State $S.push(V_0)$
+\State $visited_0 = True$
+\While {$S$ is not empty}
+\State $U = S.pop()$
+\State $d = \frac{360}{deg(U)}$
+\State $D = 0$
+\For{$u$ neighbors of $U$}
+    \If{$visited_u$ is $False$}
+        \State $V_u = (U_x + cos(\frac{PI*D}{180.0}), U_y+sin(\frac{PI*D}{180.0}))$
+        \State $visited_u = True$
+        \State $S.push(V_u)$
+        \State $D = D + d$
+    \EndIf
+\EndFor
+\EndWhile
+\State \Return $V$
+\end{algorithmic}
+\label{algo:greedy}
+\vspace{-0.4cm}
+\end{algorithm}
+
+
+%\subsubsection{Shared Memory Parallelism}
+%We have implemented all of our Algorithms in OpenMP \cite{dagum1998openmp}. It provides several compiler directives to easily implement in parallel environment using multi-core architecture. It also provides three loop scheduling schemes, namely, {\myfont static}, {\myfont dynamic} and {\myfont guided} which have advantages based on solution approach. As there are $p$ threads to run in parallel, the asymptotic running time of cache blocking version of \toolname{} is $O(\frac{n^2}{p})$ and for quad-tree approximation, it is $O(\frac{n\log n}{p})$. 
+
+%\subsubsection{Setting LinLog and Edge Weight}We want to make more options available in \toolname{}. As a step towards it, we have employed popular linlog mode \cite{noack2003energy} and edge weight mode so that those options can also take advantage of high performance cache coherent implementation. 
+
+%\subsubsection{Greedy Force Approximation}
+%In this mode of repulsive force calculations, we only consider 150-200 vertices that are in $n$-hops distant. We set this mode in such a way that it calculates $f_r$ in first $80\%$ iterations using greedy approach and last $20\%$ iterations using general approach as described in Algorithm \ref{algo:cbBatchLayout}. The purpose of last $20\%$ iterations is that it compensates force approximation so that the quality of final layout is adorable.  We have also made another option available in our tool where first 80\% time is used in \toolnameBH{} and last 20\% time is used in \toolname{} to generate layout. This option generates good layout in promising running time.
+
+\subsection{Performance Metrics}
+\label{sec:aesthetic_measure}
+There are several aesthetic metrics in the literature to assess the quality of a layout generation algorithm \cite{purchase2002metrics,kwon2017would,de2019multi}. Though there does not exist a single metric that can uniquely determine the effectiveness of a layout, it gives a quantitative value that tells us how layout algorithms perform. For the sake of completeness, we have used the following aesthetic metrics along with running time analysis.
+
+%{\bf Edge Crossing (EC): }
+%Edge crossing has been found to be an important aesthetic measure in many studies \cite{huang2007effects}; it basically computes the number of edge crossing points in a layout. This implies that a lower number of edge crossing points represents a better layout. Some studies normalize this value between 0 to 1 where $1$ indicates better layout \cite{purchase2002metrics}. In this paper, we only report the edge crossing number as in some cases, the normalized value does not reflect the actual measurement.
+
+{\bf Stress (ST): }
+Stress computes the difference between geometric distance and graph theoretic distance for any pair of vertices in a graph~\cite{brandes2008experimental,de2019multi}. Since different algorithms may require different drawing space based on which stress may change, the drawing space is scaled before computing the stress for all algorithms. Thus, the reported value is the minimum value achievable after scaling the layout. A lower ST value indicates a better layout, and it is computed using $\sum_{i,j\in V} w_{ij}(\parallel c_i - c_j\parallel - d_{ij})^2$ where, $c_i$ and $c_j$ are coordinates of vertices $i$ and $j$, respectively. The value of $d_{ij}$ represents a graph theoretic distance between vertices $i$ and $j$, and $w_{ij} = \frac{1}{d_{ij}^2}$.
+
+
+%\subsubsection{Minimum Angle (MA)}
+%The minimum angle is another aesthetic metric which computes the average absolute deviation of adjacent incident edge angles from the ideal minimum angle \cite{purchase2002metrics}. This metric can be computed using following equation:
+
+%\begin{equation*}
+%    MA = 1 - \frac{1}{|V|}\sum_{v\in V}|\frac{\theta(v) - \theta_{min}(v)}{\theta(v)}|
+%\end{equation*}
+%where, $\theta(v) = \frac{360}{deg(v)}$ and $\theta_{min}(v)$ is the minimum angle between the incident edges on vertex $v$. Higher value of $MA$ represents better layout.
+
+{\bf Edge Uniformity (EU):}
+\label{subsec:uel}
+Sometimes the uniformity of edge lengths represents better readability of a layout \cite{huang2007effects}. We define EU in a similar way as defined in \cite{hachul2007large,de2019multi}. It finds the normalized standard deviation of edge length which can be computed using $\sqrt{\frac{\sum_{e\in E}(l_e - l_{\mu})^2}{|E|.l_{\mu}^2}}$ where, $l_{\mu}$ is the average length of all edges and $|E|$ represents the number of edges in the graph. Lower value of EU represents better quality of the layout.
+
+{\bf Neighborhood Preservation (NP): }
+This measure computes the number of neighbors that are close to a vertex in a graph as well as in the driven layout. It has been used to compare graph layouts in many tools like tsNET \cite{kruiger2017graph} and Maxent \cite{gansner2012maxent}. This is a normalized similarity measure where $0$ means that the adjacency of vertices are not preserved in the layout whereas $1$ means that all vertices preserve their respected neighbors.
+
+\section{Results}
+
+\subsection{Experimental Setup}
+We implemented \toolname{} in C++ with multithreading support from OpenMP.
+%which requires at minimum GCC version 4.9 and OpenMP version 4.5. 
+We ran all experiments in a server consisting of Intel Xeon Platinum 8160 processors (2.10GHz) arranged in two NUMA sockets. 
+The system has 256GB memory, 48 cores (24 cores/socket), and 32MB L3 cache/socket. 
+%2.10GHz, 32KB L1 cache, 1MB L2 cache, 32MB L3 cache, 48 cores and 2 NUMA nodes with 256GB memory. 
+For comparison, we used ForceAtlas2 implemented in Gephi and OpenOrd from its  GitHub\footnote{https://github.com/SciTechStrategies/OpenOrd} repository.
+We also experimented with Gephi's OpenOrd implementation (denoted by OpenOrdG), but found that the GitHub implementation produced better visualizations. 
+We use Gephi's toolkit v0.9.2 \cite{bastian2009gephi} to run multi-threaded ForceAtlas2 and OpenOrdG. 
+The Barnes-Hut variant of ForceAtlas2 is termed as ForceAtlas2BH. 
+For \toolnameBH{}, we use the same threshold value ($1.2$) for MAC as in ForceAtlas2BH. 
+Unless otherwise specified, we use the default settings for all of these tools.
+For OpenOrd, we set the edge-cutting parameter to $0$, and we set the default time distribution in different stages of simulated annealing. 
+While the \toolname{} software includes four variants of $(a,r)$-energy model considered in the ForceAtlas2 paper, we only show results from \toolname{} using $(2,-1)$-energy model (equivalent to the Fruchterman and Reigngold algorithm).
+We selected this model because it usually generates better visualizations~\cite{jacomy2014forceatlas2}.
+
+
+
+%We run all experiments in a server machine which is configured as following: Intel\textsuperscript{\textregistered} Xeon\textsuperscript{\textregistered} Platinum 8160 CPU\textcopyright2.10GHz, 32KB L1 cache, 1MB L2 cache, 32MB L3 cache, 48 cores and 2 NUMA nodes with 256GB memory. We compare our results with other spring-electrical based tools like OpenOrd, and Gephi's ForceAtlas2 and OpenOrd which are some of the current state-of-the art tools. We term OpenOrd to represent the original tool from authors' GitHub\footnote{https://github.com/SciTechStrategies/OpenOrd} repository and OpenOrdG to represent Gephi's OpenOrd. Notably, we observe some differences between OpenOrd and OpenOrdG in our experiments. We also run tsNET \cite{kruiger2017graph} to conduct some experiments though it is very slow and not effective for big graph visualization. We run tsNET tool using only one thread as it has no multi-threaded version and set perplexity and learning rate as 800 and 6000, respectively. We observe that it can generate good layout for small graphs but failed to generate any layout for medium or bigger graphs in our experiments. We use Gephi's toolkit v0.9.2 \cite{bastian2009gephi} to run multi-threaded ForceAtlas2 and OpenOrdG. The Barnes-Hut version of ForceAtlas2 is termed as ForceAtlas2BH. For both version of OpenOrd, we set edge cutting parameter as $0$ and default time distribution in different stages of simulated annealing. For \toolnameBH{}, we use same threshold value ($1.2$) for MAC as in ForceAtlas2BH. Unless otherwise noted, we use default settings for all of these tools.
+
+\begin{table}[]
+\caption{Graphs used in our experiments. $|V|$ and $|E|$ represent number of vertices and edges, respectively. d means average degree.}
+\vspace{-5pt}
+\centering
+\begin{tabular}{|p{1.35cm}|p{1.15cm}|p{1.34cm}|c|p{1.7cm}|}
+\hline
+\textbf{Graph} & \textbf{$|V|$} & \textbf{$|E|$} & \textbf{d} & \textbf{Type}\\ \hline
+Powergrid             &      4,941	               &   13,188                &        	2.66              & Small World \\ \hline
+add32            &     	4,960                &   	19,848                  & 	3.00       &   Scale Free  \\ \hline
+ba\_network	           &      6,000	                &    5,999            &    	1.99                     & Scale Free \\ \hline
+3elt\_dual	          & 9,000          & 	26,556	         &     2.95                  & Mesh \\ \hline
+PGP           &         	10,680              &  	48,632	                &    4.55                 & Scale Free \\ \hline
+pkustk02           &         	10,800             &      	399,600	             &        76              & Feiyue twin tower\\ \hline
+fe\_4elt2	           &      11,143               &   	65,636	                & 5.89        &   Mesh  \\ \hline
+bodyy6	           &        19,366              &    	134,208	                &        5.93             & NASA Mat.\\ \hline
+%tube2   &	21,498  &	897,056 &	40.72 & Structural Problem \\ \hline
+pkustk01	            &       22,044               &         	979,380         &      	45.42               & Beijing bot. exhib. h. \\ \hline
+
+OPF\_6000   &	29,902	&   274,697	    &   8.66    &  Ins. of Pow. Sys. G. U. \\ \hline
+finance256	&   37,376	    &   298,496	    &   6.98    &   Lin. Prog. \\ \hline
+%gridgena	           & 48,962	            & 512,084          &    9.4                &  Optimization Problem\\ \hline
+finan512    &	74,752	    &   261,120	    &   6.98    &   Eco. Prob. \\ \hline
+lxOSM	&   114,599 &	239,332 & 2.08 & Op. St. Map \\ \hline
+comYoutube	&   1,134,890 &	5,975,248   & 5.26  & Social Net. \\ \hline
+%af\_shell10	&   1,508,065 &	52,259,885   & 33.65  & Structural Problem \\ \hline
+Flan\_1565	&   1,564,794	&   114,165,372   & 71.95  & Struc. Prob. \\ \hline
+\end{tabular}
+\label{tab:datasets}
+\vspace{-0.5cm}
+\end{table}
+
+\subsection{Datasets}
+\label{lab:datasets}
+Table \ref{tab:datasets} shows a diverse collection of test graphs including small world networks, scale free networks, mesh, structural problem, optimization problem, linear programming, economic problem, social networks, and road networks. 
+These graphs were collected from the SuiteSparse matrix collection (https://sparse.tamu.edu).
+Specifically, we use Luxembourg OSM (lxOSM) and Flan\_1565 datasets to test the ability of algorithms to visualize large-scale graphs. 
+For scalability experiments, we also generated benchmark networks by Lancichinetti et al.~\cite{lancichinetti2008benchmark}. 
+For this tool, we set mixing parameter, avg. degree, community minsize, community maxsize to 0.034, 80, 128 and 300, respectively, and vary maximum degree from 100 to 300. 
+We generated a total of 5 random graphs, each of which has $2^v$ vertices, where $v \in \{16, 17, 18, 19, 20\}$. 
+
+\subsection{Algorithmic Options and Their Impacts}
+\subsubsection{Initialization}
+At first, we compare the differences between greedy initialization using Algorithm \ref{algo:greedy} and random initialization using the C++ function {\myfont rand}.
+Both initialization techniques generate random coordinates within a given range {\myfont [-MAXMIN, MAXMIN]}.
+We feed initial coordinates to \toolname{}, and Fig. \ref{fig:selfcheckout}(a) shows the layout energy for  the \emph{3elt\_dual} graph after various iterations. 
+We observe that in the $i^{th}$ iteration, the greedy-initialized layout has lower energy than  the randomly-initialized layout.
+This result is consistent across other graphs as well.
+Fig. \ref{fig:selfcheckout}(a) reveals that greedy initialization accelerates the convergence of \toolname{}.
+Hence,  we use the greedy initialization in subsequent experiments in the paper (both initializations are available in our software).
+
+
+
+
+%For this experiment, we have used \emph{3elt\_dual} graph and made sure that all vertices are initialized within same boundary value i.e., we generate random coordinates within range {\myfont [-MAXMIN, MAXMIN]} then for greedy procedure we scale all coordinates so that they lie within range {\myfont [-MAXMIN, MAXMIN]}. Then we feed these initial coordinates to \toolname{} and results are shown in Fig. \ref{fig:selfcheckout}(a) for different number of iterations. We observe that the \emph{Energy} of greedy initialization technique is always smaller than random technique and found this result consistent across several graphs. So, we select this greedy initialization technique for all of our next experimental results; however, we have kept both initialization techniques available in our tool.
+
+
+%We have compared acceleration of convergence between greedy initialization and random initialization technique. For greedy technique, we have used Algorithm \ref{algo:greedy} and 
+%for random technique we have used built-in {\myfont rand} function of C++. For this experiment, we have used \emph{3elt\_dual} graph and made sure that all vertices are initialized within same boundary value i.e., we generate random coordinates within range {\myfont [-MAXMIN, MAXMIN]} then for greedy procedure we scale all coordinates so that they lie within range {\myfont [-MAXMIN, MAXMIN]}. Then we feed these initial coordinates to \toolname{} and results are shown in Fig. \ref{fig:selfcheckout}(a) for different number of iterations. We observe that the \emph{Energy} of greedy initialization technique is always smaller than random technique and found this result consistent across several graphs. So, we select this greedy initialization technique for all of our next experimental results; however, we have kept both initialization techniques available in our tool.
+
+\subsubsection{Minibatch size}
+We now select a minibatch size that provides enough parallelism without affecting the convergence rate significantly.
+Fig. \ref{fig:selfcheckout}(b) shows layout energies for different minibatches for the \emph{pkustk02} graph.
+Here, BL256 denotes \toolname{} with minibatch size of 256.
+For this graph, we observe that small minibatches converge faster (in terms of iterations) than large minibatches. 
+For example, BL1 and BL256 achieve the same energy at 1000 and 1100 iterations, respectively (marked by brown squares in Fig. \ref{fig:selfcheckout}(b)). 
+Consequently, BL256 needs to run 100 more iterations to reach the same energy achieved by BL1.
+However, the cost of extra iterations is offset by faster parallel runtime of BL256.
+Fig.~\ref{fig:selfcheckout}(c) shows the runtime for different minibatches when we run \toolname{} with 48 threads for the same graph \emph{pkustk02}.
+To achieve the energy level marked by brown squares, BL1 takes around 433.6 seconds, whereas BL256 takes only 9.7 seconds.
+That is, BL256 is $\sim 40\times$ faster than BL1 despite the former taking 100 more iterations than the latter to reach the same layout energy.
+For this reason, minibatches play a central role in attaining high performance by our parallel algorithm.
+However, using larger minibatches beyond 256 does not improve the performance further.
+For example, BL256 and BL2048 behave almost similarly as can be seen in Figs. \ref{fig:selfcheckout}(b) and \ref{fig:selfcheckout}(c).
+We also observe similar minibatch profiles for other graphs. Hence, we set 256 as the default minibatch size for the rest of our experiments (a user can change the minibatch size in our software). 
+
+
+%\subsubsection{Batch size}
+%We conduct another experiment to choose effective batch size that will be faster towards convergence with reasonable running time. We empirically found that this result is consistent for graphs with higher average degree. We show the results of \emph{pkustk02} graph in Figs. \ref{fig:selfcheckout}(b) and \ref{fig:selfcheckout}(c) for several batches and iterations using 48 threads. BL$n$ represents a batch of size $n$. For the example graph, we see that small batches converge faster across iterations than large batches which is expected (Fig. \ref{fig:selfcheckout}(b)). For example, BL1 and BL256 achieve same level of \emph{Energy} around 1000 and 1100 iterations, respectively (marked as brown square box in Fig. \ref{fig:selfcheckout}(b)). As described earlier, our intuition is that BL256 will take less time to run for 1100 iterations than what BL1 takes to run for 1000 iterations. In Fig. \ref{fig:selfcheckout}(c), we show corresponding running time where we see that BL256 takes only around 9.7 seconds whereas BL1 takes around 433.6 seconds. B256 is faster because it offers more parallelism than BL1. We also notice here that BL256 optimizes more faster than BL512 and their run-times are approximately same. So, a trade-off between convergence and run-time is important to select a batch size. We have kept this as an option in our tool; however, after doing a rigorous set of experiments on several graphs we use a batch of 256 vertices for all of our next experimental results.
+
+
+\subsubsection{Batch Randomization}
+We conduct experiments for the randomization of batches which is a common practice in machine learning. We reported standard deviation as well as energy curves for different runs using \emph{3elt\_dual} graph (Figure S3 in supplementary file). From our experiments, we observed that randomized batch selection achieves better energy curve than fixed sequential batch selection but results are not deterministic i.e., for each run, output is different (similar but not same) even though all hyper-parameters are same. We can see a greater difference for a smaller number of iteration. Randomization also introduces overhead in total running time for reshuffling and it can not take advantage of optimal cache usage. Moreover, randomized batch selection does not make any significant improvement in layout. So, we keep sequential batch selection as our default option in \toolname{}.
+\begin{figure*}[ht]
+\includegraphics[width=0.33\linewidth]{figures/initialization.png}
+\includegraphics[width=0.33\linewidth]{figures/batchesenergy3.png}
+\includegraphics[width=0.33\linewidth]{figures/batchesruntime3.png}
+\vspace{-0.4cm}
+\caption{(a) Energy curves for greedy and random initialization (\emph{3elt\_dual} graph). (b) Energy curves ($\log$ scale) for different batches (\emph{pkustk02} graph). (c) Running time ($\log$ scale) for different batches of \toolname{} (\emph{pkustk02} graph).}
+\label{fig:selfcheckout}
+\end{figure*}
+%\vspace{-0.3cm}
+
+\subsubsection{Number of threads} 
+Using more threads not necessarily translates to faster runtime, especially for small graphs.
+This is because of the overhead of thread \emph{fork-join} model used in OpenMP.
+For larger graphs with more than 100,000 vertices, we recommend employing all available threads.
+For smaller graphs, users can consider using fewer threads. 
+Hence, the number of threads is provided as an option in \toolname.
+
+%It is recommended 
+%Choosing a higher number of threads does not always perform well especially when the graph has few number of vertices. This is mainly due to the overhead of thread \emph{fork-join} model. We restrict such unnecessary overhead by choosing a suitable value for threads. For \toolnameBH{}, we allow more than 32 threads in the default setting when number of vertices in the graph is more than one million; however, user can always reset the default value.
+% AA: It is not good to say 32 or any number here because it will be specific for Skylake machine that we are using.
+
+\begin{figure*}[ht]
+\includegraphics[width=0.33\linewidth]{figures/tvalues.png}
+\includegraphics[width=0.33\linewidth]{figures/strongs.png}
+\includegraphics[width=0.33\linewidth]{figures/weaksrev.png}
+\vspace{-0.4cm}
+\caption{(a) Energy values ($\log$ scale) for different multiplicative factor of $Step$ using \emph{3elt\_dual} graph. (b) \commentKhaled{Strong scaling: Running time ($\log$ scale) for different number of threads using a synthetic graph of $2^{18}$ vertices generated by \cite{lancichinetti2008benchmark}. (c) Weak scaling: Running time (seconds) for different number of threads and graph sizes.}}
+\vspace{-0.5cm}
+\label{fig:selfcheckout2}
+\end{figure*}
+
+\subsubsection{Step length or learning rate}
+Line 14 of Algorithm~\ref{euclid} uses a multiplicative factor for $Step$, which dictates both convergence and the quality of the final layout.
+Intuitively, we want to adapt the step length so that the algorithm takes bigger steps in the beginning but increasingly smaller steps as we move closer to the minimum energy.
+Fig.~\ref{fig:selfcheckout2}(a) shows layout energies at convergence with various multiplicative factors for the \emph{3elt\_dual} graph.
+%Here, a multiplication factor of 0.9 means that we reduce the step size by $10\%$ in every iteration.
+We observe that the factor of 0.999 (that is $0.1\%$ reduction of step length in every iteration) provides the best balance as the converged energy is minimum for this factor. 
+Hence, we use this multiplicative factor in all experiments with \toolname{}.
+We note that adaptive steps are also used in other force-directed layouts such as in the algorithm developed by Yifan Hu~\cite{hu2005efficient}.
+In this paper, we empirically identify an effective adaption policy so that \toolname{} converges faster.
+
+%\subsubsection{Multiplicative factor of step length}
+%In Algorithm \ref{euclid}, notice in line 14 that there is a multiplicative factor for $Step$. Different tool uses different technique for updating step size. For example, Yifan Hu \cite{hu2005efficient} used 0.9 and an adaptive update technique. In our tool, we select this multiplicative factor empirically based on convergence speed for different graphs. We show experimental results of multiplicative factor on \emph{3elt\_dual} graph in Fig.~\ref{fig:selfcheckout2}(a). We notice that if we increase this value from $0.09$, Energy decreases and when we reach $0.999$, Energy reaches to a minimal value. After that Energy increases with the increase of multiplicative factor. %A concrete theory may play important role for explanation to this characteristic which is beyond of this paper. For all of our further experiments, we use this multiplicative factor in all versions of \toolname{}.
+
+\subsection{Running Time and Scalability}
+\label{lab:runtime}
+We run all algorithms for 500 iterations using 47 threads (one thread per core) and report their runtime in Table~\ref{tab:runningtime}.
+Since OpenOrdG leaves out a core for kernel-specific tasks, we also leave a core unutilized for fairness in comparison.  
+In Table \ref{tab:runningtime}, we include time for all steps except file input/output operations.
+If we consider exact force calculations, \toolname{} is on average $15\times$ faster than ForceAtlas2 (min:$7.6\times$, max:$21.8\times$).
+For approximate force calculation, \toolnameBH{} is on average $2\times$ faster than OpenOrd (min:$1.4\times$, max:$9.5\times$).
+Both \toolnameBH{} and OpenOrd are faster than ForceAtlas2BH.
+Notice that OpenOrdG (that is Gephi's OpenOrd) also runs fast, but its layout quality is very low as seen in the next section.
+Overall, \toolnameBH{} is almost always the fastest algorithm as denoted by bold numbers in Table \ref{tab:runningtime}.
+We also tested tsNET~\cite{kruiger2017graph} to conduct some experiments (with perplexity and learning rate set to 800 and 6000, respectively). 
+We observe that tsNET can generate good layouts for small graphs, but failed to generate any layout for medium or bigger graphs in our experiments. 
+For small graphs like \emph{3elt\_dual}, tsNET took around 1 hour whereas other multi-threaded tools generated layout within few seconds. 
+Hence, we did not include tsNET runtimes in Table \ref{tab:runningtime}. 
+
+{\bf Thread and vertex scalability.} We now discuss the thread and vertex scalability of the three fastest algorithms: \toolnameBH{} (FLBH), ForceAtlas2BH (FA2BH), and OpenOrd (OO).
+As discussed in section \ref{lab:datasets}, we use a benchmark tool~\cite{lancichinetti2008benchmark} to generate graphs for the scalability experiment.
+Fig.~\ref{fig:selfcheckout2}(b) shows the thread scalability for a graph with $2^{18}$ vertices.
+We observe that both  \toolnameBH{}  and OpenOrd scale linearly with threads (cores), but  \toolnameBH{} is $\sim4\times$ faster than OpenOrd on all thread counts. 
+ForceAtlas2BH does not scale linearly, and it is generally not faster than OpenOrd.
+Fig.~\ref{fig:selfcheckout2}(c) shows the \commentKhaled{weak scalability where we use increasingly larger graphs varying number of threads. Fig.~\ref{fig:selfcheckout2}(c) starts with a graph of $2^{16}$ vertices running on 2 threads. Then, we increasingly double the problem size as well as computing resource, run experiments and report the runtime. Among all three algorithms, we observe that \toolnameBH{}'s work distribution remains balanced (i.e., curve remains horizontal). Hence, \toolnameBH{} shows superior weak scaling performance compared to other two algorithms.}
+
+{\bf Memory usage.} We measured the memory consumption of all algorithms using the {\myfont memory-profiler} python package.
+For the lxOSM graph, \toolname{}, \toolnameBH{}, ForceAtlas2, ForceAtlas2BH, OpenOrdG, and OpenOrd consumed maximum memory of 16.36MB, 30.34MB, 676.38MB, 1348.38MB, 1265.32MB and 14.12MB, respectively. 
+Gephi's ForceAtlas2, ForceAtlas2BH and OpenOrdG consumed higher memory than others possibly because of the high memory requirements of Gephi itself.
+In fact, ForceAtlas2BH failed to generate layouts for two large graphs due to its high memory consumption.
+In our algorithm, Barnes-Hut force approximation requires additional space to store the quad-tree data structure, and hence it consumed more memory than the exact force computation. 
+Overall, \toolnameBH{} can compute layouts faster without consuming significant memory. 
+
+
+%For this experiment, we run all tools for 500 iterations using 47 threads\footnote{For this experimental setup, we choose 47 because of OpenOrdG which by default obliges to use one less core than maximum available cores} and results are reported in Table \ref{tab:runningtime}. We measure running time of all tools for initialization and iterative optimization steps which excludes file input/output operations. In Table \ref{tab:runningtime}, we see that either \toolname{} or \toolnameBH{} is winner in all cases and it clearly indicates robustness of our algorithm compared to all other tools. For example, ForceAtlas2BH (FA2BH) takes 46.98 seconds for \emph{finan512} graphs whereas \toolnameBH{} takes only 10.53 seconds. For the same graph, multi-threaded version of OpenOrdG and OpenOrd take around 31.74 and 22.57 seconds, respectively. Notice that OpenOrdG also runs fast but we see later that the quality of layout is not good. Among all, Barnes-Hut version of our introduced \toolname{} is the fastest tool and generate good quality layout. Note that we do not report running time of tsNET as it could not generate layout for all graphs using our computing resources (even for \emph{finance256} graph, tsNET failed to generate layout). For small graph like \emph{3elt\_dual}, tsNET took around 1 hour whereas other multi-threaded tools generate layout within few seconds. So, we skipped tsNET for further experiments as high performance is our focus in addition to good quality layout. 
+
+%We also tested the memory usage by all tools using {\myfont memory-profiler} python package and observed that \toolname{}, \toolnameBH{}, ForceAtlas2, ForceAtlas2BH, OpenOrdG and OpenOrd consumed maximum memory of 16.36MB, 30.34MB, 676.38MB, 1348.38MB, 1265.32MB	and 14.12MB, respectively, for lxOSM graph. Note that Gephi's ForceAtlas2, ForceAtlas2BH and OpenOrdG consumed higher memory than others whereas our tool consumed significantly less memory to produce high quality layouts within very short time. In fact, for this high memory consumption, ForceAtlas2BH failed to produce layout for two big graphs using our computing resources. Barnes-Hut force approximation requires additional space to store quad-tree and hence consumed more memory than $O(n^2)$ version. In summary, \toolname{} and/or \toolnameBH{} perform well for efficient cache memory usage and processing vertices of a batch in parallel. 
+
+
+
+
+%We also show the scalability of \toolnameBH{} (BLBH), FA2BH and OpenOrd (OO) in Figs.~\ref{fig:selfcheckout2}(b) and \ref{fig:selfcheckout2}(c). All experimental setups are same as before. As discussed in section \ref{lab:datasets}, we use a benchmark tool by Lancichinetti et al. \cite{lancichinetti2008benchmark} to generate all graphs for this experiment. In Fig.~\ref{fig:selfcheckout2}(b), we show run time using different number of threads on a graph of $2^{18}$ vertices. We see that \toolnameBH{} is faster than other tools and almost linearly scalable over different number of threads. Our experiments also show that OpenOrd is scalable and faster than ForceAtlas2BH. In Fig.~\ref{fig:selfcheckout2}(c), we show scalability over different size of graphs using 32 threads for each tool. We observe that run time increases linearly for all tools.
+
+\begin{table}[!tb]
+\caption{Runtime for different methods. Lower value represents better result. BL, BLBH, FA2, FA2BH, OOG and OO represent \toolname{}, \toolnameBH{}, ForceAtlas2, ForceAtlas2BH, OpenOrdG and OpenOrd, respectively. Better results are shown in bold font.}
+\vspace{-4pt}
+\centering
+\begin{tabular}{|p{1.2cm}|p{0.63cm}|p{0.6cm}|p{0.65cm}|p{0.7cm}|c|p{0.8cm}|}
+\hline
+\multirow{2}{*}{\textbf{Graph}} & \multicolumn{6}{c|}{\textbf{Running time (seconds)}} \\ \cline{2-7} 
+                                & BL   & BLBH   & FA2   & FA2BH   & OOG   & OO  \\ \hline
+Powergrid	    &   \textbf{0.95}	&   0.98	&   20.73	&   3.04	&   1.67 & 1.43\\ \hline
+add32	&   1.03	&   \textbf{1.02}	&   20.75	&   3.15	&   1.71 &   1.45 \\ \hline
+ba\_network	&   1.42	&   \textbf{1.22}	&   25.47	&   3.61	&   2.18 & 1.78 \\ \hline
+3elt\_dual	&   2.92	&   \textbf{1.54}	&   54.6	&   4.87	&   3.17 & 2.67 \\ \hline
+PGP	&   4	&   \textbf{1.83}	&   68.67	&   6.26	&   4.18 & 3.26\\ \hline
+
+pkustk02	&   4.23	&   \textbf{1.98}	&   76.69	&   10.72	&   10.32 & 3.83 \\ \hline
+fe\_4elt2	&   4.33	&   \textbf{1.86}	&   75.4	&   6.34	&   4.21 & 3.35 \\ \hline
+bodyy6	&   12.3	&  \textbf{2.95}	&   143.08	&   9.69	&   6.75 & 5.85 \\ \hline
+pkustk01	&   16.23	&   \textbf{3.43}	&   242.72	&   18.49	&   15.33 & 7.25 \\ \hline
+OPF\_6000	&   29.75	&   \textbf{4.69}	&   266.96	&   18.31	&   12.45 & 8.95\\ \hline
+finance256	&   45.49	&   \textbf{5.4}    &   412.6	&   20.37	&   14.69 & 11.18\\ \hline
+finan512	&   185.8	&   \textbf{10.53}	&   1408	&   46.98	&   31.74 & 22.57\\ \hline
+lxOSM	&   -	&   \textbf{21.59}	&   -	&  72.30 	&  -  & 33.62 \\ \hline
+comYout.	&   -	&   \textbf{174.5}	&   -	&   1504.7	& -    & 1670.52 \\ \hline
+%af\_shell10	&   -	&   \textbf{221.27}	&   -	&   -	&  -  & 508.55\\ \hline
+Flan\_1565	&  -	&   \textbf{224.3}	&   -	&   -	&   - & 609.56 \\ \hline
+\end{tabular}
+\label{tab:runningtime}
+\vspace{-0.4cm}
+\end{table}
+
+
+
+
+\begin{table*}[!t]
+\centering
+\caption{Layouts of different graphs generated by different algorithms. BatchLayout convergence criteria was set to 1E-6. Number of iterations and running time are shown in supplementary file, Table S2.}
+\label{tab:convergedlayouts}
+
+\begin{tabular}{|c|p{2.5cm}|p{2.6cm}|p{2.6cm}|p{2.6cm}|p{2.5cm}|}
+\hline
+\textbf{Graph}   & \textbf{BatchLayout} & \textbf{BatchLayoutBH} & \textbf{ForceAtlas2} & \textbf{ForceAtlas2BH} & \textbf{OpenOrd} \\ \hline
+        \textbf{Powergrid} & \multicolumn{5}{|c|}{\includegraphics[height=1.8cm,width=0.8\linewidth]{layouts/convergedlayouts/us_powergrid_converged.png}}                                                                                                                \\ \hline
+
+\textbf{ba\_network}        & \multicolumn{5}{c|}{\includegraphics[height=1.8cm,width=0.8\linewidth]{layouts/convergedlayouts/ba_network_converged.png}}                                                                                                                 \\ \hline
+\textbf{3elt\_dual}        & \multicolumn{5}{c|}{\includegraphics[height=1.8cm,width=0.8\linewidth]{layouts/convergedlayouts/3elt_dual_converged.png} }                                                                                                                                                        \\ \hline
+\textbf{pkustk02}        & \multicolumn{5}{c|}{\includegraphics[height=1.8cm,width=0.8\linewidth]{layouts/convergedlayouts/pkustk02_converged.png}}                                                                                                                 \\ \hline
+\textbf{fe\_4elt2}        & \multicolumn{5}{c|}{\includegraphics[height=1.8cm,width=0.8\linewidth]{layouts/convergedlayouts/fe_4elt2_converged.png}}                                                                                                                 \\ \hline
+\textbf{bodyy6}        & \multicolumn{5}{c|}{\includegraphics[height=1.8cm,width=0.8\linewidth]{layouts/convergedlayouts/bodyy6_converged.png}}                                                                                                                 \\ \hline
+
+\textbf{pkustk01}        & \multicolumn{5}{c|}{\includegraphics[height=1.8cm,width=0.8\linewidth]{layouts/convergedlayouts/pkustk01_converged.png}}  \\ \hline
+
+\textbf{finan256}        & \multicolumn{5}{c|}{\includegraphics[height=1.8cm,width=0.8\linewidth]{layouts/convergedlayouts/finan256_converged.png}}  \\ \hline
+\end{tabular}
+\vspace{-0.2cm}
+\end{table*}
+
+\subsection{Visualization}
+We now visualize the layouts generated by all algorithms considered in the paper. 
+At first, we run \toolname{} until convergence (when the energy difference between successive iterations becomes less than $10^{-6}$).
+Then, all other algorithms including \toolnameBH{} were run for the same number of iterations that \toolname{} took to converge.
+The visualization from these layouts are shown in Table~\ref{tab:convergedlayouts}.
+The runtime and converged energy are provided  in supplementary Table S2, which shows that \toolnameBH{} runs much faster than other tools.
+Table~\ref{tab:convergedlayouts} demonstrates that \toolname{} and \toolnameBH{} produce \commentKhaled{readable} layouts that are comparable or better than ForceAtlas2 and ForceAtlas2BH, respectively.
+Generally, \toolnameBH{} and ForceAtlas2BH layouts are much better than OpenOrd.
+Gephi's OpenOrd generates inferior layouts; hence, we did not show them in Table~\ref{tab:convergedlayouts}.
+Note that \toolname{} uses Fruchterman and Reingold as its default energy model, which is different from the default model in ForceAtlas2. 
+Hence, \toolname{}'s superior layouts for some graphs (e.g., finan256) are not surprising because the FR model usually generates better layouts as was also reported in the ForceAtlas2 paper~\cite{jacomy2014forceatlas2}.
+ForceAtlas2 does not use FR as its default model possibly because of its higher computational cost (also reported in ~\cite{jacomy2014forceatlas2}).
+In this paper, we show that the FR algorithm runs much faster in our \toolname{} framework and can generate better layouts for some graphs. 
+
+In the scalability and runtime experiments, we showed results with a fixed 500 iterations. %(per iteration runtime is usually fixed for an algorithm). 
+Supplementary Table S1 shows the visualization from all algorithms after 500 iterations.
+In many cases, layouts after 500 iterations are close to the layouts at convergence. 
+Hence, many algorithms including \toolname{} provide ``number of iterations" as an option to users.   
+
+Both \toolname{} and ForceAtlas2 provide many options beside default options used in our experiments. 
+It is possible that tuning these parameters will generate better-quality layouts for some graphs.
+However, we stick to default parameters in this paper for simplicity and fairness. 
+OpenOrd may generate different layouts for the same graph when different numbers of threads are used.
+By contrast, \toolname{} and \toolnameBH{} generate the same layout for a given graph irrespective of number of threads. 
+
+
+\begin{figure}[!t]
+\vspace{-0.1cm}
+    \centering
+    \includegraphics[width=0.48\linewidth]{layouts/FLan_BatchLayoutBH_5000.png}
+    \includegraphics[width=0.48\linewidth]{layouts/Flan_OpenOrd_5000.png}
+    \caption{Layouts of \emph{Flan\_1565} graph (1.56M vertices and 114.2M edges) generated by \toolnameBH{} (left) and
+    OpenOrd (right).
+    %Layouts of Flan\_1565 which has around 1.56M vertices and 114.2M edges. We ran each tool for 5000 iterations to generate layout. \toolnameBH{} (left subfigure) took only 49 minutes to generate high quality layout whereas OpenOrd (right subfigure) took around 1 hour and 39 minutes though quality of layout is very poor. ForceAtlas2BH failed to allocate memory in our computing machine for this graph and could not generate any layout. \toolnameBH{} generates high quality layout in shortest possible time.
+    }
+    \vspace{-0.4cm}
+    \label{fig:verybiggraph}
+\end{figure}
+
+Finally, Fig.~\ref{fig:verybiggraph} shows the layout of \emph{Flan\_1565}, the largest graph in our dataset.
+We show layouts from \toolnameBH{} and OpenOrd after running them for 5000 iterations (ForceAtlas2BH went out of memory for this graph).
+For this graph,  OpenOrd's layout is not good enough even though we allow both algorithms to run for 5000 thousands of iterations. 
+Furthermore, OpenOrd took 1 hour and 39 minutes whereas \toolnameBH{} took 49 minutes to finish 5000 iterations. 
+This clearly demonstrates the effectiveness of \toolnameBH{} to visualize graph with hundreds of millions of edges.
+However, generating layouts in half an hour may not be good enough for certain applications.
+We plan to address this by implementing  \toolnameBH{} for distributed systems.
+%and for GPUs. 
+
+
+%We show visualization of all layouts in supplementary file, Table S1, for which we compared aesthetic measures. We see that \toolname{} and \toolnameBH{} generate better or competitive layouts for all graphs. Note that we select batch size as 256 which is suitable for big graphs but for small graphs we can select smaller batch size as it will not increase running time much but generate very good quality layouts. Actually, more better quality layouts are achievable by tuning several hyper parameters of \toolname{} and \toolnameBH{} which is a trade-off between running time and quality. For simplicity of explanation we used same hyper parameters for all graphs. We also notice that there is significant difference between OpenOrdG and original OpenOrd. When we observe this, we include both implementations in our experimental results for the sake of clarification. From layouts, we can conclude that OpenOrd is more appropriate to compare results than OpenOrdG though it offers more flexibility. As stated by authors, one drawback of OpenOrd is that it generates different layouts if we use different number of threads which is not aligned with scientific computation. Our \toolname{} and \toolnameBH{} generate same layout and report same energy value for different number of threads. 
+
+%We provide converged layouts of \toolname{} in Table \ref{tab:convergedlayouts} based on a threshold value of $10^{-6}$. All other tools including \toolnameBH{} were run for same number of iterations that \toolname{} took to converge. We provide this information along with runtime in supplementary file, Table S2, where we see that \toolnameBH{} runs much faster than other tools. In Table \ref{tab:convergedlayouts}, we also observe that \toolnameBH{} produces high quality layout which proves its effectiveness along with better running time.
+
+
+
+% Finally, we generate layout of \emph{Flan\_1565} graph for 5000 iterations using 48 threads and report layouts in Fig. \ref{fig:verybiggraph}. Note that ForceAtlas2BH failed to allocate heap memory in our computing machine for this big graph and thus could not generate any layout. Observe that \toolnameBH{} generates high quality layout within the smallest possible time than OpenOrd which clearly indicates effectiveness and efficacy of \toolnameBH{} for big graphs.
+
+\begin{table*}[!t]%[t]
+\caption{Comparison of Stress (ST) and Neighborhood preservation (NP) measures among all tools. For ST, a lower value means a better result and for NP, a higher value represents a better result. Better results are shown in bold font.}
+\vspace{-4pt}
+\centering
+\begin{tabular}{|c|c|c|c|c|c|l|c|c|c|c|c|c|}
+\hline
+\multirow{2}{*}{\textbf{Graph}} & \multicolumn{6}{c|}{\textbf{ST}}                            & \multicolumn{6}{c|}{\textbf{NP}}            \\ \cline{2-13} 
+                                & BL       & BLBH     & FA2       & FA2BH & OO & OOGH & BL & BLBH & FA2 & FA2BH & OOG & OO \\ \hline
+
+Powergrid	&	\textbf{1.3E+6}	&	1.6E+6	&	2.4E+6	&	2.2E+6	&	2.5E+6	&	2.4E+6	&		0.39	&	0.266	&	0.403	&	\textbf{0.408}	&	0.324	&	0.336 \\ \hline
+
+add32	&	2.2E+6	&	\textbf{1.9E+6}	&	5.3E+6	&	5.4E+6	&	6.2E+6	&	2.3E+6	&			0.453	&	0.347	&	\textbf{0.538}	&	0.523	&	0.362	&	0.409 \\ \hline
+
+ba\_network	&	2.8E+6	&	\textbf{2.5E+6}	&	3.4E+6	&	3.4E+6	&	3.9E+6	&	2.9E+6	&			0.357	&	0.295	&	0.457	&	0.452	&	0.384	&	\textbf{0.465} \\ \hline
+
+3elt\_dual	&	\textbf{5.6E+6}	&	6.6E+6	&	9.2E+6	&	8.0E+6	&	1.4E+7	&	1.1E+7	&			\textbf{0.38}	&	0.271	&	0.253	&	0.334	&	0.171	&	0.174 \\ \hline
+
+PGP	&	\textbf{8.2E+6}	&	1.2E+7	&	9.9E+6	&	9.8E+6	&	1.1E+7	&	8.8E+6	&			0.18	&	0.119	&	0.24	&	0.243	&	\textbf{0.266}	&	0.231 \\ \hline
+
+pkustk02	&	\textbf{3.7E+6}	&	4.4E+6	&	1.0E+7	&	1.1E+7	&	1.9E+7	&	8.1E+6	&			\textbf{0.649}	&	0.583	&	0.549	&	0.544	&	0.38	&	0.513 \\ \hline
+
+fe\_4elt2	&	\textbf{1.0E+7}	&	1.7E+7	&	1.2E+7	&	1.5E+7	&	2.1E+7	&	1.8E+7	&			\textbf{0.36}	&	0.25	&	0.319	&	0.289	&	0.222	&	0.207 \\ \hline
+
+bodyy6	&	\textbf{3.1E+7}	&	4.1E+7	&	3.4E+7	&	4.3E+7	&	6.1E+7	&	5.2E+7	&			0.213	&	0.205	&	\textbf{0.278}	&	0.251	&	0.217	&	0.124 \\ \hline
+
+pkustk01	&	\textbf{1.7E+7}	&	1.9E+7	&	1.8E+7	&	2.0E+7	&	4.1E+7	&	3.1E+7	&			0.513	&	0.398	&	\textbf{0.528}	&	0.523	&	0.373	&	0.396 \\ \hline
+
+\end{tabular}
+\label{tab:measures_st_np}
+\vspace{-0.2cm}
+\end{table*}
+
+
+\begin{table}[!t]
+\caption{\commentKhaled{Comparison of Edge uniformity (EU) measures among all tools. For this measure, lower value means better result.} Better result of each graph is shown in bold font.}
+\vspace{-4pt}
+\centering
+\begin{tabular}{|p{1.3cm}|c|p{0.7cm}|c|c|c|c|}
+\hline
+\multirow{2}{*}{\textbf{Graph}} &  \multicolumn{6}{c|}{\textbf{EU}}            \\ \cline{2-7} 
+                                & BL & BLBH & FA2 & FA2BH & OOG & OO \\ \hline
+
+Powergrid	&     0.83	&   \textbf{0.5}	&   1.46	&   1.33	&   1.93	&   1.18 \\ \hline
+
+add32	&   1.38	&   \textbf{1.04}	&   1.30	&   1.26	&   1.86	&   1.76 \\ \hline
+
+ba\_network	&     1.07	&   \textbf{0.58}	&   3.23	&   3.30	&   3.01	&   2.93 \\ \hline
+
+3elt\_dual	&   0.39	&   \textbf{0.39}	&   0.59	&   0.63	&   1.37	&   0.53 \\ \hline
+
+PGP	&  0.81	&   \textbf{0.65}	&   1.43	&   1.42	&   2.44	&   1.43 \\ \hline
+
+pkustk02		&   0.73	&   \textbf{0.67}	&   1.09	&   1.12	&   1.93	&   0.88 \\ \hline
+
+fe\_4elt2	&   \textbf{0.39}	&   0.53	&   0.53	&   0.51	&   1.55	&   0.48 \\ \hline
+
+bodyy6	&   0.76	&   0.80	&   \textbf{0.49}	&   0.51	&   1.64	&   0.79 \\ \hline
+
+pkustk01	&   	0.83	&   \textbf{0.70}	&   1.01	&   1.02	&   1.62	&  0.93 \\ \hline
+\end{tabular}
+\vspace{-0.5cm}
+\label{tab:measures_ec_eu}
+\end{table}
+
+\subsection{Comparison of Aesthetic Metrics}
+We quantitatively measure the quality of graph layouts using standard aesthetic metrics discussed in Section~\ref{sec:aesthetic_measure}.
+Similar to the runtime analysis, we measure aesthetic quality of layouts after running each algorithm for 500 iterations and report the numbers in Tables~\ref{tab:measures_st_np} and \ref{tab:measures_ec_eu}.
+\commentKhaled{There is no clear winner according to all metrics, which is expected since different algorithms optimize different energy functions. Table \ref{tab:measures_st_np} shows ST (lower is better) and NP measures (higher is better), where \toolname{} and \toolnameBH{} are better than other tools for ST measure and competitive with their peers for NP measure. Table \ref{tab:measures_ec_eu} shows EU (lower is better), where we observe that \toolnameBH{} is winner for most of the graph instances. Overall, \toolname{} and \toolnameBH{} perform better according to ST and EU measures and competitive according to NP measure.}
+
+%We report comparative results among different tools based on aesthetic measures in Tables \ref{tab:measures_ec_eu} and \ref{tab:measures_st_np} using 500 iterations. In Table \ref{tab:measures_ec_eu}, EC and EU measures are reported where lower value means better result. We observe that \toolname{} is competitive to ForceAtlas2 and performs better in some graphs for EC measure. For two graphs with large number of vertices and edges, we could not compute EC measure as it has very high time complexity. As mentioned earlier, \toolname{} misses some updates in each iteration while updating coordinates of vertices based on a batch. However, we see here that it does not effect so much to the quality measure and \toolname{} gets similar EC measure even after running same number of iterations. In EU measure, we see that \toolname{} and/or \toolnameBH{} dominate other tools which means our tool preserves edge uniformity very well towards layout generation.
+
+
+%We show quantitative comparison of ST and NP measures in Table \ref{tab:measures_st_np}. For ST, lower value means better result whereas high value of NP indicates better result. For ST, we observe that either \toolname{} or \toolnameBH{} performs better than other tools which is due to the advantage of using spring-electrical force update technique as underlying energy model. For NP measure, \toolname{} performs better than other tools in three instances out of nine and highly competitive in other instances. No single aesthetic measure can uniquely represent better quality of layout but a combination can reveal some feelings of better quality. We see that our tool clearly dominates in two measures and highly competitive in other two measures which are great advantages towards better quality layout.
+
+
+
+
+
+\section{Related Work}
+\label{sec:relatedworks}
+Graph drawing is a well studied problem in the literature. 
+In addition to the spring-electrical approach, there are other models such as the spectral method \cite{koren2003drawing}, and high-dimensional embedding \cite{harel2002graph}. 
+Recently, Kruiger et al.~\cite{kruiger2017graph} introduced tsNET based on stochastic neighbor embedding technique. 
+Due to space limitation, we restrict our discussion to force-directed approaches.
+
+Kamada and Kawai~ \cite{kamada1989algorithm} proposed a spring model where optimal drawing is obtained by minimizing stress.
+In their model, stress is represented by the difference between geometric distance and graph-theoretic shortest path distance. 
+The computational complexity of this model is high, and quad-tree based force approximation can not be applied to it~\cite{hu2005efficient}. 
+Other graph drawing algorithms that optimize a stress function also produce readable layouts~\cite{gansner2012maxent,meyerhenke2017drawing}, but they are generally prohibitively expensive for large graphs.
+
+Fruchterman and Reigngold (FR) proposed a spring-electrical model where an energy function is defined in terms of \emph{attractive} and \emph{repulsive} forces \cite{fruchterman1991graph}. 
+This model is computationally faster than the spring model, and quad-tree based force approximation can also be applied. 
+Yifan Hu introduced a multi-level version of force-directed algorithm~\cite{hu2005efficient}. In his approach, repulsive force can be approximated by a quad-tree data structure, resulting in one of the fastest sequential algorithms. \commentKhaled{Other efficient multi-level algorithm includes $FM^3$ \cite{hachul2004drawing} which was later integrated in OGDF library \cite{chimani2013open}. 
+Interestingly, Andreas Noack introduced the LinLog energy model which is very effective in capturing clusters in the graph layout~\cite{noack2003energy}.
+
+OpenOrd~\cite{martin2011openord} by Martin et al. is a parallel multi-level algorithm following the force-directed model.}
+OpenOrd is reasonably fast and generate layouts of large-scale graphs. 
+Finally, ForceAtlas2 by Jacomy et al. introduced a more general framework for graph layout combining various features (repulsive force approximation by Barnes-Hut approach, LinLog mode, etc.)~\cite{jacomy2014forceatlas2}. 
+ForceAtlas2 is known to generate continuous layouts as a user can stop the program anytime with valid (possibly unoptimized) layouts.
+Our work is influenced by ForceAtlas2 and covers many features available in ForceAtlas2.
+The ForceAtlas2 paper~\cite{jacomy2014forceatlas2} demonstrated that FR model can generate \commentKhaled{readable} layouts but it can be slower than other energy models. 
+In this paper, we addressed this challenge with a multi-threaded cache-efficient algorithm that is both faster and generates \commentKhaled{readable} layouts. 
+
+
+Recently, Zheng et al. used a sequential SGD approach for graph drawing, which optimizes stress to generate the layout of a graph~\cite{sgd28419285}. 
+However, their software is very slow as it considers graph theoretic distances in the optimization function. 
+Both ForceAtlas2 and OpenOrd can run in parallel and are available in Gephi's toolkit~\cite{bastian2009gephi}. 
+Force-directed algorithm has also been implemented in \commentKhaled{distributed platforms~\cite{arleo2017large,arleo2018distributed}} as well as for GPUs~\cite{brinkmann2017exploiting}.
+These tools  cannot be run on any server because they rely on special hardware. 
+We did not compare with these implementations because our objective in this paper is to develop a general-purpose and fast algorithm for multicore servers.
+
+
+%\section{Related Works}
+
+%Graph drawing problem has been studied well in the literature. In addition to spring-electrical approach, there are other models like spectral method \cite{koren2003drawing} and high-dimensional embedding \cite{harel2002graph}. Recently, Kruiger et al. \cite{kruiger2017graph} introduced tsNET which is based on stochastic neighbor embedding technique. This is a sequential algorithm and runs too slow. Due to space limitation, we restrict our discussion to force-directed approaches.
+
+%Kamada and Kawai proposed spring model where optimal drawing is derived by minimizing energy which is represented as difference between geometric distance and graph theoretic shortest path distance \cite{kamada1989algorithm}. The computational complexity of this model is high and quad-tree force approximation can not be applied to it as described in \cite{hu2005efficient}. There are other graph drawing algorithms that lie in this category of \emph{stress} optimization which also produces good quality layout \cite{gansner2012maxent,meyerhenke2017drawing}.
+
+%Fruchterman and Reigngold (FR) proposed a spring electrical model where energy function is derived in terms of \emph{attractive} and \emph{repulsive} forces \cite{fruchterman1991graph}. This model is computationally faster than spring model and quad-tree based force approximation can also be applied. Yifan Hu introduced a multi-level version of force-directed algorithm \cite{hu2005efficient} where a graph is coarsened into smaller one following few steps and reversed back by prolongation and some refinements which give an optimal layout. In this approach, repulsive force can be approximated by quad-tree data structure and this is one of the fastest sequential algorithm. Later, Andreas Noack introduced LinLog energy model which is very effective in capturing clusters in the graph layout \cite{noack2003energy}.
+
+%OpenOrd by Martin et al. is a multi-level algorithm using force-directed model which is very fast as it can run on a distributed system and generate layout for a graph of large size \cite{martin2011openord}. Finally, ForceAtlas2 by Jacomy et al. introduced a more general framework for graph layout combining various features (repulsive force approximation by Barnes-Hut approach, LinLog mode, etc.) which is considered as state-of-the-art tool \cite{jacomy2014forceatlas2}. This is a continuous model which can take advantage of multi-core architecture. Both ForceAtlas2 and OpenOrd are available in Gephi's toolkit \cite{bastian2009gephi}. A more recent tool by Zheng et al. uses sequential SGD approach for graph drawing which optimizes stress to generate layout of a graph \cite{sgd28419285}. But this tool is very slow as it considers graph theoretic distance in optimization function. Authors of \cite{jacomy2014forceatlas2} demonstrated that FR model can generate high quality layout but very slow. In this paper, we revisit FR model and observe that a multi-threaded cache efficient implementation can be much faster and generate high quality layout within shortest possible time. Force-directed algorithm has also been implemented in distributed platform~\cite{arleo2017large} as well as GPU \cite{brinkmann2017exploiting}, but these tools are machine dependent, and not portable. Thus, in this paper, our goal is to build a general purpose algorithm with many options for shared memory architecture that will be portable and useful for all users, and runs much faster than other tools to generate high quality layout.
+
+%We also run tsNET \cite{kruiger2017graph} to conduct some experiments though it is very slow and not effective for big graph visualization. We run tsNET tool using only one thread as it has no multi-threaded version and set perplexity and learning rate as 800 and 6000, respectively. We observe that it can generate good layout for small graphs but failed to generate any layout for medium or bigger graphs in our experiments. 
+
+
+\vspace{-0.2cm}
+\section{Discussions and Conclusions}
+In this paper, we present a parallel force-directed algorithm \toolname{} and its Barnes-Hut approximation  \toolnameBH{} for generating 2D layouts of graphs. 
+The presented algorithms are highly scalable, robust with respect to diverse classes of graphs, can be run on any multicore computer, and runs faster than other state-of-the-art algorithms. 
+%Our software can be run in any computer, but multicore processor  is recommended.
+Aside from carefully chosen default hyper-parameters (e.g., initialization, minibatch size, energy model, learning rate, convergence conditions), \toolname{} provides flexibility to let users choose hyper-parameters that are suitable for the graph.
+In terms of flexibility, \toolname{} is comparable to the flexibility of ForceAtlas2 and can be integrated with any visualization tool. 
+%which is a trade-off between quality and running time. More importantly, \toolnameBH{} can generate readable layout of a graph with hundred of thousands of vertices in multicore machines within few seconds which is a clear advancement over other tools.
+
+The high performance of \toolname{} comes from two important optimizations that we made. 
+First, \toolname{} exposes more parallel work to keep many processors busy. 
+More parallel work comes from our minibatch scheme, which is also a widely-used technique in training Deep Neural Networks. 
+Second, we incorporate cache-blocking technique commonly used to optimize linear algebra operations.
+Hence, this paper unifies two proven techniques from machine learning and linear algebra and delivers a high-performance graph layout algorithm.
+As a result, \toolname{} is highly scalable and runs significantly faster than other state-of-the-art tools. 
+
+%As discussed earlier, it has various features though we have shown few experimental results for the sake of space. We have employed several $(a,r)$-energy models so that those models can take advantage of high performance in shared memory. We have provided scripts to convert other graph file formats to matrix market format to increase the usability of our tool. %More importantly, our tool can generate readable layout of graphs having hundreds of thousands of vertices withing few seconds.
+
+
+%This high performance comes from careful implementations of efficient memory usage in shared memory architecture. We have shown results for scaling by varying the number of threads and the number of vertices which support the scalability of our tool.
+
+\toolname{} generates graph layouts without sacrificing their aesthetic qualities.
+We visually and analytically verified the quality of layouts for different classes of graphs covering grid networks, small world networks, scale-free networks, etc.
+In all cases, \toolname{} generates good layouts that are similar or better than its peers.
+
+%\textbf{Robustness and Quality:} To test the robustness of our tool, we chose different types of graphs including small world networks, scale-free networks, etc. For all these graphs, our tool performed better or competitively in terms of aesthetic measures. As shown in our visual representation (see Tab. \ref{tab:convergedlayouts}), the quality of a layout generated by our tool is also better.
+
+%\textbf{Easy to use and various options:} 
+
+\toolname{} is implemented as an open-source software with detailed documentation. 
+This software depends on standard C++ and OpenMP libraries and is portable to most computers.
+We use simple Python scripts to visualize layouts generated by our software. 
+Hence, we believe that \toolname{} will benefit many users in visually analyzing complex networks from diverse scientific domains.    
+
+
+While this paper only focuses on \commentKhaled{parallel} force-directed algorithms, other classes of algorithm might generate better layouts than the algorithms considered in this paper.
+For example, tsNET can generate better quality layouts when it converges. 
+However, such tools are often prohibitively expensive for large-scale graphs.
+For example, tsNET took 16 hours to generate a layout for \emph{OPF\_6000}, whereas \toolname{} generates a comparable layout in just few seconds.
+In fact, users can set a very low threshold in \toolname{}, decrease the batch size and increase number of iterations to get superior layouts from our software (e.g., see supplementary Table S4). \commentKhaled{We also compared our results with $FM^3$ available in OGDF library and found that \toolnameBH{} is always faster than $FM^3$ for non-engineered settings in OGDF library (see supplementary Table S9 for runtime details). For two large graphs of Table \ref{tab:datasets}, \toolnameBH{} is approximately $5\times$ faster than $FM^3$.}
+
+%For some graphs with more than 37K vertices in Table \ref{tab:datasets}, tsNET fails to generate any layout using our computing resources. And it takes more than 16 hours to generate a layout for \emph{OPF\_6000} graph whereas our tool can generate a readable layout within a few seconds. However, in our tool, we also keep this convergence criteria, which generate the best quality layout much faster than tsNET. Simply, users can set a very low threshold, decrease the batch size and increase number of iterations to get such layouts (see supplementary file, Table S4).
+
+This paper only considered shared-memory parallel algorithms since multicore computers and servers are prevalent in scientific community.
+However, \toolname{} can be easily implemented for GPUs and distributed-memory systems. 
+%We hope to extend \toolname{} using MPI architecture to build a heterogeneous system for very big graph visualization. 
+\commentKhaled{A distributed algorithm will require larger minibatches if only ``data parallelism" is used. 
+However, if we also use graph partitioning (which is equivalent to model parallelism in deep learning), we can have enough parallelism for large-scale distributed systems.} 
+%We also consider incorporating edge-bundling \cite{holten2009force} techniques with \toolname{} to remove edge cluttering and improve visual quality.
+Expanding \toolname{} for other high-performance architectures and improving the aesthetic quality for massive graphs remain our future work.
+
+%for meaningful visualizations of large-scale graphs. 
+
+%Hence, our future direction will be to integrate forced-directed edge bundling \cite{holten2009force} with \toolname{} to remove edge cluttering and improve visual quality. In addition, efficient implementation of multipole expansion method will also be a future development task.
+
+\section*{Acknowledgements}
+\commentKhaled{We would like to thank Stephen Kobourov, Katy Borner, Iqbal Hossain, Felice De Luca and Bruce Herr for helpful discussions and comments on measures. 
+%Authors also would like to thank anonymous reviewers whose comments have greatly improved the manuscript.
+Funding for this work was provided by the Indiana University Grand Challenge Precision Health Initiative.}
+
+\vspace{-0.15cm}
+\nocite{*}
+%\bibliographystyle{abbrv-doi-narrow}
+%\bibliography{main}
+\input{main.bbl}
+\end{document}

@@ -1,0 +1,45 @@
+\section{Discussion}
+\label{ss: discussion}
+
+In this section, we discuss how security scanners can defend against evasions (Section~\ref{ss:anti-evasion})
+and what limitations our work currently has (Section~\ref{ss:extension}).
+
+\subsection{Mitigating Evasions}
+\label{ss:anti-evasion}
+
+One way to mitigate dynamic evasions is to adapt general anti-evasion techniques from other domains to the problem of analyzing PDF documents.
+Several recent papers propose to load a potentially malicious file in environments targeted at revealing the malicious behavior of the file.
+For example, FuzzDroid~\cite{rasthofer2017making}, IntelliDroid~\cite{wong2016intellidroid}, and SmartDroid~\cite{zheng2012smartdroid} try to cause a potentially malicious Android app to reach ``sensitive'' API calls that would reveal malicious behavior, such as sending an SMS to a premium number.
+Adapting this technique to PDF scanners requires identifying sensitive APIs in PDFs.
+For known exploits, such APIs may be known, e.g., it is known that the ``Toolbutton'' exploit relies on calling the \code{app.addToolButton} API.
+Finding sensitive APIs for previously unknown exploits remains an open research problem.
+A related technique to cope with dynamic evasions is to explore multiple execution paths for branch decisions that depend on the environment in which a file is executed.
+Rozzle~\cite{rozzle-de-cloaking-internet-malware-2} proposes this idea for client-side JavaScript code.
+Adapting their approach is a promising direction for mitigating the environment-related dynamic evasions.
+
+To deal with UI-related evasions, dynamic scanners could adapt ideas used in PuppetDroid~\cite{gianazza2014puppetdroid} and PyTrigger~\cite{fleck2013pytrigger}.
+These approaches record an interaction trace from a human and play it back when loading the file under analysis to get through possible checks that guard the attack.
+One of the dynamic scanners studied in this work, Cuckoo, mitigates evasions using a simpler form of this idea: The scanner arbitrarily moves the mouse to simulate a human user~\cite{cuckoo_mouse_movement}.
+However, this mitigation technique is unlikely to work for evasions that require a more complicated user interaction, such as a ``captcha''.
+
+To identify files that behave differently in an analysis environment, some techniques compare the execution behavior of the file in several different environments, e.g. virtual and physical~\cite{balzarotti2010efficient}.
+Another kind of anti-evasion technique is to hide any difference between a virtual and a physical execution environment to fool the evasive malware~\cite{shi2018handling}.
+%
+Finally, to deal with the large number of possible evasions and combinations of evasions, training machine learning models to distinguish benign from malicious files seems to be a worthwhile direction~\cite{smutz2012malicious,vsrndic2013detection,laskov2011static,corona2014lux0r}.
+The main challenge for effectively training machine learning models is to obtain a sufficiently large set of labeled data.
+Our framework could serve as a generator of malicious training files that use different evasions and combinations of evasions.
+
+The high recall of SAFE-PDF~\cite{2018arXiv181012490J}, which is based on abstract interpretation of JavaScript code embedded in PDFs, shows that conservative program analysis may provide an effective way of detecting malicious behavior despite evasions. The downside of any conservative program analysis are spurious warnings, which the relatively high false positive ratio of SAFE-PDF confirms.
+
+
+
+\subsection{Choice of Scanners}
+\label{ss:extension}
+
+We focus on in-production, commercial security scanners because they represent the current state-of-the-practice, and recent academic scanners because they represent the state-of-the-art.
+The studied scanners contain more static than dynamic scanners because static scanners currently dominate the market.
+For example, the VirusTotal service aggregates more than 60 static scanners at the time of writing this paper~\cite{vt_engines_count}, whereas we could find only ten commercial dynamic scanners, out of which three consented to participate in this research.
+
+Our work should not be understood as a comparison of different scanners, but rather as a comparison of each scanner's effectiveness before and after adding evasions.
+The version of the scanners used in online aggregation services, which we use for the studied static scanners, may differ from the full-fledged scanners, because vendors may optimize the response time for an online service~\cite{pitfall}.
+

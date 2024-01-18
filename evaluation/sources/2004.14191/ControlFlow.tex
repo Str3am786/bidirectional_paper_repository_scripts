@@ -1,0 +1,234 @@
+
+%-------------------------------------------------------------------------------
+\section{Control Flow Analysis}
+\label{sec:controlflow}
+%-------------------------------------------------------------------------------
+In this section, we first consider the definition of a function at the binary level.
+Then, we discuss sliced microexecution, our proposed method for jump table analysis.
+\subsection{Function Definitions}
+\label{sec:function-definitions}
+
+The notion of function is important to our approach as it determines the scope of CFG and, consequently, the correctness of dominance relationships.
+Functions are well-defined constructs in the source code.
+However, compiler optimizations such as function splitting and inlining significantly change the layout of corresponding binary-level functions.
+
+Fortunately, these optimizations are not of concern to us as long as \textit{well-formed} function definitions are given to {\bcov}.
+A function is defined by the pair $F=(s,z)$ where $s$ and $z$ are start address and byte size respectively.
+A function can have a set of \textit{entry} and \textit{exit} points where control flow enters and leaves the function respectively.
+We say that a function definition is well-formed if
+(1)~its area does not overlap with other functions, and
+(2)~all of its basic blocks are reachable only through its entries.
+
+\textbf{Definitions source}.
+Our tool uses linker symbols as a source of well-formed function definitions.
+These symbols, unlike debug symbols, are available by default in all builds.
+In stripped binaries, {\bcov} can read function definitions from call-frame information (CFI) records which can be found in the \texttt{.eh\_frame} section.
+This section stores the data necessary for stack unwinding and is part of the loadable image of the binary, i.e., is not stripped.
+These records must be available to enable C++ exception handling.
+However, they are typically available in C binaries as well since they
+are needed for crash reporting, among other tasks.
+
+Note that CFI records might not contain all the functions defined in linker symbols.
+For example, developers might exclude CFI records of leaf functions to save memory.
+However, we empirically observed that function definitions in CFI records largely match those found in linker symbols.
+Additionally, in the unlikely case where CFI records are unavailable,
+we may still resort to function identification techniques such as~\cite{Andriesse2017,BYTEWEIGHT2014Bao}.
+
+
+\textbf{Function entries}.
+The main entry of a function is trivially defined by its start address.
+Other functions can either \textit{call} or \textit{tail-call} only the main entry.
+We have empirically validated this assumption in our dataset.
+That is, we have not found any instance where a (direct) function call targets an internal basic block in another function.
+%~\footnote{We found a few functions that have \textit{intra-procedural} calls. They were found only in \texttt{libopencv\_core}.}
+However, non-local control transfer mechanisms, such as \texttt{longjmp} and exception handling, violate this assumption.
+We refer to possible targets of non-local control transfer as auxiliary function entries.
+Such entries are not dominated by, or even unreachable from, the main function entry.
+Auxiliary entries of \texttt{longjmp} are identified during CFG construction.
+They are simply the successor of each basic block that calls \texttt{setjmp}.
+
+The identification of auxiliary entries used in exception handling is more elaborate.
+The Itanium C++ ABI specifies the exception handling standard used in modern Unix-like systems.
+Of interest to us in this specification is the \textit{landing pad} which is a code section responsible for catching, or cleaning up after, an exception.
+A function can have several landing pads, e.g., it can catch exceptions of different types.
+We consider each landing pad to be an auxiliary entry.
+Collecting landing pad addresses requires {\bcov} to iterate over all CFI records in the \texttt{.eh\_frame} section.
+More specifically, {\bcov} examines all Frame Description Entry (FDE) records looking for a pointer to a language-specific data area (LSDA).
+If such a pointer exists, then {\bcov} parses the corresponding LSDA to extract landing pad addresses.
+%Note that LSDAs can generally  be found in the \texttt{.gcc\_except\_table} section.
+
+\textbf{Function exits}.
+Our tool analyzes the CFG to identify the basic blocks where the control flow leaves a function.
+We consider two parameters 
+(1)~the type of the control-transfer instruction which can be \texttt{jmp}, \texttt{call}, or \texttt{ret}, and
+(2)~whether it is a direct or indirect instruction.
+A \texttt{jmp} targeting another function is a tail-call and generally also an exit point.
+However, the jump table analysis discussed in section \ref{sec:jumptable} can determine that certain indirect \texttt{jmp} are intra-procedural, i.e., local to the function.
+On the other hand,  a \texttt{call} typically returns, i.e, is not an exit point, except for calls to non-return functions.
+The non-return analysis implemented in {\bcov} is responsible for identifying such functions.
+Finally, we consider all \texttt{ret} instructions to be exit points.
+
+Our model of a function occupying a contiguous code region is simple; yet, we found it to be consistent with our large dataset.
+Moreover, it can be augmented with additional analyses to identify function entries and exits.
+This provides enough flexibility to handle special situations that might arise in practice, 
+for example, using \texttt{ret} to implement indirect calls in Retpoline~\cite{RetpolineTurner}.
+
+
+\subsection{Jump Table Analysis}
+\label{sec:jumptable}
+
+Recovering the targets of indirect control transfer instructions is desirable in several applications such as control-flow integrity.
+However, this problem is, in general, undecidable, which means that we can only hope for approximate solutions, i.e. , either to over-approximate or under-approximate the actual set of targets.
+Nevertheless, the \texttt{switch} statement in C/C++ remains amenable to precise analysis.
+It is commonly implemented as an indirect \texttt{jmp} that is based on single variable indexing into a look-up table. 
+This index variable is intra-procedurally bounded.
+
+The analysis of jump tables enables us to
+(1)~increase CFG precision,
+(2)~instrument jump table data, and
+(3)~avoid disassembly errors.
+The latter issue is relevant to architectures such as ARM where compilers inline jump table data in the code section.
+Fortunately, in x86-64, such data typically reside in a separate read-only section, which enables correct disassembly using linear sweep~\cite{AndriesseUsenixSec16}.
+
+
+The analysis of jump tables can be challenging as compilers enjoy a lot of flexibility in implementing \texttt{switch} statements.
+A jump table can be \textit{control-bounded} by checking the value of the index against a bound condition.
+Alternatively, should the expected values be dense, e.g., many values below 16, the compiler might prefer a \textit{data-bounded} jump table, e.g, using a bitwise \texttt{and} with \texttt{0xf}.
+Additionally, compilers are free to divide a \texttt{switch} with many \texttt{case} labels into multiple jump tables.
+Our goal in this analysis is to recover information about each individual jump table.
+This includes its control flow targets and total number of entries.
+
+We propose sliced microexecution, a novel method for jump table analysis which combines classical backward slicing with microexecution~\cite{Godefroid2014}.
+The latter refers to the ability to emulate any code fragment without manual inputs.
+Basically, for each indirect \texttt{jmp} in a function, {\bcov} attempts to test the sequence of hypotheses depicted in Table~\ref{tab:jump-table-hypothsis}.
+If they are invalid then {\bcov} aborts the analysis and considers this \texttt{jmp} to be a tail-call.
+Otherwise, {\bcov} proceeds with the actual recovery depending on the type of jump table which can generally either be control-bounded or data-bounded.
+
+
+\begin{table}[t!]
+    \centering
+    \small
+    \setlength\tabcolsep{3pt}
+    %    \renewcommand{\arraystretch}{1}
+    \caption{Hypotheses tested, or falsified, to analyze a jump table. Backward slicing answers \#1 to \#3. Microexecution is used to falsify hypotheses and recover the jump table.}
+    \label{tab:jump-table-hypothsis}    
+    \begin{tabularx}{\columnwidth}{@{}lp{5.2cm}p{2.4cm}@{}}
+        \\ 
+        &
+        \textbf{Hypothesis} &
+        \textbf{Action}   \\
+        \toprule
+        (1)   & Depends on constant base address?    &
+        \makecell[tl]{if yes test (2)\\else abort}\\
+        (2)   & Is constrained by a bound condition?    &
+        \makecell[tl]{if yes test (3)\\else assume (4)} \\
+        (3)   & Bound condition dominates jump table?    &
+        \makecell[tl]{if yes do recovery\\else assume (4)} \\
+        (4)   & \tblentry{Assume jump table is data-bounded}    &
+        \makecell[tl]{do recovery and\\try to falsify} \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+
+We discuss this method based on the example shown in Figure~\ref{fig:jump-table-example}.
+First, {\bcov} has to test hypothesis \#1 by backward slicing from \texttt{0x9f719} until it reaches instruction at \texttt{0x9f712} which has a memory dependency.
+This dependency has a base address in \texttt{r15}.
+So is this base address constant?
+Backward slicing for \texttt{r15} shows that it is constant indeed.
+Note that a jump table should depend on a single variable used as the index.
+The table's base address is a constant determined at compile time.
+
+We move now to test hypothesis~\#2.
+It is tested by spawning a \textit{condition slicer} upon encountering each conditional \texttt{jmp}, .e.g, instruction at \texttt{0x9f707}.
+This slicer is used to check whether the variable influencing the bound condition is also the jump table index.
+This is the case in our example at \texttt{0x9f6f0} where the value in \texttt{r12b} influences both the condition at \texttt{0x9f707} and the jump table index.
+Now that a bound condition is found we need to test it against hypothesis~\#3.
+
+A jump table might be preceded by multiple conditional comparisons that depend on the index.
+We apply heuristics to quickly discard the ones that can not represent a bound condition, e.g., comparisons with zero.
+However, there can still be more than one candidate.
+Here, we leverage the fact that a bound condition should dominate the jump table.
+Otherwise, a path in CFG would exist where the index value remains unbounded.
+We check for dominance during the backward CFG traversal needed for slicing.
+Basically, it should not be possible to bypass the bound condition.
+
+Backward slicing produces a program slice (code fragment) which captures the essential instructions affecting the jump table.
+This slice represents a univariate block-box function with the index as its input variable.
+Modifying the index should trigger behavioral changes especially in the observed jump address at the output.
+Assuming that this slice represents a jump table, we reason about its behavior using microexecution.
+Also, we try to validate our assumption by widely varying the index.
+
+Before microexecuting a slice, {\bcov} first loads the binary using a built-in ELF loader.
+Then, it initializes a valid memory environment for the given program slice.
+For example, it allocates memory for the pointer \texttt{[rsp+0x8]} and assigns a valid address to \texttt{rsp}.
+It is now possible to start ``fuzzing'' the index.
+However, the expected behavior of the slice depends on the type of jump table.
+
+
+\begin{figure}[t!]
+\centering
+\begin{lstlisting}[style=custom-x64]
+9f6a1: lea    r15,[rip+0xe69e4] ; set table base
+                    .
+9f6f0: movzx  eax,r12b    ; index is r12b
+9f6f4: cmp    r12b,0x5b   ; bound comparison
+9f6f8: mov    QWORD PTR [rsp+0x8],rax
+|\HiLight|9f6fd: mov    rax,QWORD PTR [rbx]
+|\HiLight|9f700: mov    r13,QWORD PTR [rax+0x10]
+|\HiLight|9f704: mov    ecx,r13d
+9f707: ja     9f880   ; jump to default case
+9f70d: mov    rax,QWORD PTR [rsp+0x8]
+9f712: movsxd rax,DWORD PTR [r15+rax*4]
+9f716: add    rax,r15
+9f719: jmp    rax     ; jump to matching case
+\end{lstlisting}
+\vspace{-2pt}
+    \caption[workflow]{Jump table example from \textsf{perl}~v5.28 compiled with \textsf{gcc}~v7.3.
+        Highlighted instructions are not part of the backward slice.
+        The jump table base is set relatively far at \texttt{0x9f6a1}.}
+    \Description{Jump table example from perl v5.28 compiled with gcc v7.3}
+    \label{fig:jump-table-example}
+\end{figure}
+
+
+In control-bounded jump tables, a change in behavior must be observed in the intervals $[0,b)$ and $(b,\plusinfty)$ where $b$ is the bound constant.
+This constant is located in the first instruction that sets the flags before the bound condition.
+In our example, this is the instruction at \texttt{0x9f6f4}.
+{\bcov} tests 24 index values in total, 8 of which are sampled from $[0,b]$ including $0$, $b-1$, and $b$.
+The remaining 16 values increase exponentially, in powers of 2, starting from $b+1$.
+We found this scheme to give us high confidence in the results.
+
+The jump table is expected to target an instruction inside the current function for most inputs in $[0,b)$.
+On the other hand, the jump table should not be reachable for all inputs in $(b,\plusinfty)$.
+That is, the bound condition should redirect control flow to the default case.
+Should the behavior of the program slice not match what we expect from a control-bounded jump table,
+then we abort and assume that it is data bounded.
+Note that we are not strict about the behavior for input $b$ since the bound condition might check for equality.
+
+Assuming that a given indirect \texttt{jmp} represents a data-bounded jump table, we need
+effective techniques to (1) stop backward slicing, (2) validate our assumption, and (3) explore
+the bound limits.
+Note that compilers might use more than one bitwise instruction to bound the index. 
+Moreover, developers might prefer computed gotos over switch statements. ~\footnote{Computed gotos is a \textsf{gcc} extension to C which is also supported in \textsf{clang}.}
+In this case, they need to assume responsibility for checking index bounds. 
+
+To cope with this implementation diversity, bcov continues backward slicing as long as the current slice depends on only one variable. 
+For example, assume that \texttt{rax} holds the index and is later used as a base register to read from memory. 
+This means that the current slice would depend on \texttt{rax} as well as the variable accessed in memory. 
+Backward slicing would stop before this increase in dependencies.
+Then, \bcov{} executes the program slice 24 times, each time increasing the index exponentially while setting the least significant bits to one.
+This allows us to explore the bound limits in the common case of bitwise \texttt{and} with a bitmask like \texttt{0xf}.
+Other bit patterns are also tried to better penetrate combinations of bitwise instructions.
+Our key insight is that we should not have full control over the jump target.
+That is, arbitrary change in the index should be reflected in a \textit{constrained} change in the jump target.
+Additionally, jump targets need to be located in the current function similar to the case of control-bounded jump tables.
+Should the program slice withstand these diverse tests, then we can be highly confident that it represents a jump table.
+
+Our evaluation shows that sliced microexecution is precise and robust against various compiler optimizations.
+It allowed {\bcov} to reliably recover the jump tables in the core loop of the Python interpreter, located in function \texttt{\_PyEval\_EvalFrameDefault}. Note that these jump tables are compiled from complex computed gotos.
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "binder"
+%%% End:

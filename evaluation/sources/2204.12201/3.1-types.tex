@@ -1,0 +1,45 @@
+\subsection{Modular and bit-level arithmetic}\label{ss:modcom}
+
+Some FHE schemes define arithmetic addition, subtraction, and multiplication on numeric rings, but not other arithmetic such as division or comparison. While some applications may not require any other operation, a programmer is accustomed to having all programming operations available in their programs.
+For example, the C++ statement "{\tt{}if(a<b)c+=a}" and its corresponding data-oblivious form: "{\tt{}c+=(a<b)*a}", cannot be evaluated with an FHE scheme where the comparison operation is not defined.
+Notably, addition, subtraction, and multiplication on integers is an incomplete set of arithmetic operations; for instance, the comparison operation cannot be reduced to these three operations. However, when operating on bits, the same set of operations is universal, having addition and subtraction correspond to logical \texttt{XOR} and multiplication to logical \texttt{AND}.
+
+\eee\ solves this problem by allowing the programmer to use data types constructed out of sequences of encrypted bits. Indeed, as the least possible requirement to the computing capacity, an FHE scheme must be able to evaluate the logic \texttt{NAND} (or \texttt{NOR}) gate on ciphertexts, since this elementary function is sufficient for universal computation. 
+In this way, the variables in the expression "{\tt{}c+=(a<b)*a}" are defined as \emph{integral types} where all three operations (comparison, multiplication, and addition) are performed using bit-level arithmetic circuits. We call this computation {\it bit-level arithmetic}, as opposed to the natively provided {\it modular arithmetic}, where addition and multiplication are performed directly on ciphertexts.
+
+The transition from modular to bit-level arithmetic is straightforward: Since
+the encrypted bit values are limited to 0 and~1, logic gates, such as \texttt{AND}, \texttt{XOR}, \texttt{NOT}, etc, can be expressed via the following expressions:
+\vspace{-0.2cm}
+\begin{equation*}\label{eq:logic}
+\begin{split}
+x \ \texttt{AND} \ y = xy,& \qquad x \ \texttt{NAND} \ y = 1-xy \\
+x \ \texttt{OR} \ y = x+y-xy,& \qquad x \ \texttt{NOR} \ y = 1-(x \ \texttt{OR} \ y) \\
+x \ \texttt{XOR} \ y = x+y-2xy,& \qquad x \ \texttt{XNOR} \ y = 1-(x \ \texttt{XOR} \ y) \\
+ \texttt{NOT} \ x = 1-x,& \qquad \texttt{MUX}(x,y,z) = x(y-z)+z, \\
+\end{split}
+\end{equation*}
+
+\noindent where \texttt{MUX} is the multiplexer operation (as in {$x$?$y$:$z$}). The set of values $\{0,1\}$ is closed under the above set of expressions. 
+In this paper, we use the term \emph{homomorphic gates} to describe logic gates operating on encrypted bits. Given these homomorphic gates, higher level operations (comparison, addition, multiplication) can be built using standard combinational arithmetic circuit design, which allows to perform any programming operation, i.e. giving the full spectrum of C++ arithmetic. Gate equations simplify for plaintext modulo $2$; e.g. XOR gate does not require multiplication, as \mbox{$x \ \texttt{XOR} \ y = x+y \bmod 2$}.
+
+\innersection{Data types}
+We define three data types for bit-level arithmetic, \secuint, \secint, and \secbool, and one for modular arithmetic, \secmod. 
+A \secuint\ or \secint\ variable is an array of ciphertexts, each encrypting either zero or one. \secuint\ is comparable to \texttt{unsigned int}, while \secint\ corresponds to \texttt{int}.
+The third type is \secbool, which is a type derived from \secuint\texttt{<1>}. It is the secure equivalent of \texttt{bool}.
+For modular arithmetic, there is only the native type, which operates modulo the plaintext modulus. We call this type \secmod.
+
+With bit-level arithmetic, we can express programs with operations not supported by modular arithmetic.
+Listing~\ref{list:fibs} demonstrates the transition from plaintext computation to secure computation: Integer variables are declared with the secure type \secuint; the rest of the code remains the same.
+%\footnote{\secuint\ is the secure equivalent of \texttt{unsigned int}. We discuss signed integers later.} Note that the type is parameterized with the size. 
+In encrypted computation, increasing the number of bits of integral types can lead to a dramatic increase in performance overhead.
+For this reason, we define the bit size as a template specialization.
+% As experimental results demonstrate, even 1 bit can make significant difference in performance, affecting the practicality dimension. 
+Explicit size declaration can be found in functional programming languages, so the programmer may already be familiar with this practice.
+In the example of Listing~\ref{list:fibs}, all variables are 8 bits (lines 3, 4).
+
+The postfix {\tt{}\_E} after each constant provides encrypted values used in variable initialization of integral type variables.
+% The configuration file with the specifications of the encryption defines the type name and postfix used for constants in the program.
+\eee\ automatically encrypts and replaces the plaintext constants with their encrypted representations, so the final binary does not have information about the initial values used in the program. 
+
+\input{list/fib_e3_secint.tex}
+

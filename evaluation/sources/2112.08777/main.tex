@@ -1,0 +1,198 @@
+
+\documentclass[11pt,a4paper]{article}
+\usepackage[]{acl}
+\usepackage{latexsym}
+\usepackage{arydshln}
+\usepackage{soul}
+
+\renewcommand{\UrlFont}{\ttfamily\small}
+\usepackage{microtype}
+
+
+
+
+\usepackage{array}
+\usepackage{pifont}
+\usepackage{tabularx}
+\usepackage{adjustbox}
+\usepackage{multirow}
+\usepackage{enumitem}
+\usepackage{xspace}
+\usepackage{tcolorbox}
+\usepackage{booktabs,amsfonts,dcolumn}
+\usepackage{url}
+\usepackage{amsmath,amsthm,amsfonts,amssymb,bm,stmaryrd}
+\usepackage[noorphans,vskip=0.75ex,leftmargin=2ex]{quoting}
+
+\usepackage{amsmath}%
+\usepackage{kantlipsum}
+\usepackage{tabularx}
+\usepackage[utf8]{inputenc} %
+\usepackage[T1]{fontenc}    %
+\usepackage{url}            %
+\usepackage{booktabs,multirow}       %
+\usepackage{amsfonts}       %
+\usepackage{nicefrac}       %
+\usepackage{microtype}      %
+
+
+\usepackage{graphicx}
+\usepackage{times}
+\usepackage{epsfig}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{xcolor,vwcol}
+\usepackage{booktabs}
+\newcommand\numberthis{\addtocounter{equation}{1}\tag{\theequation}}
+
+
+\usepackage[OT6,T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+
+\DeclareMathOperator{\E}{\mathbb{E}}
+
+\usepackage{mathtools}
+\DeclarePairedDelimiterX{\norm}[1]{\lVert}{\rVert}{#1}
+\usepackage{multicol}
+\usepackage[linesnumbered,ruled,vlined]{algorithm2e}
+\usepackage{setspace}
+
+\newcommand{\pushline}{\Indp}%
+\newcommand{\popline}{\Indm\dosemic}%
+\let\oldnl\nl%
+\newcommand{\nonl}{\renewcommand{\nl}{\let\nl\oldnl}}%
+
+\DeclareMathAlphabet{\pazocal}{OMS}{zplm}{m}{n} 
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{colortbl}
+
+\usepackage{booktabs} %
+\usepackage{subcaption}
+\usepackage{times}
+\usepackage{latexsym}
+\usepackage{makecell} 
+\usepackage{amsfonts} 
+\usepackage{amsmath} 
+\usepackage{amssymb} 
+\newcommand{\mC}[0]{\mathcal{C}}
+\newcommand{\mCt}[0]{\mathcal{C}_T}
+\newcommand{\mCv}[0]{\mathcal{C}_V}
+
+\newcommand{\bridge}[1]{{\color{orange} \textbf{\textit{#1}}}}
+\newcommand{\support}[1]{{\color{blue}\textit{#1}}}
+\newcommand{\answer}[1]{{\color{green!55!black}\textbf{#1}}}
+\newcommand{\sentid}[1]{{\color{green!55!black}#1}}
+\newcommand{\armenian}{\fontencoding{OT6}\fontfamily{cmr}\selectfont}
+\DeclareTextFontCommand{\textarmenian}{\armenian}
+
+
+\newcommand\BibTeX{B\textsc{ib}\TeX}
+
+\definecolor{brightmaroon}{rgb}{0.76, 0.23, 0.28}
+\newcommand{\ac}[1]{{\textcolor{brightmaroon} {[#1 -- AC]}}}
+\newcommand{\neww}[1]{{\color{black}{#1}}}
+\renewcommand{\sectionautorefname}{\S}
+\renewcommand{\subsectionautorefname}{\S}
+\renewcommand{\subsubsectionautorefname}{\S}
+\newcommand{\sect}{\S}
+\newcommand{\red}[1]{\textcolor{black}{#1}}
+
+\input{header}
+
+\title{Long Context Question Answering via Supervised Contrastive Learning}
+
+\author{Avi Caciularu$^{\clubsuit}\thanks{\;\; Work partly done as an intern at AI2.}$\hspace{1em}
+\textbf{Ido Dagan$^\clubsuit$ \hspace{1em}Jacob Goldberger$^{\spadesuit}$ }\hspace{1em} Arman Cohan$^{\diamondsuit,\heartsuit}$\vspace{6pt}\\  
+    $^\clubsuit$Computer Science Department, Bar-Ilan University, Ramat-Gan, Israel\\
+    $^\spadesuit$Faculty of Engineering, Bar-Ilan University, Ramat-Gan, Israel\\
+    $^\diamondsuit$Allen Institute for AI, Seattle, WA\\
+    $^\heartsuit$Paul G. Allen School of Computer Science, University of Washington, Seattle, WA\\
+    {\small\tt avi.c33@gmail.com, armanc@allenai.org} \\
+    {\small\tt dagan@cs.biu.ac.il, jacob.goldberger@biu.ac.il }
+}
+\date{}
+
+\begin{document}
+
+
+\maketitle
+\input{abstract}
+
+\input{intro}
+
+\input{background}
+
+
+
+
+\section{Question-Evidence Contrastive Loss}
+\label{sec:method}
+In this section, we elaborate on our novel proposed contrastive loss term, combining question-evidence similarity maximization (\sect\ref{subsec:qe_sim}), and question-type aware projections (\sect\ref{subsec:qt_aware}).
+
+\subsection{Question-Evidence Similarity}
+\label{subsec:qe_sim}
+To encourage the long-context transformer model to capture relationships between the question and evidence sentences, we introduce an additional sequence-level loss that compares and contrasts the question with context sentences. 
+
+The additional proposed loss $\mathcal{L}_{QE}$ is based on the InfoNCE loss~\cite{oord2018representation}, and is applied over instances consisting of triplet of vectors representing the question, an evidence sentence and distractor sentences. The loss encourages the question and evidence representations to become closer to each other, while pushing the question and distracting sentences away. 
+
+Formally, the contrastive loss is defined as the sum of negative log-likelihood losses over all input examples, where each loss term discriminates the positive units from negative ones:
+\begin{align}\label{eqn:loss}
+    \mathcal{L}_{QE_i} = -\log \sum\limits_{s^+ \in \mathcal{S}^+_i} \left(\frac{e^{sim(s^+, q_i)/\tau_k}}{\sum\limits_{s \in \mathcal{S}_i} e^{sim(s, q_i)/\tau_k}}\right),
+\end{align}
+where $s$ ($q_i$) is the sentence (question) marker vector representation (see \texttt{$\langle$s$\rangle$} and \texttt{$\langle$/s$\rangle$} in Fig.~\ref{fig:model})%
+, $\tau_k$ is the configurable temperature hyperparameter, and $sim(\cdot)$ is a similarity metric. $\mathcal{L}_{QE_i}$ serves a single example, and the final aggregated loss ${\mathcal{L}_{QE}}$ is obtained by averaging over all the examples.
+
+We incorporate $\mathcal{L}_{QE}$ into the main QA span extraction/generation loss $\mathcal{L}_{QA}$ using the augmented loss:
+\begin{equation*}
+{\mathcal{L}=(1-\lambda)\cdot\mathcal{L}_{QA}+\lambda\cdot\mathcal{L}_{QE},}
+\end{equation*}
+where $\lambda$ is a weighting hyperparameter. 
+
+
+The underlying $sim(\cdot)$ can take the form of a non-parametric similarity function, e.g., the dot product ($sim\left(s, q\right){=}s^\top q$) or the cosine similarity ($sim\left(s, q\right){=}\frac{s^\top q}{\norm{s}\norm{q}}$). However, we show empirically that using such similarity over the raw representations harms the performance results of the model, since seemingly, it is hard to find a shared representation that should optimize the two loss functions. Hence, we adopted linear projections, per question type, to cast the similarity learning objective into proxy linear spaces.
+
+
+
+
+\subsection{Incorporating Question-Type Projections}
+\label{subsec:qt_aware}
+\red{Long-context QA benchmarks often provide a question-type label per instance as an additional challenge, such as ${\text{\{yes, no, span\}}}$ for HotpotQA. We hypothesize that maximizing question-evidence similarity under a question-type-specific sub-space can enable more flexibility and inductive bias to the model, for producing better representations and further improving the performance.}
+Following \citet{iter-etal-2020-pretraining}, we define the following similarity function:
+\begin{equation}
+sim_k\left(s,q\right)=s^\top W_k q,
+\label{eq:first_s}
+\end{equation}
+where $k$ is the expected question type and $W_k$ is the corresponding learnable projection matrix. Such linear projections ensure that a specific subspace per question type exists. We additionally incorporate different temperature hyperparameters $\tau_k$ per question type in Eq.~\ref{eqn:loss} (see the ablation in Table \ref{tab:ablations} for their effect). %
+The dimensions of the proposed $W_k$ tend to be large, in accordance with the dimensions of the transformer's hidden-layers.\footnote{Empirically, we end up with $W_k\in\mathbb{R}^{768\times768}$ for base-sized models and $W_k\in\mathbb{R}^{1024 \times1024}$ for large-sized models.} Hence, following~\citet{barkan-etal-2020-within}, we apply new non-square linear projections instead of using $W_k$:
+\begin{equation}
+sim_k\left(s,q\right)=\frac{s_k^\top q_k}{\norm{s_k}\norm{q_k}},
+\label{eq:cos_k}
+\end{equation}
+where we set $$s_k{:=}W^S_{k}s,\quad
+q_k{:=}W^Q_{k}q,$$ and
+$W^S_{k}$ (or $W^Q_{k}$) is the matrix that projects $s$ (or $q$) into a lower dimension, in the $k^\text{th}$ question-type sub-space. 
+In order to improve the separation between the different sub-spaces induced by different question types, we generated additional negative instances per sentence, as follows. 
+
+We projected every question-sentence pair using all the mappings according to the available question types, and computed their cosine similarity (according to Eq.~\ref{eq:cos_k}). Then, all the obtained scores were considered as negative, except the ones that belong to question-evidence pairs projected using the correct question-type mapping. %
+
+
+\input{experiments}
+
+\section{Conclusion}
+In this work, we proposed an effective sequence-level contrastive loss for improving the performance of long-range transformers in solving QA tasks that require reasoning over long contexts. We demonstrate consistent improvement when using our approach on three different models over two different benchmarks.
+For future work, we propose exploring variations of our proposed supervised loss on other long-context tasks, such as long-document and multi-document summarization, and integrating our method into information retrieval re-ranker models.
+
+\input{ack}
+\input{ethical}
+
+
+\bibliography{acl2021,anthology}
+\bibliographystyle{acl_natbib}
+\clearpage
+\appendix
+\input{appndx}
+
+\end{document}

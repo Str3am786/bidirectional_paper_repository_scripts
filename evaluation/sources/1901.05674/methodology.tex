@@ -1,0 +1,232 @@
+\section{A Methodology for Assessing Evasions}
+\label{ss:methodology}
+
+To study the anti-evasion capabilities of malware scanners, we present a generic methodology to study evasions and their effect on scanners.
+The methodology is designed to address a set of research questions presented in Section~\ref{ss: questions}.
+To address these questions, we define several metrics that measure how evasions influence the outcome of malware scanners (Section~\ref{ss: metrics}).
+Our methodology assumes that possibly malicious files are analyzed by scanners, and that these files may contain evasions.
+\emph{File} here means any type of file ranging from executables (e.g., Android apps) to document files (e.g., Office documents).
+\emph{Scanner} here means a software tool that classifies a file either as malicious or as benign.
+Finally, \emph{evasion} refers to a technique aimed at concealing the fact that a file is malicious.
+
+\subsection{Research Questions}
+\label{ss: questions}
+
+We focus on the following research questions (RQs):
+
+\begin{itemize}
+    \item \textbf{RQ1:} How accurately do the scanners classify malicious and benign files in the presence of evasions?
+    \item \textbf{RQ2:} How effective are the evasions at fooling specific scanners?
+    \item \textbf{RQ3:} Which evasions are most effective?
+    \item \textbf{RQ4:} Do some evasions have the opposite of the expected effect, i.e.,
+      do they cause scanners to detect  malicious files that are missed otherwise?
+    \item \textbf{RQ5:} Are there combinations of evasions that are harder to detect than the individual evasions?
+    \item \textbf{RQ6:} Does the effectiveness of an evasion depend on the exploit or the payload used in a malicious file?
+\end{itemize}
+
+\subsection{Metrics for Assessing Evasions}
+\label{ss: metrics}
+
+To address the above questions, we define several metrics.
+For illustration, consider the set of example files in Table~\ref{t:example suite}.
+There are two single evasions, called $e_1$ and $e_2$, and one evasion that is a combination of the two, called $e_{1,2}$.
+Lines 1--16 in the table represent malicious files.
+Each malicious file is based on an exploit, a payload, and optionally, also an evasion.
+The last two lines of the table represent two benign files without any payload, exploit, or evasion.
+For each file, the table shows if two (hypothetical) scanners classify the file as malicious or benign.
+
+\begin{table}[tb]
+\centering
+\caption{Example files to illustrate the metrics.}
+\setlength{\tabcolsep}{7pt}
+\footnotesize
+\begin{tabular}{rlllll}
+\toprule
+\# & Evasion & Exploit & Payload & \multicolumn{2}{c}{Scanner outcome} \\
+\cmidrule{5-6}
+&&&& $s_1$ & $s_2$ \\
+\midrule
+1   &   --      &   $x_1$   &   $p_1$   &   malicious   & benign    \\
+2   &   --      &   $x_1$   &   $p_2$   &   malicious   & benign    \\
+3   &   --      &   $x_2$   &   $p_1$   &   malicious   & malicious    \\
+4   &   --      &   $x_2$   &   $p_2$   &   malicious   & malicious    \\
+
+5   &   $e_{1}$      &   $x_1$   &   $p_1$   &   malicious   & malicious    \\
+6   &   $e_{1}$      &   $x_1$   &   $p_2$   &   malicious   & malicious    \\
+7   &   $e_{1}$      &   $x_2$   &   $p_1$   &   malicious   & benign    \\
+8   &   $e_{1}$      &   $x_2$   &   $p_2$   &   malicious   & benign    \\
+
+9   &   $e_{2}$      &   $x_1$   &   $p_1$   &   benign   & benign    \\
+10   &   $e_{2}$      &   $x_1$   &   $p_2$   &   benign   & benign    \\
+11   &   $e_{2}$      &   $x_2$   &   $p_1$   &   malicious   & benign    \\
+12   &   $e_{2}$      &   $x_2$   &   $p_2$   &   malicious   & benign    \\
+
+13   &   $e_{1,2}$      &   $x_1$   &   $p_1$   &   benign   & malicious    \\
+14   &   $e_{1,2}$      &   $x_1$   &   $p_2$   &   benign   & malicious    \\
+15   &   $e_{1,2}$      &   $x_2$   &   $p_1$   &   benign   & malicious    \\
+16   &   $e_{1,2}$      &   $x_2$   &   $p_2$   &   benign   & malicious    \\
+
+17   &   --      &   --   &   --   &   benign   & benign    \\
+18   &   --      &   --   &   --   &   malicious   & benign    \\
+
+\bottomrule
+\end{tabular}
+\label{t:example suite}
+\end{table}
+
+For a  set $E$ of evasions, a set $S$ of scanners, and a set $F$ of malicious files, 
+we use the notation $f^e$ for a file $f \in F$ that uses an evasion $e \in E$.
+The function $\mathit{mal}: S \times F \rightarrow \mathit{Boolean}$  indicates whether a scanner classifies a given file as malicious.
+Inversely, the notation $\neg \mathit{mal}(s,f)$ means that a scanner $s$ classifies a file $f$ as benign.
+For a set $F_{ben}$ of benign files that do not contain any payload, exploit, or evasion, and a set $F$ of malicious files from a set of payloads,
+optionally a set of exploits,
+and a set $E$ of evasions,
+we define the following formulas to measure scanners' performance in dealing with evasions.
+
+\textbf{Recall and false positive ratio.}
+We evaluate a scanner's accuracy in distinguishing malicious from benign files by measuring recall and false positive (FP) ratio.
+
+\begin{definition}[Recall]
+Given a scanner $s$ and a set $F$ of malicious files, the recall of $s$ is:
+$$
+\mathit{recall}(s, F) = \frac{|\{ f \in F ~|~ \mathit{mal}(s,f) \}|}{|F|}
+$$
+\label{def: recall}
+\end{definition}
+%
+The FP ratio is computed for each scanner $s$ on a set $F_{ben}$ of benign files.
+Here we use benign files only, because these are the files where a scanner might mislead users by erroneously classifying a file as malicious.
+%
+\begin{definition}[FP ratio]
+Given a scanner $s$ and a set $F_{ben}$ of benign files, the FP ratio of $s$ is:
+$$
+\mathit{FP~ratio}(s, F_{ben}) = \frac{|\{ f \in F_{ben} ~|~ \mathit{mal}(s,f) \}|}{|F_{ben}|}
+$$
+\label{def: fp ratio}
+\end{definition}
+
+For the example files in Table~\ref{t:example suite}, recall and FP ratio are as follows.
+
+\vspace{.5em}
+{
+\centering
+$recall(s_1) = \frac{10}{16} = 0.625$ \hspace{2em} $recall(s_2) = \frac{8}{16} = 0.5$ \\
+}
+\vspace{.5em}
+
+\vspace{.5em}
+{
+\centering
+$FP~ratio(s_1) = \frac{1}{2} = 0.5$ \hspace{2em} $FP~ratio(s_2) = \frac{0}{2} = 0.0$\\
+}
+\vspace{.5em}
+
+\textbf{Effectiveness of evasions.} We measure the success of an evasion in bypassing a scanner for a set of malicious files.
+Intuitively, we compare the outcome of a scanner for each file with an evasion to the outcome of the scanner for the exact same file without the evasion.
+
+\begin{definition}[Evasion effectiveness]
+Given a scanner $s$ and a set $F$ of malicious files, the effectiveness of an evasion $e$ is:
+$$
+\mathit{eff}(e, s, F) = \frac
+{|\{ f \in F ~|~ \mathit{mal}(s,f) \wedge \neg \mathit{mal}(s,f^{e}) \}|}
+{|\{ f \in F ~|~ \mathit{mal}(s,f) \}|} \\
+$$
+If the scanner does not classify any file as malicious, which would lead to a division by zero, the effectiveness is defined to be zero.
+\label{def: eff}
+\end{definition}
+
+For example, to compute the effectiveness of $e_{1}$ in Table~\ref{t:example suite}, we
+compare row 5 with row 1, row 6 with row 2, row 7 with row 3, and row 8 with row 4.
+As a result, the effectiveness for the two scanners $s_1$ and $s_2$ is:
+
+\vspace{.5em}
+{
+	\centering
+	$\mathit{eff}(e_{1}, s_1, F) = \frac{0}{4} = 0.0$
+	\hspace{2em} 
+	$\mathit{eff}(e_{1}, s_2, F) = \frac{2}{2} = 1.0$\\
+}
+\vspace{.5em}
+
+We summarize the effectiveness of evasions across multiple scanners
+by computing the arithmetic mean of the effectiveness values across these scanners.
+
+For the running example in Table~\ref{t:example suite}, the evasion effectiveness for scanners $S=\{s_1,s_2\}$ is calculated as follows:
+\begin{gather*}
+\mathit{eff}(e_{1}, \{s_1, s_2\}, F) = \frac{0.0 + 1.0}{2} = 0.5 \\
+\mathit{eff}(e_{2}, \{s_1, s_2\}, F) = \frac{\frac{2}{4} + \frac{2}{2}}{2} = 0.75 \\
+\mathit{eff}(e_{1,2}, \{s_1, s_2\}, F) = \frac{\frac{4}{4} + \frac{0}{2}}{2} = 0.5
+\end{gather*}
+
+Likewise, to summarize the effectiveness across a set of evasions, we average effectiveness values across the set. For the evasions $E=\{e_1,e_2,e_{1,2}\}$ in the example we have:
+\begin{gather*}
+\mathit{eff}(\{e_{1}, e_{2}, e_{1,2}\}, \{s_1, s_2\}, F) = \frac{0.5 + 0.75 + 0.5}{3} \approx 0.58
+\end{gather*}
+
+
+\textbf{Counter-effectiveness: attacker's cost of using evasions.} Even though the goal of an evasion is to bypass the detection of a scanner, an evasion may also have the opposite effect: to cause a scanner mark a
+file as malicious that otherwise would be marked as benign.
+We call an evasion that has such an effect \emph{counter-effective}.
+
+\begin{definition}[Evasion counter-effectiveness]
+\label{def:counterEff}
+Given a scanner $s$ and a set $F$ of malicious files, the counter-effectiveness of an evasion $e$ is:
+\begin{multline*}
+\mathit{counterEff}(e, s, F) =
+\frac
+{|\{ f \in F ~|~ \neg \mathit{mal}(s, f) \wedge \mathit{mal}(s, f^e) \}|}
+{|\{ f \in F ~|~ \neg \mathit{mal}(s, f) \}|}
+\end{multline*}
+\end{definition}
+
+For example, for the evasions in Table~\ref{t:example suite} we have:
+\begin{gather*}
+\mathit{counterEff}(e_1, \{s_1, s_2\}, F) = \frac{\frac{0}{0} + \frac{2}{2}}{2} = 0.5 \\
+\mathit{counterEff}(e_2, \{s_1, s_2\}, F) = \frac{\frac{0}{0} + \frac{0}{2}}{2} = 0.0 \\
+\mathit{counterEff}(e_{1,2}, \{s_1, s_2\}, F) = \frac{\frac{0}{0} + \frac{2}{2}}{2} = 0.5
+\end{gather*}
+
+From the attacker's perspective, another cost of using evasions is that they may interfere with the malicious behavior of a file.
+For example, an evasion in a PDF document that requires the user to move the mouse before the malicious behavior is triggered may not only hide the maliciousness but also reduce the chance that the attack is successful.
+One way of measuring this cost would be to conduct a user study that measures how often a file with an evasion successfully triggers the attack when the file is handled by users.
+We leave the challenge of measuring this cost for future work.
+
+
+\textbf{Added effectiveness by combining evasions.} A set $E$ of evasions that is combined in a file adds to the effectiveness of the individual evasions in $E$ only if $E$ is effective but none of the subsets of $E$ are effective.
+We formalize this idea in the following metric.
+
+\begin{definition}[Evasion added effectiveness]
+Given a scanner $s$ and a set $F$ of malicious files, the added effectiveness of a combined evasion $e$ is:
+\begin{multline*}
+\mathit{addedEff}(e, s, F) =\\
+\frac
+{|\{ f \in F ~|~ \mathit{mal}(s,f) \wedge \neg \mathit{mal}(s,f^e) \wedge \nexists e' \subset e ~.~ \neg \mathit{mal}(s,f^{e'}) \}|}
+{|\{ f \in F ~|~ \mathit{mal}(s,f) \wedge \neg \mathit{mal}(s,f^e) \}|}
+\end{multline*}
+where $e' \subset e$ refers to the single or combined evasions that constitute $e$.
+\label{def: added eff}
+\end{definition}
+
+For example in Table~\ref{t:example suite}, the added effectiveness of $e_{1,2}$, which is composed of $e_1$ and $e_2$, is:
+\begin{gather*}
+\mathit{addedEff}(e_{1,2}, s_1, F) = \frac{2}{4} = 0.5 \\
+\mathit{addedEff}(e_{1,2}, s_2, F) = \frac{0}{0} = 0.0
+\end{gather*}
+
+
+\textbf{Dependence of evasions on other components of a malware.}
+To study how the effectiveness depends on other malware components, e.g., its payload or exploit,
+Definition~\ref{def: eff} can be applied to subsets of all files that have that particular component in common.
+For example, to study how the effectiveness depends on the exploit used in a malicious PDF file, effectiveness is computed on the subset of all PDF files under study that are based on that very exploit.
+In Table~\ref{t:example suite}, to focus on those files that use exploit $x_2$, we consider only the set of files $F_{x_2}$ in rows 3, 4, 7, 8, 11, 12, 15, and 16.
+The effectiveness of evasion $e_1$ w.r.t.\ these files across all scanners is:
+\begin{gather*}
+\mathit{eff}(e_{1}, \{s_1, s_2\}, F_{x_2}) = \frac{\frac{0}{2} + \frac{2}{2}}{2} = 0.5
+\end{gather*}
+
+
+
+\medskip
+The set of metrics defined above allows us to address the research questions given in Section~\ref{ss: questions}.
+In particular, Definitions~\ref{def: recall} and~\ref{def: fp ratio} address RQ1, Definition~\ref{def: eff} addresses RQ2--3 and RQ6, Definition~\ref{def:counterEff} addresses RQ4, and Definition~\ref{def: added eff} addresses RQ5.
+

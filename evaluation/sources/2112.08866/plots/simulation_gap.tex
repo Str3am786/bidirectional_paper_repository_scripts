@@ -1,0 +1,86 @@
+\begin{tikzpicture}[
+%show background rectangle,
+every text node part/.style={align=center, font={\Large}},
+dot/.style={draw, circle, minimum width=0.5cm},
+network-box/.style={draw, rectangle, fill=networkcolor!30, minimum height=5cm, minimum width = 2.5cm, inner sep=0.3cm},
+posterior-box/.style={draw, rectangle, rounded corners = .10cm, minimum width = 3cm, inner sep=0.5cm},
+arrow/.style = {->, very thick}
+]
+
+    \node[draw=none, label={Training Set}] (typical-generative-set) {
+    \begin{tikzpicture}[scale=0.6]
+    \filldraw[draw=black,fill=viridisgreen!30]  plot[smooth, tension=.8, fill=viridisgreen!30] coordinates {(-3.5,0.5) (-3,2.5) (-1,3.5) (1.5,3) (4,3.5) (5,2.5) (5,-2) (2.5,-3) (0.2,-1.5) (-3,-1.5) (-3.5,0.5)};
+    \end{tikzpicture}
+    };
+    \node[dot, fill=darkgreen!80, left=1.3, label=above right:{$\x\sim p(\x\given\mathcal{M})$}] (x-star) at (typical-generative-set) {};
+    
+    \node[draw, color=viridisgreen,
+    fit={(typical-generative-set)}, 
+    label={[anchor=south west]south west:\color{forestlikegreen}Generative Model $\mathcal{M}$}, 
+    rounded corners=.30cm, inner sep=0.8cm
+    ] (generative-model) {};
+    
+    
+    \node[dot, fill=errorcolor!80, below right = 0.4cm and -2cm of generative-model, label=below right:{$\observed{\x}\sim p^*(\x)$}] (x-obs) {};
+
+    
+    \node[network-box, right = of generative-model] (summary-network) {$\huge{h_{\psib}}$\\Summary\\Network};
+    
+    \node[draw=none, right = of summary-network, label={Summary Space}] (kde) {
+        \begin{tikzpicture}
+            \draw[thick,->] (-3.5, -3.5) -- (-3.5, 3);
+            \draw[thick,->] (-3.5, -3.5) -- (3, -3.5);
+            \foreach \x/\alpha in {2/10, 1.6/20, 1.2/30, 0.8/45, 0.4/60}
+                \fill[viridisgreen!\alpha] (0, 0) circle (\x);
+            %\node[draw, fill=viridisgreen!10] (kde-outer) at (0, 0) {} circle (2) {};
+        \end{tikzpicture}
+    };
+    
+    \node[dot, fill=darkgreen!80,
+    above right = 0.25cm and 0.3cm of kde,
+    label=above:{$h_{\psib}(\x)$}
+    ] (s-star) at (kde) {};
+    \node[dot, 
+    fill=errorcolor!80, 
+    below left = -1.5cm and -1.4cm of kde,
+    label=below:{$h_{\psib}(\observed{\x})$}
+    ] (s-obs) {};
+    
+    \node[network-box, right = of kde] (inference-network) {$\huge{f_{\phib}}$\\Inference\\Network};
+    
+
+    \matrix[right = of inference-network, row sep = 0.2cm] {
+    \node[posterior-box, fill=viridisgreen!20]  (correct-posterior) {Correct\\Posterior}; \\ 
+    \node[posterior-box, fill=errorcolor!20] (incorrect-posterior) {Incorrect\\Posterior}; \\
+    };
+
+    %\node[posterior-box, above right = of inference-network, fill=darkgreen!20] (correct-posterior) {Correct Posterior};
+    %\node[posterior-box, below = of correct-posterior, fill=errorcolor!20] (incorrect-posterior) {Incorrect Posterior};
+    
+    \draw [dashed, thick] (typical-generative-set) -- (x-obs) node [sloped,midway](M){};;
+    
+    \node[below left = of M] (simulation-gap) {Misspecification};
+    \draw [arrow] (simulation-gap)  -- (M);
+    
+    \node[below left=-2.6cm and -2.6cm of kde] (kde-outer) {};
+    \draw [dashed, thick] (s-obs) -- (kde-outer) node [sloped,midway](M2){};;
+    
+    \node[below right = 2cm and 0.3cm of M2] (simulation-gap-detected) {Misspecification detected};
+    \draw [arrow] (simulation-gap-detected)  -- (M2);
+    
+    
+    \draw [arrow, dashed] (x-star) -- (summary-network);
+    \draw [arrow, dashed, color=errorcolor] (x-obs) -- (summary-network);
+    
+    \draw [arrow, dashed] (summary-network) -- (s-star);
+    \draw [arrow, color=errorcolor, dashed] (summary-network) -- (s-obs);
+    
+    %\node[below right = of s-obs] (simulation-gap-detected) {Simulation gap detected};
+    %\draw [arrow] (simulation-gap-detected) -- (s-obs);
+    
+    \draw [arrow, dashed] (s-star) -- (inference-network);
+    \draw [arrow, dashed, color=errorcolor] (s-obs) -- (inference-network);
+    
+    \draw [arrow, dashed] (inference-network) -- (correct-posterior.west);
+    \draw [arrow, color=errorcolor, dashed] (inference-network) -- (incorrect-posterior.west);
+\end{tikzpicture}

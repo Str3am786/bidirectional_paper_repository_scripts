@@ -1,0 +1,694 @@
+\documentclass{article}
+
+\usepackage[preprint]{neurips_2020}
+\setcitestyle{numbers}
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage{hyperref}       % hyperlinks
+\usepackage{url}            % simple URL typesetting
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{microtype}      % microtypography
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{nicefrac}
+\usepackage{color}
+\usepackage{amsthm}
+\usepackage{tabu}
+\usepackage{subfig}
+\usepackage{multirow}
+\usepackage[linesnumbered,ruled,vlined]{algorithm2e}
+\newcommand{\minisection}[1]{\vspace{2mm}\noindent{\textbf{#1}.}}
+\newtheorem{theorem}{Theorem}
+\newtheorem{definition}{Definition}
+
+\title{Input-Aware Dynamic Backdoor Attack}
+
+\author{
+  Tuan Anh Nguyen$^{1,2}$, Tuan Anh Tran$^{1,3}$ \\
+  $^1$VinAI Research, $^2$Hanoi University of Science and Technology, $^3$VinUniversity \\
+  \texttt{v.anhnt479@vinai.io},  \texttt{v.anhtt152@vinai.io} \\
+}
+
+\begin{document}
+\input{definitions}
+\maketitle
+
+\begin{abstract}
+  In recent years, neural backdoor attack has been considered to be a potential security threat to deep learning systems. Such systems, while achieving the state-of-the-art performance on clean data, perform abnormally on inputs with predefined triggers. Current backdoor techniques, however, rely on uniform trigger patterns, which are easily detected and mitigated by current defense methods. In this work, we propose a novel backdoor attack technique in which the triggers vary from input to input. To achieve this goal, we implement an input-aware trigger generator driven by diversity loss. A novel cross-trigger test is applied to enforce trigger nonreusablity, making backdoor verification impossible. Experiments show that our method is efficient in various attack scenarios as well as multiple datasets. We further demonstrate that our backdoor can bypass the state of the art defense methods. An analysis with a famous neural network inspector again proves the stealthiness of the proposed attack. Our \href{https://github.com/VinAIResearch/input-aware-backdoor-attack-release}{code} is publicly available.
+\end{abstract}
+
+\section{Introduction}
+
+Due to their superior performance, deep neural networks have become essential in modern artificial intelligence systems. The state-of-the-art networks, however, require massive training data, expensive computing hardwares, and days or even weeks of training. Therefore, instead of training these networks from scratch, many companies use pre-trained models provided by third-parties. This has caused an emerging security threat of neural backdoor attacks, in which the provided networks look genuine but intentionally misbehave on a specific condition of the inputs.
+
+BadNets \cite{gu2017badnets} is one of the first studies discussing this problem on the image classification task. The authors proposed to poison a part of the training data. More specifically, the poisoned images were injected with a fixed small pattern, called a trigger, at a specific location, and the corresponding labels were changed to some pre-defined attack classes. The trained networks could classify the clean testing images accurately but quickly switched to return attack labels when trigger patterns appeared. Liu et al. \cite{liu2017trojaning} extended it to different domains, including face recognition, speech recognition, and sentence attitude recognition. Since then, many variations of backdoor attacks have been proposed \cite{chen2017targeted,yao2019latent}.
+
+Though varying in mechanisms and scenarios, all these attacks rely on the same premise of using a fixed trigger on all poisoned data. It became a crucial weakness that has been exploited by defense methods \cite{wang2019neural,liu2019abs,gao2019strip,udeshi2019model}. These methods derive backdoor trigger candidates then verify by applying them to a set of clean test images.
+
+We argue that the fixed trigger premise is hindering the capability of backdoor attack methods. A dynamic backdoor that has the trigger pattern varying from input to input is much stealthier. It breaks the foundation assumption of all current defense methods, thus easily defeats them. Moreover, dynamic triggers are hard to differentiate from adversarial noise perturbations, which are common in all deep neural networks.
+\begin{center}
+    \begin{figure}[t]
+    \begin{center}
+     \includegraphics[scale=0.54]{figures/Teaser-crop.pdf}
+    \end{center}
+    \caption{\textbf{Input-aware Dynamic Backdoor Attack.} The attacker uses a generator $g$ to create a trigger ($m$, $p$) conditioned on the input image. The poisoned classifier can correctly recognize clean inputs (the leftmost and rightmost images) but return the predefined label ("plane") when injecting the corresponding triggers (the second and fourth image). Triggers are nonreusable; inserting a trigger to a mismatched clean input does not activate the attack (the middle image).}
+    \label{fig:teaser}
+    \end{figure}
+    \vspace{-2mm}
+\end{center}
+
+For simplification, we limit our work on image recognition problems. However, it could be easily extended to many other domains, such as speech recognition and sentence attitude recognition, as proposed in \cite{liu2017trojaning}.
+
+Implementing such input-aware backdoor systems is not trivial. Without careful design, the generated triggers may be repetitive or universal for different input images, making the systems collapse to regular backdoor attacks. To construct such a dynamic backdoor, we propose to use a trigger generator conditioned on the input image. The generated triggers are distinctive so that two different input images do not share the same trigger, compelled by a diversity loss. Also, the triggers should be non-reusable; a trigger generated on one image cannot be applied to another image. To enforce this constraint, we define a novel cross-trigger test alongside the traditional clean and poisoned data tests and incorporate the corresponding loss in training. Fig. \ref{fig:teaser} illustrates the proposed attack system.
+
+We evaluate our method by running experiments on the standard datasets MNIST, CIFAR-10, and GTSRB. On every dataset, the backdoor model shows near a 100\% attack success rate on poisoned data while it accurately classifies the clean and cross-trigger images to the benign labels. The trained models also easily break the state-of-the-art defense methods, including Neural Cleanse, STRIP, and Fine-Pruning, proving the effectiveness of the proposed attack.
+
+We further investigate potential practices against our attack. First, a simple image regularization such as spatial smoothing or color depth shrinking may impair the trigger pattern and break down the attack. However, we show that our backdoor is persistent to these regularizations. Second, we test the standard network inspection tool GradCam \cite{selvaraju2017grad} over our trained models. There is no visible trail, again proving the stealthiness of the proposed backdoor.
+
+\section{Background}
+\subsection{Threat model}
+Backdooring is a technique of injecting a hidden malicious functionality into a system. This functionality is activated only when a trigger appears. The attacker can secretly exploit the backdoor to gain illegal benefits from the system. For instance, a backdoored face authentication system may allow any person with a specific accessory to access all user accounts.
+
+We consider the standard threat model used by most backdoor attack and defense studies. The adversary has total control over the training process, and purposely trains the deep neural network with a backdoor. The infected network is then provided to the customer as is. The customer can run protection methods before or after deploying the model.
+
+\subsection{Previous Backdoor Attacks}
+We first review BadNets \cite{gu2017badnets}, the most common backdoor attack method. The network is trained for an image classification task $\it{f}:\mathcal{X} \rightarrow \mathcal{C}$, in which $\mathcal{X}$ is an input image domain and $\mathcal{C} = \{c_1, c_2, ..., c_M\}$ is a set of $M$ target classes. A clean training set $\mathcal{S} = \{(x_i, y_i) | i=\overline{1,N}\}$ is provided, in which $x_i \in \mathcal{X}$ is a training image and $y_i \in \mathcal{C}$ is the corresponding label.
+
+A backdoor trigger $t = (m, p)$ consists of a blending mask $m$ and a pattern $p$. To ensure stealthiness, the trigger mask must be small, i.e. $\bar{m} \ll 1$. During training, the training sample $(x,y)$ is randomly replaced by a poisoned one $(\hat{x},c)$ with a probability $\rho$. The poisoned image $\hat{x}$ is constructed from the clean input $x$ and the trigger $t = (m, p)$ through an injecting function $\mathcal{B}$:
+\begin{equation}
+\hat{x} = \mathcal{B}(x,t) = x \odot (1-m) + p \odot m 
+\label{eq:backdoor}
+\end{equation}
+where $\odot$ is pixel-wise multiplication. The attack label $c \in \mathcal{C}$ can be fixed (single-target attack) or a function of the ground-truth label $y$ (all-to-all attack). 
+A successfully trained backdoor model will accurately classify clean images while returning the predefined attack label $c$ when the trigger $t$ appears. These scenarios are called clean test and attack test, respectively.
+
+After BadNets, many different attack variations have been proposed. Chen et al. \cite{chen2017targeted} suggested to blend accessories, e.g., glasses, as backdoor triggers, making physical attacks possible. Liu et al. \cite{liu2017trojaning} offered an effective backdoor injection at fine-tuning instead of the training stage. To reduce fine-tuning effort, a reverse engineer technique was introduced to search for an efficient pattern $p$ from the pre-trained model $f$. This work also extended the attack to various domains such as speech recognition. Ji et al. \cite{ji2019programmable} generated backdoor patterns conditioned on the target class. Lately, Salem et al. \cite{salem2020dynamic} extended the trigger to a set of patterns at a set of locations making it more dynamic and stealthy. Still, all proposed methods rely on uniform backdoor triggers regardless of \textbf{input images}.
+
+\subsection{Backdoor Defenses}
+Since backdoor attacks are an emerging concern, backdoor defense has become crucial. Many studies on this topic have been proposed in recent years. We can classify them into three categories regarding usage: training defense, model defense, and testing-time defense.
+
+\subsubsection{Training defense} This defense assumes the defender has access to training data. Therefore, it focuses on data anomaly detection \cite{tran2018spectral}. This assumption, however, does not match our scenario. The backdoor model is intentionally trained by a malicious third-party. We, therefore, will skip this defense approach.
+
+\subsubsection{Model defense} Model defense methods attempt to verify or mitigate the third-party model before deployment. 
+Fine-Pruning \cite{liu2018fine} tried to neutralize the deep network by cutting neurons that are dormant on clean inputs. It, however, could not verify if a model had backdoors. 
+Neural Cleanse \cite{wang2019neural} was the first work that could detect poisoned model. For each label $l$, Neural Cleanse computed the minimal trigger candidate $t$ that could convert any clean image to $l$. It then detect among these candidates the abnormally smaller ones as backdoor indicators. ABS \cite{liu2019abs}, instead, scanned the neurons and generated trigger candidates via reverse engineering technique. These triggers were then verified by being applied to a set of clean images. Cheng et al. \cite{Cheng2019} used GradCam \cite{selvaraju2017grad} to analyze the network behavior on a clean input image with and without the synthesized trigger to detect the anomalies. Recently, Zhao et al. \cite{zhao2020bridging} indirectly applied mode connectivity into examining backdoor behaviors, effectively mitigating backdoor while maintaining acceptable models' performance on benign data.
+
+Except for Fine-Pruning and Mode Connectivity approach, all the defense methods above assumed the backdoor trigger was image-independent. The trigger candidates in Neural Cleanse were optimized on all clean inputs, while the synthesized triggers in other techniques needed verifying on different reference images.
+
+\subsubsection{Testing-time defense} We can also defend at testing-time when the deep model is already deployed. The task now is to verify if the provided image is poisoned and how to mitigate it.
+
+STRIP \cite{gao2019strip} exploited the persistent outcome of the backdoor image under perturbations for detection. More specifically, it superimposed various image patterns on the input and expected the predictions would be random for benign model/input but consistent under attack scenarios. In contrast, Neo \cite{udeshi2019model} searched for the candidate trigger patches where region blocking led to prediction change. Recently, Doan et al. \cite{Doan2019Aug} used GradCam inspection to detect potential backdoor locations. In all these methods, the trigger candidates were then verified by being injected into a set of clean images. This practice, again, strongly relied on the uniform trigger assumption.
+
+\section{Method}
+We argue that a universal backdoor trigger for all images is a bad practice and an Achilles heel of the current attack methods. The defender can estimate that global trigger by optimizing and verifying on a set of clean inputs. Hence, we propose a new method, in which each image has a unique trigger, and that trigger of an image will not work on other images.
+\subsection{Definition}
+    Recall that a classifier is a function $f: \mathcal{X} \rightarrow \mathcal{C}$, in which $\mathcal{X}$ is a input image domain and $\mathcal{C}=\{c_1, c_2, \dots, c_M\}$ is a set of $M$ target classes. In order to train the function $f$, a training dataset $\mathcal{S}=\{(x_i, y_i)|x_i \in \mathcal{X}, y_i\in\mathcal{C}, i=\overline{1,N}\}$.  
+    
+    Poisoning the classifier $f$ requires poisoning the training dataset. Let $\mathcal{B}$ be the injecting function, applying triggers $t=(m, p)$ to clean images:
+    \begin{align*}
+       \mathcal{B}: \mathcal{X}\times\mathcal{T}&\longrightarrow\mathcal{X}\\
+    (x, t) &\longmapsto \mathcal{B}(x, t) = x \odot (1-m) + p \odot m 
+    \end{align*}
+    where $m$ is a mask and $p$ is a pattern. 
+    
+Instead of using a fixed uniform trigger $t$, we propose a strictly input-aware backdoor attack.
+
+\begin{definition}
+A backdoor attack is \textbf{input-aware} if and only if any trigger $t$ is a function of the corresponding clean input $x$. Denote $g$ as the pattern generator that derives $t$, mapping from input image domain to pattern domain:
+\begin{align*}
+        g:\mathcal{X}&\longrightarrow\mathcal{P}\\
+        x&\longmapsto g(x)=t
+\end{align*}
+\end{definition}
+
+\begin{definition}
+An input-aware backdoor attack is \textbf{strict} if and only if the trigger generated by $g$ satisfies:
+\begin{itemize}
+  \item \textbf{Diversity:}  $ \exists \epsilon > 0$ such that 
+\begin{align*} 
+\frac{\|g(x_j) - g(x_i)\|}{\|x_j - x_i\|} > \epsilon \quad\quad \forall i \neq j,\\
+\end{align*}
+\vspace{-12mm}
+  \item \textbf{Nonreusablity:} A trigger generated for one input image cannot be used on another
+\begin{align*}
+f(\mathcal{B}(x_i,g(x_j))) = y_i \quad\quad \forall i \neq j.\\
+\end{align*}
+\end{itemize}
+\end{definition}
+
+Note that based on the first criterion, $g$ is Reverse Lipschitz continous. Maximizing $\frac{\|g(x_1)-g(x_2)\|}{\|x_1-x_2\|}$ will prevent $g$ from being saturated, mapping $\mathcal{X}$ into a significant subset of $\mathcal{P}$. Therefore, $g$ could be able to generate patterns notably different from input to input.
+
+In the next sections, we will discuss how to implement the new attack method. First, we design the trigger generator as an auto-encoder working on clean image input. Second, we propose a novel cross-trigger test, alongside the standard clean and attack tests, to enforce trigger nonreusability. Finally, we sum up the objective functions used in training.
+\subsection{Trigger generator network}
+The trigger generating network $g$ has a basic encoder-decoder architecture. It takes an image as an input, and generates a pattern correspondingly. After that, the generated pattern will combine with a pre-defined mask and the original input image (to create a backdoor input) or another image (used for enforcing the nonreusability of trigger).
+
+\begin{figure}[t]
+\centering
+\subfloat[Clean mode]{
+\includegraphics[width=.175\textwidth]{figures/Generator_Clean-crop.pdf}
+}
+\hspace{2mm}
+\subfloat[Attack mode]{
+\includegraphics[width=.37\textwidth]{figures/Generator_Attack-crop.pdf}
+}
+\hspace{2mm}
+\subfloat[Cross-trigger mode]{
+\includegraphics[width=.37\textwidth]{figures/Generator_Cross-crop.pdf}
+}
+
+\caption{Three running modes of the proposed input-aware backdoor system.}
+\label{fig:modes}
+\end{figure}
+ 
+\subsection{Running modes}
+Existing backdoor attacks are trained on two modes: (a) \textbf{clean mode} in which the network has to correctly recognize clean images and (b) \textbf{attack mode} in which the attack is activated on poisoned data. To enforce trigger nonreusablity, we propose in training a novel \textbf{cross-trigger mode}. Given a clean input $x$, we randomly select a different image $x'$ and generate the corresponding trigger $t'$. The injected image $\mathcal{B}(x,t')$ is assigned to the clean label $y$. These modes are illustrated in Fig. \ref{fig:modes}.
+
+In evaluation, we have three tests accordingly: clean test, attack test, and cross-trigger test.
+
+\subsection{Objective functions}
+{\bfseries Classification loss}. Our classifier loss will be computed from 3 running modes. We first select the backdoor probability $\rho_b \in (0, 1)$ and the cross-trigger probability $\rho_c \in (0, 1)$ such that  $\rho_b + \rho_c < 1$. Then, for each clean input $(x, y)$, we randomly select the mode and compute loss accordingly. Then, we sum up to get the classification loss:
+\begin{equation}
+\mathcal{L}_{cla}=\sum_{(x,y)\in\mathcal{S}, x'\in\mathcal{X}, x' \neq x}\begin{cases}
+\mathcal{L}(f(\mathcal{B}(x,G(x))),c) & \text{with probability } \rho_a\\
+\mathcal{L}(f(\mathcal{B}(x,G(x'))),y) &\text{with probability } \rho_c\\
+\mathcal{L}(f(x),y) &\text{with probability } 1-\rho_a-\rho_c\end{cases},
+\end{equation}
+where $\mathcal{L}$ is the cross-entropy loss function.
+
+{\bfseries Diversity loss}. To update the pattern generator $g$, along with classification loss $\mathcal{L}_{cla}$, we also use the {\itshape diversity enforcement regularisation} $\mathcal{L}_{div}$:
+\begin{equation*}
+    \mathcal{L}_{div} = \frac{\|x-x'\|}{\|g(x)-g(x')\|}
+\end{equation*}
+This regularisation is the prerequisite for training the generator $g$. Without this regularisation, the output of $g$ will saturate to a uniform trigger.
+
+The final objective function will be the sum of $\mathcal{L}_{cla}$ and $\mathcal{L}_{div}$, with a weighting parameter $\lambda_{div}$:
+\begin{equation*}
+    \mathcal{L}_{total} = \mathcal{L}_{cla} + \lambda_{div}\mathcal{L}_{div}
+\end{equation*}
+Algorithm \ref{alg:1} illustrates the training pipeline of our input-aware backdoor attack.
+\begin{algorithm}[t]
+\small
+  \SetAlgoLined
+  \caption{Strictly input-aware backdoor attack training}
+  \label{alg:1}
+  Let $f$ be the classifier, $g$ be the trigger generator;\\
+  Given a target label $c$,  a training dataset $\mathcal{S}$, backdoor probability $\rho_b$, cross-trigger probability $\rho_c$;\\
+  \textbf{initiate} $f$, $g$ \\
+  \For{number of training iterations}{
+    \For{$(x, y)$ in $\mathcal{S}$}{
+        $d \longleftarrow random(1); (x', y') \longleftarrow random\_sample(\mathcal{S})$ \\
+        $t \longleftarrow g(x); t' \longleftarrow g(x')$ \\
+        $\mathcal{L}_{div} \longleftarrow \nicefrac{\|x-x'\|}{\|g(x)-g(x')\|}$ \\
+        
+        \uIf{ $d < \rho_b$ } {
+           $\mathcal{L}_{cla} \longleftarrow \mathcal{L}(\mathcal{B}(x, t), c)$ \\
+        } 
+        \uElseIf{ $d < \rho_b + \rho_c$ } {
+           $\mathcal{L}_{cla} \longleftarrow \mathcal{L}(\mathcal{B}(x, t'), y)$
+        }
+        \Else {
+           $\mathcal{L}_{cla} \longleftarrow \mathcal{L}(x, y)$
+        }
+        $\mathcal{L}_{total} = \mathcal{L}_{cla} + \lambda_{div}\mathcal{L}_{div}$ \\
+        $g \longleftarrow optimize_g(\mathcal{L}_{total})$; 
+        $f \longleftarrow optimize_f(\mathcal{L}_{total})$ \\
+    }
+  }
+  \Return the trained models $f$, $g$
+\end{algorithm}
+
+\begin{table}[h]
+    \centering
+    \caption{Detailed information of the datasets and the classifiers used in our experiments. Each convolution (conv) and fully-connected (fc) layer is followed by a  ReLU, except the last fc layer. }
+    \vskip 0.05in
+    \label{tab:dataset_detail}
+    \begin{tabu} to \textwidth {llcccl}
+    \toprule
+    Dataset & Subjects & \#Labels & Input Size & \#Train. Images & Classifier\\
+    \midrule
+    MNIST & Written digits & 10 & 28 $\times$ 28 $\times$ 1 & 60000 & 2 conv, 2 fc\\
+    CIFAR-10 & General objects & 10 & 32 $\times$ 32 $\times$ 3 & 50000 & PreActRes18 \cite{he2016identity}\\
+    GTSRB & Traffic signs & 43 & 32 $\times$ 32 $\times$ 3 & 39252 & PreActRes18 \cite{he2016identity}\\
+    \bottomrule
+    \end{tabu}
+    \vspace{-1.0em}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\subfloat[Generator networks]{
+\raisebox{\height} {
+\begin{tabu} to 0.4\textwidth{ccc}
+    \toprule
+    \multirow{2}{*}{\textbf{Layers}} & \multicolumn{2}{c}{\textbf{\# Channels}} \\  
+    \cmidrule(r){2-3}
+    & MNIST & Others \\
+    \cmidrule(r){1-1} \cmidrule(r){2-3}
+    (ConvBlock) x 2, maxpool & 16 & 32 \\
+    (ConvBlock) x 2, maxpool & 32 & 64 \\
+    (ConvBlock) x 2, maxpool & - & 128 \\
+    ConvBlock, upsample, ConvBlock & - & 128\\
+    ConvBlock, upsample, ConvBlock & 32 & 64\\
+    ConvBlock, upsample, ConvBlock & 16 & 32\\
+    ConvBlock, sigmoid & 1 & 3 \\
+    \bottomrule
+\end{tabu}
+\vspace{-10mm}
+}
+\label{fig:generators}
+}
+~
+\subfloat[Attack experiments]{
+\raisebox{1.8\height} {
+    \begin{tabu} to .4\textwidth {cccc}
+    \toprule
+    Dataset & Clean & Attack & Cross \\
+    \midrule
+    MNIST & 99.54 & 99.54 & 95.25\\
+    CIFAR-10 & 94.65 & 99.32 & 88.16\\
+    GTSRB & 99.27 & 99.84 & 96.80\\
+    \bottomrule
+    \end{tabu}
+    \label{tab:results}
+    }
+\vspace{-10mm}
+}
+\caption{Network architecture of the generators and performance of the trained models. Each ConvBlock consists of a Conv2D (kernel 3x3), a BatchNorm, and a ReLU layer. The final ConvBlock does not have ReLU. }
+\vspace{-6mm}
+\label{fig:samples}
+\end{figure}
+
+\section{Experiments}
+\subsection{Experimental Setup}
+Following the previous backdoor papers, we conducted experiments on the MNIST \cite{lecun1998gradient}, CIFAR-10 \cite{krizhevsky2009learning} and GTSRB \cite{stallkamp2012man} datasets. Detailed information of these datasets are reported in Table \ref{tab:dataset_detail}. To build the classifier on CIFAR-10 and GTSRB, we used Pre-activation Resnet-18 \cite{he2016identity}, as suggested by \cite{kuangliu2020May}. The MNIST classifier has a self-defined structure as presented in Table \ref{tab:dataset_detail}. As for the generators, we use simple network architectures that are detailed in Fig. \ref{fig:generators}.
+
+\begin{figure}[t]
+\vskip 0.05in
+\centering
+\subfloat[MNIST]{
+\includegraphics[width=.25\textwidth]{figures/mnist_0.png}
+}
+\hspace{2mm}
+\subfloat[CIFAR-10]{
+\includegraphics[width=.25\textwidth]{figures/cifar10_1.png}
+}
+\hspace{2mm}
+\subfloat[GTSRB]{
+\includegraphics[width=.25\textwidth]{figures/gtrsb_0.png}
+}
+
+\caption{Sample backdoor images generated from our networks. The target label for each set is digit-0 (MNIST), airplane (CIFAR-10), and speed-limit-20 (GTSRB).}
+\vspace{-4mm}
+\label{fig:bdimages}
+\end{figure}
+
+We use the SGD optimizer for training classifier $f$, and Adam optimizer for training generator $g$ with the same learning rate 0.01. This rate drops 10 times after every 100 epochs. The networks are jointly trained until converged. We use $\lambda_{div} = 1$ and $\rho_b = \rho_c = 0.1$ in our experiments. 
+
+\subsection{Attack experiments}
+We conduct our experiments in the common single-target attack, in which the target label $c$ is the same for all images. Some sample backdoor images are presented in Fig. \ref{fig:bdimages}, and the results on testing sets are reported in Fig. \ref{tab:results}. For all three datasets, the backdoor attack success rates (ASR) are almost 100\%, while still achieving the same performance on clean data as the benign models do. Moreover, the cross-trigger accuracy are from 88.16\% (CIFAR-10) to 96.80\% (GTSRB), proving the backdoor trigger inapplicable on unpaired clean images. Note that our backdoor classifier, just by studying on training data, can recognize unseen backdoor patterns generated from unseen test images. This generalization ability is very important feature of our method. We also reported the multi-label attack experiments in the supplementary.
+
+\begin{figure}[t]
+\centering
+\subfloat[Neural Cleanse]{
+\includegraphics[width=0.3\textwidth]{figures/neural_cleanse_figure.pdf}
+\label{fig:nc}
+}
+\hspace{2mm}
+\subfloat[FinePrunning]{
+\includegraphics[width=.64\textwidth]{figures/fine-pruning-figure.pdf}
+\label{fig:fineprun}
+}
+\\
+\vskip 0.05in
+\subfloat[STRIP]{
+\includegraphics[width=.87\textwidth]{figures/strip_figure_final.pdf}
+    \vspace{-1.0em}
+\label{fig:STRIP}
+}
+
+    \vspace{-1.5mm}
+\caption{Experiments on verifying our backdoor models by the state-of-the-art defense methods.}
+\label{fig:defense}
+\end{figure}
+
+\subsection{Defense experiments}
+We are now testing our attack approaches against the current backdoor defenses, in both {\bfseries Model defense} and {\bfseries Testing defense} scenarios. 
+
+\subsubsection{Model Defenses}
+We first verify our backdoor algorithm using Neural Cleanse \cite{wang2019neural}, Fine-Pruning \cite{liu2018fine}, and Mode Connectivity \cite{zhao2020bridging}. They are representatives for three different model-defense approaches: pattern optimization, neuron analysis, and model repairing based on loss landscapes.
+
+Neural Cleanse computes the optimal patterns to convert all clean inputs to each target label. It then checks if any pattern is significantly smaller than the others as the backdoor indicator. Neural Cleanse quantifies it by the Anomaly Index metric and uses $\tau$ = 2 as the clean/backdoor threshold. As can be seen in Fig.  \ref{fig:nc}, our system easily passed this test. We can explain by the fact that the backdoor trigger varies from image to image, so there is no such small pattern that can activate the attack on all inputs. 
+
+
+In contrast, Fine-Pruning focuses on neuron analyses. It gradually removes the dormant neurons that are conditioned on clean images from a specific layer to mitigate the model. We test Fine-Pruning on our backdoor models. The plots in Fig. \ref{fig:nc} presents the model accuracy in attack and clean mode with respect to the number of neurons pruned. On all datasets, at no point is the clean accuracy substantially higher than the attack one, making backdoor mitigation impossible.
+
+Lately, Mode Connectivity suggests to mitigate backdoor by using a curve model lying on a path connection between two tampered models in the loss landscapes. The model connection is optimized based on a small set of clean training samples. The curve model is located on that path connection by a parameter $t \in [0,\,1]$; in which $t=0$ corresponds to the first tampered model and $t=1$ corresponds to the second one. This work claims that the curve model formed with an appropriate $t$, e.g., 0.1, will have an acceptable clean accuracy while no longer be affected by the backdoor. We run that method on our backdoor models on CIFAR-10 and report the error rates in Fig. \ref{fig:mode connectivity}. As can be seen, the backdoor error rate is always close to the clean one. The largest gap between them is only 20\% when using 2500 training samples and t = 0.5. Hence, this defense method cannot mitigate our backdoor.
+
+\begin{center}
+    \begin{figure}[h]
+    \begin{center}
+     \includegraphics[scale=0.502]{figures/mode_connectivity.pdf}
+    \end{center}
+    \vspace{-1mm}
+    
+    \caption{\textbf{Mode Connectivity experiments.} This plot shows the curve model's clean and attack error rates with different value $t$ on the CIFAR-10 dataset. The model connections are fine-tuned with small numbers of clean samples.}
+    \label{fig:mode connectivity}
+    \end{figure}
+    \vspace{-4mm}
+\end{center}
+
+
+\subsubsection{Testing-time Defenses}
+We also verify our method by STRIP \cite{gao2019strip}, a representative of the testing-time defense methods. Given an input image potentially poisoned, STRIP will perturb it through a random set of clean images and monitor entropies of the prediction outputs. A traditional backdoor attack is persistent to such perturbation, leading to stable and low entropy. The proposed method, however, deactivates the attack mode when image content changes and mismatches the trigger. Hence, it produces high prediction entropies and covers a similar entropy range as that of the clean model, visualized in Fig. \ref{fig:STRIP}.
+
+\subsection{Ablation studies}
+\subsubsection{The necessity of cross-trigger test and diversity loss}
+To demonstrate the efficacy of our objective functions, we train different versions of the classifier $f$ in the CIFAR-10 dataset without these loss functions. 
+
+\textbf{Without the cross-trigger test}. While achieving the same performance on the clean and attack test, the cross-trigger accuracy of the trained classifier is only around 10 \%. The trigger generated for one image could be applied to any other inputs, causing $f$ evident to standard backdoor detectors. Indeed, we verified $f$ with Neural Cleanse, and it was easily caught with Anomaly Index 9.43.
+ 
+\textbf{Without the diversity loss}. The generator $g$ outputs the same pattern for any inputs. The cross-trigger and attack mode are now contradicting as $f$ is forced to output the true class and target class with the same input. Therefore, the classifier $f$ fails to converge, having all clean, backdoor, and cross accuracy stuck at 10\%.
+
+\textbf{Without both losses}. 
+The generator $g$ outputs the same pattern for any inputs. Although the model can converge, it behaves like a normal BadNet model.
+
+\subsubsection{Analysis on backdoor probability $\rho_b$ and cross-trigger probability $\rho_c$}
+
+In this experiment, we will study how the hyper-parameters $\rho_b$ and $\rho_c$ affect the backdoor model's clean, backdoor, and cross accuracy. To do so, we train multiple backdoor models on the CIFAR-10 dataset with either $\rho_c$  or $\rho_b$ varying from 0.025 to 0.5.
+
+As can be seen in Fig. \ref{fig:rho analysis}, our method is quite stable with high accuracy on clean, attack, and cross tests. When increasing $\rho_c$, the cross accuracy increases from 80\% to 93\%. When increasing $\rho_a$, the attack success rate goes up to near 100\%, and the cross accuracy also surprisingly increases.
+
+\begin{center}
+    \begin{figure}[h!]
+    \begin{center}
+     \includegraphics[scale=0.57]{figures/rho_figure.pdf}
+    \end{center}
+    \caption{Model clean, attack, and cross accuracy on the CIFAR-10 dataset when changing $\rho_b$ and $\rho_c$.}
+    \label{fig:rho analysis}
+    \end{figure}
+    \vspace{-2mm}
+\end{center}
+
+\subsection{Behaviour analyses}
+
+\begin{figure}[t]
+\centering
+\subfloat[Image regularization]{
+\raisebox{\height} {
+\begin{tabu}{lccccc}
+    \toprule
+    \multirow{2}{*}{\textbf{Test}} & \multirow{2}{*}{\textbf{Original}} & \multicolumn{2}{c}{\textbf{Smoothing}} & \multicolumn{2}{c}{\textbf{Color shrinking}} \\  
+    \cmidrule(r){3-4} \cmidrule(r){5-6}
+    & & k = 3 & k = 5 & 3 bits & 1 bit \\
+    \cmidrule(r){1-1} \cmidrule(r){2-2} \cmidrule(r){3-4} \cmidrule(r){5-6}
+    Clean & 94.65 & 69.30 & 35.24 & 85.81 & 22.87 \\
+    Attack & 99.32 & 99.61 & 99.67 & 98.76 & 89.94 \\
+    \bottomrule
+\end{tabu}
+}
+\label{fig:reg}
+}
+~~
+\subfloat[GradCam]{
+\raisebox{0.05\height} {
+\includegraphics[width=.34\textwidth]{figures/GradCam_NIPS.png}
+\label{fig:gradcam}
+}
+}
+    \vspace{-1mm}
+\caption{\textbf{Behaviour analyses on our backdoor models:} (a) Clean and attack accuracy under different image regularizations in CIFAR-10, (b) Comparison between previous backdoor attacks \cite{gu2017badnets,ji2019programmable,salem2020dynamic} (first three columns) and ours (last column), presented by the poisoned GTSRB input (top) and the output heatmap (bottom).}
+\label{fig:behavior}
+\end{figure}
+
+
+\subsubsection{Image regularization}
+According to \cite{xu2017feature}, the perturbation based attacks may be vulnerable to simple image regularization processes such as image smoothing or color depth shrinking. We track the clean and attack accuracy of the trained CIFAR-10 backdoor model when applying those regularizations and report results in Fig. \ref{fig:reg}. Surprisingly, the proposed system is  robust to these pre-processes. While the clean accuracy quickly drops, the attack accuracy still stays at 90-100\%. 
+
+\subsubsection{Network inspection}
+
+Traditional backdoor attacks heavily rely on image-agnostic triggers; thus, they can be exposed under a network inspection such as GradCam \cite{selvaraju2017grad} as reported by recent studies \cite{Cheng2019,Doan2019Aug}. We examined backdoor models from Badnets and two recent attack methods \cite{ji2019programmable,salem2020dynamic} via GradCam visualization on their poisoned GTSRB images, and the triggers were easily caught as shown in Fig. \ref{fig:gradcam}. We then verified our model and visualized its result in the final column. The highlight regions spread out instead of focusing on the trigger, avoiding any inspection based defenses. We can explain it by the fact that our network has to match the trigger to the image content, making them equally important. 
+
+\section{Conclusion and future works}
+In this paper, we have presented a novel backdoor attack that is conditioned on the input image. To implement such a system, we use a trigger generator generating triggers from the clean input images. We enforce the generated triggers to be diverse and nonreusable for different inputs. These strict criteria make the poisoned models stealthy to pass through all defense practices. It raises the backdoor threat to a higher bar for future security research. 
+
+While being effective, our system can be further improved. The current trigger patterns are unnatural, so we aim to make them more realistic and imperceptible to humans.
+
+\section*{Broader Impact}
+Our work is beneficial for both the research community and practical AI systems. 
+
+For the research community, our work points out the weakness of the current backdoor research, both attack and defense studies, when heavily relying on the assumption of fixed and universal triggers. It raises the backdoor threat to a higher bar for future security research.
+
+With the practical AI systems, our work will raise awareness of deep models' security. It points out a potential advanced backdoor inside the deep-learning-based components acquired from third-parties. People, therefore, can look for potential protection against backdoor exploitation. It is particularly crucial to the security systems.
+
+Certainly, the attacker can also gain benefit from our work to design such effective backdoor models. Still, we believe novel and efficient defenses against the proposed attack will soon be introduced after our research released.
+
+\medskip
+
+\small
+
+\bibliographystyle{unsrt}
+\bibliography{neurips_2020}
+
+\newpage
+\normalsize
+
+\appendix
+\begin{center}
+\textbf{\Large{Supplement to ``Input-Aware Dynamic Backdoor Attack''}}
+\end{center}
+
+This supplementary contains detailed information about the datasets and the systems that we used in the experiments. It then provides more examples of the generated backdoor images and GradCam inspection results in single-target attack experiments. Finally, we present our experiments on all-to-all attack scenarios, in which multiple target labels are used.
+\section{System details}
+\subsection{Datasets}
+    We conduct our experiments in 3 datasets, from simple to more complex ones. Importantly, these datasets are all used in numerous previous works in both attack and defense studies. This makes our results more comparable and reliable.
+\subsubsection{MNIST} The dataset \cite{lecun1998gradient} is a subset of a larger set available from the National Institute of Standards and Technology (NIST). It consists of 70,000 grayscale images of handwritten digits at resolution $28 \times 28$. The dataset is divided into a training set of 60,000 images and a test set of 10,000 images. It could be found at \url{http://yann.lecun.com/exdb/mnist/}.
+
+During the training step, we randomly apply random cropping to the input image. No augmentation is applied in the evaluation stage.
+\subsubsection{CIFAR-10}
+CIFAR-10 \cite{krizhevsky2009learning} is a labeled subset of the 80-millions-tiny-images dataset, collected by Alex Krizhevsky, Vinod Nair, and Geoffrey Hinton. The dataset consists of 60,000 color images at resolution $32 \times 32$ of 10 different classes, with 6,000 images per class. It is splitted into two sets: the training set of 50,000 images and the test set of 10,000 images. The dataset is public and available in \url{https://www.cs.toronto.edu/~kriz/cifar.html}.
+
+We apply random crop, random rotation, and random horizontal flip during the training process. In the evaluation stage, no augmentation is applied. 
+\subsubsection{GTSRB}
+The German Traffic Sign Recognition Benchmark - GTSRB \cite{stallkamp2012man} dataset is originally from a challenge held at the International Joint Conference on Neural Networks (IJCNN) 2011. This dataset contains more than 50,000 images with 43 classes. Image sizes vary from $15 \times 15$ to $250 \times 250$ pixels. It comprises a training set of 39,209 images and a test set of 12,630 images. The GTSRB dataset is publicly available at \url{http://benchmark.ini.rub.de/?section=gtsrb&subsection=dataset}.
+
+In both training step and evaluation step, images are resized into $32 \times 32$ pixels. Input images are then applied random crop and random rotation in the training procedure. No augmentation is applied during the evaluation procedure. 
+
+\subsection{Classifiers}
+\subsubsection{MNIST}
+We use a simple convolution net for this dataset. Detailed architecture will be mentioned below. 
+\begin{table}[t]
+\caption{Detailed architecture of MNIST classifier. * means the layer is followed by a Dropout.}
+\label{tab: mnist classifier architecture}
+\centering
+    \begin{tabu} to \textwidth {ccccc}
+    \toprule
+    Layer & Filter & Filter Size & Stride & Activation \\
+    \midrule
+    Conv2d* & $32$ & $5 \times 5$ & $1$ & ReLU \\
+    Maxpool & $32$ & $2 \times 2$ & $2$ & - \\
+    Conv2d* & $64$ & $5 \times 5$ & $1$ & ReLU \\
+    Maxpool & $64$ & $2 \times 2$ & $2$ & - \\
+    Linear*  & $1024$ & - & - & ReLU \\
+    Linear & $10$ & - & - & Softmax \\
+    \bottomrule
+    \end{tabu}
+\end{table}
+
+\subsubsection{CIFAR-10 and GTSRB}
+For the CIFAR-10 and GTSRB datasets, we use PreActRes18 \cite{he2016deep} structure for the classifier. 
+
+\subsection{Trigger mask and pattern generators}
+For simplicity, in the paper, we mentioned the trigger generator $g$ as a whole. In practice, we divided it into two networks $g_m$ and $g_p$ for trigger mask generation and trigger pattern generation. These networks have the same structure as presented in the paper except the number of output channels; $g_m$ returns a single-channel output mask. 
+
+The pattern generator $g_p$ is jointly trained with the classifier, as described in the paper. To make the training stable, we pre-train the mask generator $g_m$, then freeze it in the main process process.
+
+\subsection{Training details}
+We use Adam optimizer for training mask generator $g_m$, with the learning rate of $0.01$. This learning rate drops 10 times each 10 epochs. We train $g_m$ for 25 epochs, then freeze this module for continue training classifier $f$ and pattern generator $g_p$.
+
+We use Adam optimizer for training pattern generator $g_p$ with the learning rate of $0.01$. Learning rate of $g_p$ drops $10$ times for each 100 epochs since the 200$^{th}$ epoch. For the classifier $f$, we use SGD optimizer with the learning rate of $0.01$. The learning rate of $f$ reduces by $10$ times every 100 epochs. We train $g_p$ and $f$ simultaneously and until the models converge at $\sim$600 epochs.
+
+\subsection{Running time}
+We use a system of a GPU RTX 2080Ti and a CPU i7 9700K to conduct our experiment. Detailed inference time of each module will be demonstrated in Table \ref{tab:inference time}.
+
+\begin{table}[t]
+    \centering
+    \caption{Inference time of our modules.}
+    \begin{tabu} to \textwidth {cccc}
+    \toprule
+     & Classifier ($f$) & Mask generator ($g_m$) & Pattern generator ($g_p$) \\
+    \midrule
+    MNIST & $6.51\,ms$ & $0.94\,ms$ & $0.99\,ms$\\
+    CIFAR-10 & $7.96\,ms$ & $1.36\,ms$ & $1.41\,ms$\\
+    GTSRB & $7.88\,ms$ & $1.36\,ms$ & $1.42\,ms$\\
+    \bottomrule
+    \end{tabu}
+    \label{tab:inference time}
+\end{table}
+
+\section{Additional experiment results}
+
+\subsection{Sample backdoor images}
+We present sample backdoor images generated by our systems, in comparison to the ones from the traditional BadNet models, in Fig. \ref{fig:all2one_sample}. As can be seen, our backdoor trigger varies from image to image.
+
+\begin{figure}[t]
+\centering
+\subfloat[MNIST]{
+\includegraphics[width=0.9\textwidth]{figures_supplementary/mnist_sample_all2one.pdf}
+\label{fig:mnist_all2one}
+}
+\hspace{2mm}
+\subfloat[CIFAR-10]{
+\includegraphics[width=0.9\textwidth]{figures_supplementary/cifar10_sample_all2one.pdf}
+\label{fig:cifar10_all2one}
+}
+\\
+\vskip 0.05in
+\subfloat[GTSRB]{
+\includegraphics[width=0.9\textwidth]{figures_supplementary/gtrsb_sample_all2one.pdf}
+    \vspace{-1.0em}
+\label{fig:gtsrb_all2one}
+}
+
+    \vspace{-1mm}
+\caption{{\bfseries Sample backdoor images}. The first row are clean images. The second and the third rows are badnet's patterns and badnet's images. The fourth and the final rows are our patterns and backdoor images.}
+    \vspace{-4mm}
+\label{fig:all2one_sample}
+\end{figure}
+
+\subsection{Network inspection}
+We present more GradCam inspection results of our backdoor networks on GTSRB and CIFAR-10 dataset in Fig. \ref{fig:gradcam_all2one}.
+
+\begin{figure}[t]
+\centering
+\subfloat[GTSRB]{
+\includegraphics[width=.95\textwidth]{figures_supplementary/grad_cam_gtsrb_all2one_mask.png}
+\label{fig:gradcam gtsrb all2one}
+}
+\hspace{2mm}
+\subfloat[CIFAR-10]{
+\includegraphics[width=.95\textwidth]{figures_supplementary/grad_cam_cifar10_all2one_mask.png}
+\label{fig:gradcam cifar10 all2one}
+}
+    \vspace{-1mm}
+\caption{{\bfseries All-to-one attack}: Backdoor inputs and their corresponding heatmaps.}
+\label{fig:gradcam_all2one}
+\end{figure}
+
+\section{All-to-all attack}
+Besides the single-target attack scenario, we also verify the effectiveness of input-aware dynamic backdoor attack in multi-target scenario, often called all-to-all attack. In this scenario, the input of class $y$ would be targeted into class $y + 1$.
+\subsection{Experimental Setup}
+We use the same experimental setups as in the single-target scenario, with a small modification. In the attack mode at training, we replace the fixed target label $c$ by $y+1$. In the attack test at evaluation, we also change the expected label similarly.
+
+\subsection{Sample backdoor images}
+We present sample backdoor images generated by our systems, in comparison to the ones from the traditional BadNet models, in Fig. \ref{fig:all2all_sample}.
+\begin{figure}[t]
+\centering
+\subfloat[MNIST]{
+\includegraphics[width=.95\textwidth]{figures_supplementary/mnist_sample_all2all.pdf}
+\label{fig:mnist_all2all}
+}
+\hspace{2mm}
+\subfloat[CIFAR-10]{
+\includegraphics[width=.95\textwidth]{figures_supplementary/cifar10_sample_all2all.pdf}
+\label{fig:cifar10_all2all}
+}
+\\
+\vskip 0.05in
+\subfloat[GTSRB]{
+\includegraphics[width=.95\textwidth]{figures_supplementary/gtrsb_sample_all2all.pdf}
+    \vspace{-1.0em}
+\label{fig:gtsrb_all2all}
+}
+
+    \vspace{-1mm}
+\caption{{\bfseries Sample all-to-all backdoor images}. The first row are clean images. The second and the third rows are triggers and backdoor images, respectively.}
+    \vspace{-4mm}
+\label{fig:all2all_sample}
+\end{figure}
+
+\subsection{Attack experiments}
+We conducted attack experiments and reported results in Table \ref{tab:all2all_attack_result}. While models still achieve state-of-the-art performance on clean inputs, the attack efficacies slightly decreases. This is due to the fact that the target label now varies from input to input. Though, the lowest attack accuracy is 93.16\%, which is still pretty high. 
+
+Similar to the single-target scenario, the triggers are still nonreusable, proved by the cross-trigger accuracies.
+\begin{table}[t]
+    \centering
+    \caption{\bfseries{All-to-all attack result.}}
+    \begin{tabu} to \textwidth {cccc}
+    \toprule
+    Dataset & Clean & Attack & Cross \\
+    \midrule
+    MNIST & 99.46 & 98.47 & 94.34\\
+    CIFAR-10 & 94.49 & 93.16 & 89.40\\
+    GTSRB & 98.93 & 98.13 & 94.29\\
+    \bottomrule
+    \end{tabu}
+    \label{tab:all2all_attack_result}
+\end{table}
+
+\subsection{Defense experiments}
+We repeat the same defense experiments used in the single-target scenario. Our backdoor models can pass all the tests as can be seen in Fig. \ref{fig:neural_cleanse_all2all}, \ref{fig:fine_pruning_all2all}, and \ref{fig:STRIP_all2all}.
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.8\textwidth]{figures_supplementary/neural_cleanse_all2all_figure.pdf}
+    \caption{Neural Cleanse}
+    \label{fig:neural_cleanse_all2all}
+\end{figure}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=1\textwidth]{figures_supplementary/fine_pruning_all2all_figure.pdf}
+    \caption{Fine-pruning}
+    \label{fig:fine_pruning_all2all}
+\end{figure}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=1\textwidth]{figures_supplementary/STRIP_all2all_figure.pdf}
+    \caption{STRIP}
+    \label{fig:STRIP_all2all}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\subfloat[GTSRB]{
+\includegraphics[width=1\textwidth]{figures_supplementary/gtrsb_gradcam_all2all_mask.pdf}
+\label{fig:gradcam gtsrb all2all}
+}
+\hspace{2mm}
+\subfloat[CIFAR-10]{
+\includegraphics[width=1\textwidth]{figures_supplementary/cifar10_gradcam_all2all_mask.pdf}
+\label{fig:gradcam cifar10 all2all}
+}
+    \vspace{-1mm}
+\caption{{\bfseries All-to-all attack}: Backdoor inputs and their corresponding heatmaps.}
+    \vspace{-4mm}
+\label{fig:gradcam_all2all}
+\end{figure}
+
+\subsection{Behaviour analyses}
+\subsubsection{Image regularization}
+Similar to the single-target scenario, we apply different image regularization techniques on the CIFAR-10 backdoor model trained for the all-to-all attack, as shown in Fig. \ref{fig:reg}. In all tests, the clean and attack accuracy are pretty similar, negating backdoor mitigation attempts.
+
+
+\begin{table}[h]
+    \centering
+    \label{tab:all2all_regularization}
+    \caption{\bfseries{Effect of image regularization on the CIFAR-10 backdoor model, all-to-all attack scenario.}}
+\begin{tabu}{lcccccc}
+    \toprule
+    \multirow{2}{*}{\textbf{Test}} & \multirow{2}{*}{\textbf{Original}} & \multicolumn{2}{c}{\textbf{Spatial smoothing}} & \multicolumn{3}{c}{\textbf{Color depth shrinking}} \\  
+    \cmidrule(r){3-4} \cmidrule(r){5-7}
+    & & k = 3 & k = 5 & 3 bits & 2 bits & 1 bit \\
+    \cmidrule(r){1-1} \cmidrule(r){2-2} \cmidrule(r){3-4} \cmidrule(r){5-7}
+    Clean & 94.49 & 68.37 & 34.76 & 86.56 & 63.60 & 28.22 \\
+    Attack & 93.16 & 66.63 & 35.29 & 85.38 & 62.26 & 25.18 \\
+    \bottomrule
+\end{tabu}
+\end{table}
+
+\subsubsection{Network inspection}
+Finally, we present the GradCam inspection results of our all-to-all backdoor networks on GTSRB and CIFAR-10 dataset in Fig. \ref{fig:gradcam_all2all}. The heatmaps, again, spread over the input image, failing to catch the backdoor regions.
+
+\end{document}

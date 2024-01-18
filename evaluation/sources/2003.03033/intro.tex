@@ -1,0 +1,83 @@
+
+% Following the explosive growth of deep learning in the past decade,
+
+Much of the progress in machine learning in the past decade has been a result of deep neural networks. Many of these networks, particularly those that perform the best \cite{gpipe}, require enormous amounts of computation and memory. These requirements not only increase infrastructure costs, but also make deployment of networks to resource-constrained environments such as mobile phones or smart devices challenging \cite{learning-both, szeEfficient, sze-energy-aware}.
+
+One popular approach for reducing these resource requirements at test time is neural network \textit{pruning}, which entails systematically removing parameters from an existing network. Typically, the initial network is large and accurate, and the goal is to produce a smaller network with similar accuracy. Pruning has been used since the late 1980s \cite{janowsky_pruning_1989, mozer_skeletonization:_1989, mozer_using_1989, karnin_simple_1990}, but has seen an explosion of interest in the past decade thanks to the rise of deep neural networks.
+
+For this study, we surveyed 81 recent papers on pruning in the hopes of extracting practical lessons for the broader community.
+For example: which technique achieves the best accuracy/efficiency tradeoff?
+Are there strategies that work best on specific architectures or datasets?
+Which high-level design choices are most effective?
+
+There are indeed several consistent results: pruning parameters based on their magnitudes substantially compresses networks without reducing accuracy, and many pruning methods outperform random pruning.
+However, our central finding is that the state of the literature is such that our motivating questions are impossible to answer.
+Few papers compare to one another, and methodologies are so inconsistent between papers that we could not make these comparisons ourselves.
+For example, a quarter of papers compare to no other pruning method, half of papers compare to at most one other method, and
+dozens of methods have never been compared to by any subsequent work.
+In addition, no dataset/network pair appears in even a third of papers, evaluation metrics differ widely, and hyperparameters and other counfounders vary or are left unspecified.
+%These conditions make it difficult to confidently answer the seemingly basic questions we have posed.
+
+% In the past decade, the resurgence of interest in neural networks has led to a similar resurgence of interest in pruning them, with dozens of papers published on this topic.
+% Pruning is loosely inspired by neuroscience (c.f. \cite{hebbOrig, levy1993synaptogenesis, synapticPruning1998, mSynaptogenesis}), and
+
+% modifying an existing architecture to be more efficient by intelligently removing some of its parameters. % This is in contrast to \textit{quantization}, which entails representing the same number of parameters with fewer bits.
+
+% Given the number of papers published on neural network pruning, one would expect that there has been great progress in this subfield. Concretely, one would expect that the most recent methods demonstrably outperform older methods, and that there are a number of robust findings about what works and what doesn't.
+
+% These expectations are natural since they are met in other subfields of deep learning. For example, in image classification on large datasets, VGG networks \cite{vgg} have been shown to outperform AlexNet \cite{alexnet}; sufficiently deep ResNets \cite{resnet, resnet2} outperform VGG networks; NASNets outperform ResNets \cite{nasnet}; and EfficientNets \cite{efficientnet} outperform NASNets. Moreover, we have learned that having larger models generally improves accuracy given sufficient data \cite{gpipe}, that adding residual connections often improves accuracy \cite{resnet, resnet2}, that appropriate normalization can allow much larger learning rates \cite{batchnorm, understandingBatchNorm}, and many other lessons. While these results do not hold perfectly in all cases, numerous independent reimplementations \cite{keras, pytorch, unreproducibleCurtis, pytorchModels, imagenetGeneralize} have reproduced most of these findings.
+% SE-ResNets \cite{squeezeExcite} outperforms ResNets;
+% that replacing dense convolutions with depthwise-separable convolutions can yield similar or improved accuracy with smaller models \cite{xception},
+% that balancing the number of layers, number of channels, and resolution can yield improved accuracy and efficiency \cite{efficientnet},
+% that using linear bottleneck layers in residual blocks is often helpful \cite{resnet2},
+
+% This paper argues that neural network pruning mostly lacks a rich body of knowledge of this sort. In particular, we claim that neural network pruning may not have seen demonstrably progressed since its introduction 30 years ago. We mean this not in the sense that progress has demonstrably \textit{not} happened, but that it has not \textit{demonstrably} happened, since few pruning methods have ever been meaningfully compared to one another.
+% We do not believe that this is a product of individual authors behaving unreasonably or the problem of pruning being too difficult (or trivial) to make progress on---rather, it is a product of poor experimental methodology, methods being ignored by subsequent papers, low standards among reviewers, and, above all, a lack of standard benchmarks. We emphasize that this is not a statement that no individual paper is well-executed or valuable, but that the literature as a whole is being held back by a lack of standardization.
+
+% This paper attempts to extract analogous lessons from the neural network pruning literature,
+
+%%This paper attempts to extract lessons from the neural network pruning literature and to provide a conceptual overview for readers not familiar with the area. While there are several results that are consistent across many papers---for example, the ability of a well-designed pruning method to outperform random pruning---our central finding is that it is difficult or impossible to compare most reported results in the literature.
+
+% After systematically aggregating results from 79 papers on pruning written since 2010
+%%After systematically aggregating results from 81 papers on pruning, we found that a quarter of papers compare to no other pruning method, half of papers compare to at most one other method, and dozens of methods have never been compared to by any subsequent work. Furthermore, there is no network and dataset pair used by even a third of the literature, papers often define performance metrics differently or use different metrics entirely, and few papers control for hyperparameter choice and other confounding variables. Moreover, after pruning hundreds of models in a standardized setting, we found that common experimental practices in the literature can often yield incorrect conclusions.
+%%As a result of these and similar findings, we are unable to characterize what progress has been made in this field over its existence.
+
+% There are a number of reasons why comparing results across methods is difficult, but the most prominent is
+Most of these issues stem from the absence of standard datasets, networks, metrics, and experimental practices. % After extracting results from \npapers pruning papers, we are unable to rigorously defend the claim that current methods outperform those introduced 30 years ago.
+% Consequently, to help improve the situation,
+To help enable more comparable pruning research,
+we identify specific impediments and pitfalls, recommend best practices, and introduce ShrinkBench, a library for standardized evaluation of pruning. ShrinkBench makes it easy to adhere to the best practices we identify, largely by providing a standardized collection of pruning primitives, models, datasets, and training routines.
+
+% The ultimate goal of this paper is to facilitate future progress in neural network efficiency. To that end, we make the following contributions:
+Our contributions are as follows:%
+\begin{enumerate}[leftmargin=5mm]
+    \itemsep1pt
+    \vspace{-2mm}
+    \item A meta-analysis of the neural network pruning literature based on comprehensively aggregating reported results from \npapers papers.
+    \item A catalog of problems in the literature and best practices for avoiding them. These insights derive from analyzing existing work and pruning hundreds of models.
+    \item ShrinkBench, an open-source library for evaluating neural network pruning methods available at \\{ \url{https://github.com/jjgo/shrinkbench}}.
+    % \item Aggregation and standardization of experimental results from \npapers papers on neural network pruning. We make the results of this aggregation publicly available as a collection of spreadsheets and CSV files (TODO link). % This may be the single largest compilation of results for any one machine learning problem, depending on what counts as ``one problem.''
+    % \item Distillation of findings that appear to be robust given the current state of the literature, including novel findings enabled by our aggregation of results.
+    % \item Identification of methodological issues in the existing literature and how to avoid them in future papers. Most of these issues stem from a lack of standard benchmarks.
+    % \item ShrinkBench, an open-source library and benchmark for pruning research that makes it easy to avoid the issues we identify. In addition to providing useful code, it includes a standardized collection of models, datasets, preprocessing functions, and training routines. As we will argue, standardization of these components is essential for obtaining meaningful comparisons across methods.
+\end{enumerate}
+%%\vspace{-2mm}
+%%
+%%This paper is similar in spirit to others pointing out flaws in the literature on information retrieval \cite{armstrong_improvements_2009}, recommender systems \cite{dacrema_are_2019}, time series data mining \cite{keogh_need_2003, ding_querying_2008}, and overall machine learning \cite{lipton_troubling_2018, sculley_winners_2018}. However, rather than centering on poor interpretation of results, subtle problems with experiments, or lack of reproducibility, our findings center on the incomparability of different papers even when all reported results are taken at face value. We also differ in that we provide not merely a critique, but also tools to help alleviate the problem and a meta-analysis of what general findings do seem to hold.
+
+% TODO checklist + more central shrinkbench
+
+% I.e., even full acceptance of all published numbers still leaves one with no idea which methods are the best.
+% it is not that methods don't work as well when reimplemented by others, or that authors have attributed their success to the wrong factors, but that even full acceptance of all published numbers still leaves one with no idea which methods are the best. % nowhere near adequate to establish which methods are the best.
+
+% unusually troubling in that they hold \textit{even when all reported results are taken at face value}, not
+
+% This paper can be understood as a sort of survey or meta-review, although with a different emphasis than what is typical in computer science and machine learning. While we do attempt to distill lessons from the current literature and identify directions for future work, we replace the traditional \textit{summary of methods} with a \textit{critique of metholodogies}.
+
+
+
+% However, we also argue that the situation can be remedied. After discussing methodological problems
+
+% Something about how even slight details matter since accuracy is often changed by less than 1\%. Also clarifying that we don't think authors are lying or anything---just not being rigorous enough and taking insufficient steps to make their work both comparable to other work and independently reproducible.
+
+% Also mention that these results hold even for papers published in top venues, or just plot distribution of papers by venue (with number of citations?)

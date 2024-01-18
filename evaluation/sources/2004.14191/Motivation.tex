@@ -1,0 +1,80 @@
+%-------------------------------------------------------------------------------
+\section{Motivation}
+\label{sec:motivation}
+%-------------------------------------------------------------------------------
+
+There is a plethora of tools dedicated to coverage analysis.
+They vary widely in terms of goals and features.
+Therefore, we motivate the need for our approach via a comparison with a representative set of popular tools. 
+Our discussion is based on Table~\ref{tab:tool-comparison}.
+
+We start with source-level tools supported in \textsf{gcc} and \textsf{clang}, which are \textsf{gcov} and  \textsf{llvm-cov} respectively.
+Both track similar artifacts such as statement coverage.
+The key difference is in the performance of instrumented binaries.
+\textsf{gcov} can not accurately track code coverage in optimized builds.
+In comparison, \textsf{llvm-cov} features a custom mapping format embedded in LLVM's intermediate representation (IR).
+This allows it to cope better with compiler optimizations.
+Also, this mapping format tracks source code regions with better precision compared to \textsf{gcov}.
+
+The ability of a binary-level tool such as \textsf{bcov} to report source-level artifacts is limited by the binary-to-source mapping available.
+Off-the-shelf debug information can be used to report statement coverage - the most important artifact in practice~\cite{IvankovicFSE19, Gopinath2014}.
+In this setting, \textsf{bcov} offers several advantages including:
+(1)~detailed view of individual branch decisions regardless of the optimization level,
+(2)~precise handling of non-local control flow such as \texttt{longjmp} and C++ exception handling, and
+(3)~flexibility in instrumenting only a selected set of functions, e.g., the ones affected by recent changes, which is important for the efficiency of continuous testing~\cite{IvankovicFSE19}.
+
+\begin{table}[t!]
+    \centering
+    \renewcommand{\arraystretch}{1.0}
+    \setlength\tabcolsep{2.5pt}
+    \caption{A comparison with representative coverage analysis tools. 
+    Compiler-dependent tools require modifying the build system and recompilation which limits flexibility. 
+    The usability of binary-level tools in the testing workflow is limited. 
+    In contrast, {\bcov} only requires replacing a binary with an instrumented version.}
+    \label{tab:tool-comparison}    
+    \begin{tabularx}{\columnwidth}{@{}lcccccc@{}}
+        \\ 
+        &
+        \tblhead{Level} &
+        \tblhead{Coverage\\goal} &
+        \tblhead{Compiler\\independence} &
+        \tblhead{Performance\\overhead} &
+        \tblhead{Flexibility} &
+        \tblhead{Usability} \\
+        \toprule
+        \textsf{gcov}        & \tblentry{source}    & \tblentry{complete} 	& \ding{53} & \ding{53}	  & \ding{53}	   & \ding{51}       \\
+        \textsf{llvm-cov}    & \tblentry{source}    & \tblentry{complete} 	& \ding{53} & \ding{51}   & \ding{53}    & \ding{51}             \\
+        \textsf{sancov}      & \tblentry{IR}        & \tblentry{heuristic} 	& \ding{53} & n/a         & \ding{53}    & \ding{51}             \\
+        \textsf{Intel PT}    & \tblentry{binary}    & \tblentry{heuristic}  & \ding{51} & \ding{51}   & \ding{53}    & \ding{53}       \\
+        \textsf{drcov}         & \tblentry{binary}    & \tblentry{both} 	    & \ding{51} & \ding{53}   & \ding{51}    & \ding{53}     \\
+        {\bcov}              & \tblentry{binary}    & \tblentry{both}	      & \ding{51} & \ding{51}   & \ding{51}    & \ding{51}    \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+
+The recent fuzzing renaissance has motivated the need to improve efficiency by heuristically tracking coverage.
+SanitizerCoverage (\textsf{sancov})~\cite{SanitizeCoverageURL}  is a pass built into LLVM which supports collecting various types of feedback signals including basic block coverage.
+It is used in prominent fuzzers like LibFuzzer~\cite{LibFuzzerWebsite} and Honggfuzz~\cite{SwieckiHonggfuzz}.
+The performance overhead of \textsf{sancov} is not directly measurable as the usage model varies significantly between \textsf{sancov} users.
+Also, \textsf{sancov} is tightly coupled with LLVM sanitizers (e.g., ASan) which add varying overhead.
+Extending {\bcov} with additional feedback signals, similar to \textsf{sancov}, is an interesting future work.
+
+Hardware instruction tracing mechanisms, like Intel\textsuperscript{\textregistered}~PT (IPT), can also be used for coverage analysis.
+However, IPT can dump gigabytes of compressed trace data within seconds which can be inefficient to store and post-process.
+In our experiments, IPT dumped 6.5\,GB trace data for a \textsf{libxerces} test that lasted only 5 seconds. 
+Post-processing and deduplication took more than 3 hours.
+In comparison, our tool can produce an accurate coverage report for the same test after processing a 53\,KB dump in a few seconds.
+Schumilo {\etal}~\cite{kAFL:Schumilo2017} propose to heuristically summarize IPT data on the fly and thus avoid storing the complete trace.
+
+Dynamic binary instrumentation (DBI) tools can report binary-level coverage using dedicated clients (plug-ins) like \textsf{drcov}.
+DBI tools act as a process virtual machine that JIT-emits instructions to a designated code cache.
+This process is complex and may break binaries. 
+Moreover, JIT optimizations add overhead to the whole program even if we are only interested in a selected part such as a shared library.
+Our evaluation includes a comparison with the popular DBI tools  \textsf{Pin}~\cite{IntelPinWeb} and \textsf{DynamoRIO}~\cite{DynamoRIOWeb}.
+
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "binder"
+%%% End:

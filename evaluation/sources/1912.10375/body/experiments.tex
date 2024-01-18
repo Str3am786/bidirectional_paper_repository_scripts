@@ -1,0 +1,360 @@
+\section{Experiments}
+We now  present the experimental evaluation results for \advcodec. In particular, we target on two popular NLP tasks, sentiment classification and QA. For both models, we perform whitebox and transferability based blackbox attacks. In addition to the model accuracy (untargeted attack evaluation), we also report the targeted attack success rate for \advcodec. We show that the proposed \advcodec can outperform other state of the art baseline methods on different models. The details of pretraining tree decoder and experimental setup can be found in Appendix \S \ref{appendix:ablation} and \S \ref{appendix:setup}.
+
+
+% how to train the adv ae
+
+% \subsection{Experimental Setup}
+% dataset, models, parameters (learning rate, optimizer)
+% baselines
+
+
+% During the attack, the LSTM cell sequentially takes the embedding of each word $x_i$ as input and output the encoded state $h_i$.  The context vector $z$ here refers to the last step's output  $h_n$ of the encoder LSTM cell. The perturbation $z^*$ is added only on the context vector $h_n$ without influencing previous encoded states $h_i$ ($i<n$). 
+% \vspace{-4mm}
+\subsection{Adversarial Evaluation Setup for Sentiment Classifier}
+ In this task, sentiment analysis model takes the user reviews from restaurants and stores as input and is expected to predict the number of stars (from 1 to 5 star) that the user was assigned.
+ 
+\textbf{Dataset.}
+We choose the Yelp dataset \citep{yelpdataset} for sentiment analysis task. It consists of 2.7M yelp reviews, in which we follow the process of \citet{nfc512} to randomly select 500K review-star pairs as the training set, and 2000 as the development set, 2000 as the test set.  
+
+\textbf{Models.}  \textit{{BERT}} \citep{Devlin2019BERTPO} is a transformer \citep{Vaswani2017AttentionIA} based model, which is unsupervisedly pretrained on a large corpus and is proven to be effective for downstream NLP tasks.  
+% We fine-tune BERT in the Yelp dataset for sentiment classification. 
+% that provides an approach to quantitatively measure model attention and helps us conduct and analyze our adversarial attacks.
+ \textit {{Self-Attentive Model (SAM)}} \citep{nfc512} is a state-of-the-art text classification model uses self-attentive mechanism. More detailed model settings are listed in the appendix.
+    
+    %As it is a classic classification task, we believe low adversarial accuracy on this task should demonstrate our adversarial text generation framework has the potential to attack other classification NLP tasks. The following transferability experiments should confirm our observation.
+\textbf{Evaluation metrics.} \textit{Targeted attack success rate} (abbr. target) is measured by how many examples are successfully attacked to output the targeted label in average, while \textit{untargeted attack success rate} (abbr. untarget) calculates the percentage of examples attacked to output a label different from the ground truth. 
+
+\textbf{Attack Baselines.} \textit{Seq2sick} \citep{seq2sick} is a whitebox projected gradient method to attack seq2seq models. Here, we perform seq2sick attack on sentiment classification models by changing its loss function, which was not evaluated in the original paper. \textit{TextFooler} \citep{TextFooler} is a simple yet strong blackbox attack method to perform word-level in-place adversarial modification. Following the same setting, Seq2Sick and TextFooler are only allowed to edit the prepended sentence.
+
+
+
+\begin{table*}[t!] \small
+\centering
+
+\begin{tabular}{ccccc|ccc}
+\toprule
+\multirow{2}{*}{Model} & Origin  &  & \multicolumn{2}{c}{Whitebox Attack} & \multicolumn{3}{c}{Blackbox Attack} \\
+\cmidrule(lr){4-5} \cmidrule(lr){6-8}
+&  & & {Pos-\advcodecword} & {Ans-\advcodecword}  & {Pos-\advcodecword} & {Ans-\advcodecword}  & AddSent\\
+\midrule
+\multirow{2}{*}{BERT} & EM & 81.2  & \textbf{29.3} & 43.2   & \textbf{32.3} / 52.8   & 45.2 / 51.7  & 46.8        \\
+                        & F1  & 88.6 & \textbf{33.2} & 47.3   & \textbf{36.4} / 57.6  & 49.0 / 55.9   & 52.6   \\
+\midrule
+\multirow{2}{*}{BiDAF} & EM       & 60.0   & \textbf{15.0} & 21.0 & \textbf{18.9} / 29.2  & 20.5 / 28.9  & 25.3 \\
+                       &  F1      & 70.6  & \textbf{17.6 } & 23.6 & \textbf{22.5} / 34.5  & 24.1 / 34.2  & 32.0    \\
+\bottomrule
+\end{tabular}
+\caption{Adversarial evaluation on QA models. %in terms of EM and F1 scores.
+Pos-\advcodec and Ans-\advcodec respectively refer to the position targeted attack and answer targeted attack. 
+% Pos-\advcodecword and Ans-\advcodecword respectively refer to  the position targeted attack and answer targeted attack performed by \advcodecword. 
+The transferability-based blackbox attack uses adversarial text generated from whitebox models of the same architecture (the former score) and different architecture (the latter score). %to evaluate the blacobox model. 
+}
+\label{tab:AttackQA}
+% \vspace{-3mm}
+\end{table*}
+
+
+\subsection{Adversarial Evaluation Setup for Question Answering Systems}
+\textbf{Task and Dataset.} In this task, we choose the SQuAD dataset \citep{rajpurkar-etal-2016-squad} for question answering task. The SQuAD dataset is a reading comprehension dataset consisting of 107,785 questions posed by crowd workers on a set of Wikipedia articles, where the answer to each question must be a segment of text from the corresponding reading passage. To compare our method with other adversarial evaluation works \citep{jia-liang-2017-adversarial} on the QA task, we evaluate our adversarial attacks on the same test set as \citet{jia-liang-2017-adversarial}, which consists of 1000 randomly sampled examples from the SQuAD development set. 
+
+\textbf{Model.} We adapt the \emph{BERT} model to run on SQuAD v1.1 with the same strategy as that in \citet{Devlin2019BERTPO}, and we reproduce the result on the development set. \textit{BiDAF}\citep{seo2016-bidirectional} is a multi-stage hierarchical process that represents the context at different levels of granularity and uses bidirectional attention flow mechanism to obtain a query-aware context representation. 
+
+\textbf{Evaluation metrics.} For untargeted attack evaluation, We use the official script of the SQuAD dataset \citep{rajpurkar-etal-2016-squad} to measure both adversarial exact match rates and F1 scores. The lower EM and F1 scores mean the better attack success rate. For targeted attack evaluation, we use the targeted exact match rates and targeted F1 Score that calculate how many model outputs match the targeted fake answers (\textit{e.g.}, the fake answer ``Donald Trump'' in Table \ref{tab:example}). Higher targeted EM and F1 mean higher targeted attack success rate. 
+
+%The results are shown in Table \ref{targetedQA}. It shows that \advcodecword has the best targeted attack ability on QA. And all our attack methods outperform the baseline(Universal Triggers) when it comes to the targeted results.
+ 
+\textbf{Attack Baseline.}  \emph{AddSent} \citep{jia-liang-2017-adversarial} appends a manually constructed legit distracting sentence to the given text so as to introduce fake information, which can only perform untargeted attack. \emph{Universal Adversarial Triggers} \citep{wallace-etal-2019-universal} are input-agnostic sequences of tokens that trigger a model to produce a specific prediction when concatenated to any input from a dataset.  %Here, we compare the targeted attack ability of \advcodec with it.
+ 
+
+\subsection{Adversarial Evaluation}
+
+\subsubsection{\advcodecword}
+
+% \begin{table*}[htp!]\small \setlength{\tabcolsep}{7pt}
+%  \begin{minipage}[htp!]{0.48\linewidth}
+% % \begin{table}[t!] \small
+% \centering
+% \caption{Whitebox attack success rates for AdvCodec(Word) on Sentiment Classifiers. 
+% % The original accuracy for BERT and SAM are around 70\%.
+% %Adv($\cdot$) is short for our attack AdvCodec($\cdot$) at different levels.
+% %\advcodecsent is short for our sentence-level attack \advcodecsent, %while \advcodecword is short for our word-level attack \advcodecword.
+% }
+%  \label{tab:whiteboxSentiment}
+% \begin{tabular}{ccccc}
+% \toprule
+% Model & Origin & & {\advcodecword}  & Seq2Sick \\
+% \midrule
+% \multirow{2}{*}{BERT} & \multirow{2}{*}{0.703} & TSR           & \textbf{0.990}         & 0.974   \\
+%     &  & USR          & \textbf{0.993}          & 0.988    \\
+% \midrule
+% \multirow{2}{*}{SAM} & \multirow{2}{*}{0.704} & TSR        & \textbf{0.956}   & 0.933   \\
+%      & & USR       & \textbf{0.967}          & 0.952      \\
+% \bottomrule
+% \end{tabular}
+% % \vspace{-3mm}
+% % \end{table}
+% \end{minipage}
+% \quad 
+% \begin{minipage}[htp!]{0.48\linewidth}
+% % \begin{table}[t!] \small
+% \centering
+% \caption{Blackbox attack success rates for AdvCodec(Word) on Sentiment Classifiers. 
+% % The original accuracy for BERT and SAM are around 70\%.
+% %Adv($\cdot$) is short for our attack AdvCodec($\cdot$) at different levels.
+% %\advcodecsent is short for our sentence-level attack \advcodecsent, %while \advcodecword is short for our word-level attack \advcodecword.
+% }
+%  \label{tab:blackboxSentiment}
+% \begin{tabular}{ccccc}
+% \toprule
+% Model &  & {\advcodecword} &  Seq2Sick & TextFooler \\
+% \midrule
+% \multirow{2}{*}{BERT}  & TSR  & \textbf{0.990}  & 0.974   \\
+%     &  USR          & \textbf{0.993}          & 0.988    \\
+% \midrule
+% \multirow{2}{*}{SAM}  & TSR  & \textbf{0.956}   & 0.933   \\
+%      & USR       & \textbf{0.967}          & 0.952      \\
+% \bottomrule
+% \end{tabular}
+% % \vspace{-3mm}
+% % \end{table}
+% \end{minipage}
+% \end{table*}
+
+
+
+
+
+% \begin{table*}[t!]\small \setlength{\tabcolsep}{5pt}
+% \centering
+% \caption{WhiteBox targeted attack results on QA in terms of exact match rates and F1 scores by the official evaluation script. The lower EM and F1 scores mean the better attack success rate.}
+%  \label{WhiteboxQA}
+% \begin{tabular}{cccccccc}
+% \toprule
+% \multirow{2}{*}{Model} & & \multirow{2}{*}{Origin} & \multicolumn{2}{c}{Position Targeted Attack} & \multicolumn{2}{c}{Answer Targeted Attack} & \multicolumn{1}{c}{Baseline (untargeted)} \\
+% \cmidrule(lr){4-5} \cmidrule(lr){6-7} \cmidrule(lr){8-8}
+%  & & & {\advcodecsent} & {\advcodecword}  & {\advcodecsent} & {\advcodecword} & AddSent\\
+% \midrule
+
+% \multirow{2}{*}{BERT}  & EM & 81.2 &49.1       & \textbf{29.3}           & 50.9                    & 43.2                    & 46.8    \\
+%       & F1 & 88.6 & 53.8          & \textbf{33.2}         & 55.2                  & 47.3                  & 52.6  \\
+% %      & $\Delta \text{F1}$ & $=$ & 34.8  & \textbf{55.4} & 33.4 & 41.3 & 36.0 \\
+%       \midrule
+% \multirow{2}{*}{BiDAF} & EM & 60.0 & 29.3  	          & \textbf{15.0}             & 30.2                    & 21.0                      & 25.3    \\
+%       & F1 & 70.6 &  34.0   & \textbf{17.6}         & 34.4                  & 23.6                  & 32.0 \\
+%       \bottomrule
+% \end{tabular}
+% % \vspace{-0.3cm}
+% \end{table*}
+
+% \begin{table*}[htp!]\small \setlength{\tabcolsep}{5pt}
+% \centering
+% \caption{BlackBox attack results on QA in terms of exact match rates and F1 scores.  The transferability-based blackbox attack uses adversarial text generated from whitebox models (annotated as $(w)$) to attack different blakcbox models (annotated as $(b)$). }
+%  \label{BlackboxQA}
+% \begin{tabular}{cccccccc}
+% \toprule
+% \multirow{2}{*}{From} &\multirow{2}{*}{Attack} &  & \multicolumn{2}{c}{Position Targeted Attack} & \multicolumn{2}{c}{Answer Targeted Attack} & \multicolumn{1}{c}{Baseline (untargeted)} \\
+% \cmidrule(lr){4-5} \cmidrule(lr){6-7} \cmidrule(lr){8-8}
+%  & & & {\advcodecsent} & {\advcodecword}  & {\advcodecsent} & {\advcodecword}& AddSent\\
+% \midrule
+% \multirow{4}{*}{$\text{BiDAF}_{(w)}$} &\multirow{2}{*}{$\text{BERT}_{(b)}$}  & EM & 57.7           & 52.8           &  58.7	                   &  51.7	                  & \textbf{46.4}    \\
+%   &   & F1 &  62.9         & 57.5         & 63.7                 & 55.9                & \textbf{51.9} \\
+% \cmidrule{2-8}
+%  &\multirow{2}{*}{$\text{BiDAF}_{(b)}$}  & EM &      26.7 & \textbf{18.9} & 26.4 & 20.5 & 22.3 \\
+%   &   & F1 & 31.3 & \textbf{22.5} & 30.6 & 24.1 & 27.8\\
+%       \midrule
+% \multirow{4}{*}{$\text{BERT}_{(w)}$} & \multirow{2}{*}{$\text{BERT}_{(b)}$} & EM & 47.0 & \textbf{32.3} & 49.6 & 45.2 & 46.4\\
+%     &  & F1 & 52.0 & \textbf{36.4} & 54.2 & 49.0 & 51.9\\
+% \cmidrule{2-8}
+% & \multirow{2}{*}{$\text{BiDAF}_{(b)}$} & EM &  30.4        & 29.2             & 29.8 & 28.9                                    & \textbf{22.3}    \\
+%   &   & F1 &  35.5         & 34.5      & 35.3   & 34.2                           & \textbf{27.8} \\
+%       \bottomrule
+% \end{tabular}
+% % \vspace{-0.2cm}
+% \end{table*}
+
+
+
+
+\textbf{Attack Sentiment Classifiers.} We perform the baseline attacks and our \advcodec attack in concat attack scenario  under both whitebox and blackbox settings. Our targeted goal for sentiment classification is the opposite sentiment. Specifically, we set the targeted attack goal as 5-star for reviews originally below 3-star and 1-star for reviews above.
+%First we append a sentence to each text in our test set and only allow each attack method to modify this sentence to fool the target model. The adversarial sentences can both be generated by \advcodecsent and \advcodecword. 
+We compare our results with a strong word-level attacker Seq2sick, as shown in the Table \ref{tab:AttackSentiment}. We can see our \advcodecword  outperforms the baselines and achieves nearly $100\%$ attack success rate on the BERT model under whitebox settings. 
+
+
+
+We also perform transferability based blackbox attacks. Specifically, the transferability-based blackbox attack uses adversarial text generated from whitebox BERT model to attack blackbox SAM, and vice versa. We compare our blackbox attack success rate with the blackbox baseline TextFooler and blackbox Seq2Sick based on transferability. Table \ref{tab:AttackSentiment} demonstrates our \advcodecword model still has the best blackbox targeted and untargeted success rate among all the baseline models.
+
+% Also, we realize the targeted success rate for \advcodecsent is lower than the word-level baseline. We assume the reason is that \advcodecsent has the dependency tree constraints during decoding phase, thus increasing the difficulty to find both grammatical correct and adversarial sentences that can successful attack. 
+
+% On the contrary, the Seq2Sick baseline can edit any words under no semantic or syntactic constraints. Moreover, our following human evaluation exactly confirms \advcodecsent has better language quality. 
+% However, it is somewhat unfair to compare a sentence-level adversarial text generator with a word-level one because a good sentence autoencoder should not output ungrammatical words, while the Seq2Sick baseline can edit any words under no semantic or syntactic constraints. Moreover, our following human evaluation exactly confirms \advcodecsent has better language quality. 
+
+%  \textbf{Scatter Attack v.s. Concat Attack. }In addition, we find scatter attack success rate is slightly lower than concat attack. We think there are two reasons to explain this phenomenon: Firstly, the average number of tokens added in scatter attack is 10, while the average number of tokens added in concat attack is 19. Therefore concat attack has the freedom to manipulate on more words than scatter attack, thus resulting in higher attack accuracy. Secondly, inserting adversarial tokens to different positions of the passage also affects the success rate, which is discussed in \S \ref{sec:ablation}.
+%also reveals the positions where adversarial tokens inserted also affect the attack success rate.
+
+ % \textbf{Blackbox Attack.} We perform transferability based blackbox attacks. We compare our blackbox attack success rate with the blackbox baseline TextFooler and blackbox Seq2Sick based on transferability. Table \ref{BlackboxSentiment} demonstrates our \advcodecword model still has the best blackbox targeted and untargeted success rate among all the baseline models.
+
+%\textbf{Scatter Attack.} In the scatter attack scenario, Table \ref{scatterwhite}  and Table \ref{scatterblack} in the appendix show that our \advcodecword outperforms the Seq2sick baseline on both whitebox and transferability based blackbox attacks.
+
+
+
+
+% ablation study of positions
+% qualatative results table here -- for multiple task and models
+
+% qualatative results table here -- for multiple task and models
+
+
+% \textbf{Adversarial Evaluation.}
+
+\begin{table}[t!] \small
+% Higher targeted EM and F1 mean higher targeted attack success rate. 
+\begin{tabular}{ccccc}
+\toprule
+\multicolumn{2}{l}{Model} & \advcodecsent  & \advcodecword  & UT \\
+\midrule
+\multirow{2}{*}{BERT}  & target EM & 32.1                  & \textbf{43.4}                  & 1.4               \\
+      & target F1 & 32.4                   & \textbf{46.5}                  & 2.1   \\   
+      \midrule
+\multirow{2}{*}{BiDAF} & target EM & 53.3                  & \textbf{71.2}                  & 21.2              \\
+      & target F1 & 56.8                  & \textbf{75.6}                  & 22.6              \\
+        \bottomrule
+\end{tabular} 
+\caption{Targeted Attack Results of whitebox attack on QA. UT is short for Universal Trigger baseline.}
+\label{targetedQA}
+% \vspace{-4mm}
+\end{table}
+
+
+\begin{table*}[t!] \small
+\centering
+\begin{tabular}{ccccc|cccc}
+\toprule
+\multirow{2}{*}{Method} & \multicolumn{4}{c}{Sentiment Classifier} & \multicolumn{4}{c}{QA} \\
+\cmidrule(lr){2-5} \cmidrule(lr){6-9}
+         & Origin Human & Human & Models & Quality & Origin Human & Human & Models  & Quality\\
+\midrule
+\advcodecsent & \multirow{2}{*}{0.95} & 0.82  & 0.363 / 0.190 & 65.67\%  & \multirow{2}{*}{90.99}  & 81.78  & 49.1 / 29.3  &   69.50\%   \\
+\advcodecword &                       & 0.82  & 0.007 / 0.033 & 34.33\%  &                         & 82.90  & 29.3 / 15.0  &   30.50\%    \\
+\bottomrule
+\end{tabular}
+\caption{Human evaluation on \advcodecsent and \advcodecword. ``Origin Human'' is the human scores on the original dataset. ``Human'' are the human scores on adversarial datasets.}
+ \label{tab:human}
+\vspace{-3mm}
+\end{table*}
+
+
+\textbf{Attack QA models.} We perform the whitebox attack and transferability-based attack on our testing models. As is shown in Table \ref{tab:AttackQA}, \advcodecword achieves the best whitebox attack results on both BERT and BiDAF. It is worth noting that although BERT has better performances than BiDAF, the performance drop for BERT $\Delta \text{F1}_\text{BERT}$ is $55.4$ larger than the performance drop for BiDAF $\Delta \text{F1}_\text{BiDAF} = 53.0$, which again proves the BERT is insecure under the adversarial evaluation. We also find the position targeted attack is slightly stronger than the answer targeted attack. We assume it is because the answer targeted attack has fixed targeted answer and limited freedom to alter the appended sentence, but the position targeted attack has more freedom to alter the fake answer from the targeted position spans. 
+
+Then we evaluate the targeted attack performance on QA models. The results are shown in Table \ref{targetedQA}. It shows that \advcodecword has the best targeted attack ability on QA. And all our attack methods outperform the baseline.
+
+We also transfer adversarial texts generated from whitebox attacks to perform blackbox attacks. Table \ref{tab:AttackQA} shows the result of the blackbox attack on testing models. All our proposed methods outperform the baseline method (AddSent) when transferring the adversaries among models with same architectures. 
+
+ %\textbf{Scatter Attack.} 
+% We also perform the untargeted scatter attack on BERT-QA. We insert 30 random tokens (but no more than $1/3$ the total words of the paragraph) over the paragraph, optimize and find the adversarial tokens that can cause model output the wrong answers in the untargeted manner. The EM score and F1 score respectively drop from $81.2$ to $34.3$ and $88.6$ to $49.7$. We can see that the untargeted scatter attack can also achieve a higher untargeted attack success rate than \citet{jia-liang-2017-adversarial}.
+%We also tried the scatter attack on QA though the performances are not good. It turns out QA systems highly rely on the relationship between questions and contextual clues, which is hard to break when setting an arbitrary token to a target answer. 
+%This is also why we use some heuristics to create similar fake context when initializing QA appended sentence. 
+%We discussed in Appendix A.3 the untargeted scatter attack can work well and outperform the baseline methods.
+%\boxin{explain why scatter attack does not work.} 
+
+
+
+\subsection{Human Evaluation \& \advcodecsent}
+\label{sec:quality}
+We conduct a thorough human subject evaluation to assess the human response to different types of generated adversarial text. The main conclusion is that even though these adversarial examples are effective at attacking machine learning models, they are much less noticeable by humans.
+
+\subsubsection{Evaluation Metrics and Setup} We focus on two metrics to evaluate the validity of the generated adversarial sentence:
+\textbf{adversarial text quality} and  \textbf{human performance} on the original and adversarial dataset. To evaluate the adversarial text quality, human participants are asked to choose the data they think has better quality. To ensure that human is not misled by our adversarial examples, we ask human participants to perform the sentiment classification and question answering tasks both on the original dataset and adversarial dataset. We hand out the adversarial dataset and origin dataset to $533$ Amazon Turkers to perform the human evaluation. More experimental setup details can be found in Appendix \S\ref{appendix:human}.
+
+% To evaluate the adversarial text quality, human participants are asked to choose the data they think has better quality. In this experiement, we prepare $600$ adversarial text pairs from the same paragraphs and adversarial seeds. We hand out these pairs to $28$ Amazon Turks. Each turk is required to annotate at least 20 pairs and at most 140 pairs to ensure the task has been well understood. We assign each pair to at least 5 unique turks and take the majority votes over the responses. 
+
+
+% Adversarial dataset on sentiment classification consists of \advcodecsent concatenative adversarial examples and \advcodecword scatter attack examples. Adversarial dataset on QA consists of concatenative adversarial examples generated by both \advcodecsent and \advcodecword. 
+% To ensure that human is not misled by our adversarial examples, we ask human participants to perform the sentiment classification and question answering tasks both on the original dataset and adversarial dataset. Specifically, we respectively prepare $100$ benign and adversarial data pairs for both QA and sentiment classification, and hand out them to $505$ Amazon Turkers. Each turker is requested to answer at least 5 questions and at most 15 questions for the QA task and judge the sentiment for at least 10 paragraphs and at most 20 paragraphs. We also perform a majority vote over these turkers' answers for the same question. 
+
+
+\subsubsection{Analysis}
+
+Human evaluation results are shown in Table \ref{tab:human}. We see that the overall vote ratio for \advcodecsent is higher, which means it has better language quality than \advcodecword from a human perspective.
+We assume the reason is that \advcodecsent decodes under the dependency constraints during decoding phase so that it can more fully harness the tree-based autoencoder structure. And it is reasonable to see that better language quality comes at the expense of a lower adversarial success rate. As Table \ref{tab:human} shows, the adversarial targeted success rate of \advcodecsent on SAM is $20\%$ lower than that of \advcodecword, which confirms the trade-off between language quality and adversarial attack success rate.
+
+The human scores on original and adversarial datasets are also shown in Table \ref{tab:human}. We can see that human performances are barely affected by concatenated adversarial sentence.
+% While we can spot a drop from the benign to adversarial datasets, we conduct an error analysis in QA and find the error examples are noisy and not necessarily caused by our adversarial text. For adversarial data in the sentiment classification task, we notice that the generated tokens or appended sentences have opposite sentiment from the benign one. However, our evaluation results show human readers can naturally ignore abnormal tokens and make correct judgement according to the context. 
+% We note that the human performance drops a bit on adversarial text.
+Specifically, the scores drop around $10\%$ for both QA and classification tasks based on \advcodec. This is superior to the state-of-the-art algorithm \citep{jia-liang-2017-adversarial} which has $14\%$ performance drop for human performance.
+
+We also analyze the human error cases. A further quantitative analysis (Appendix \S \ref{appendix:humanerror}) shows that most wrong human answers do not point to our generated fake answers but may come from the sampling noise when aggregating human results. 
+
+% We also analyze the human error cases. In QA, we find most wrong human answers do not point to our generated fake answers, which confirms that their errors are not necessarily caused by our concatenated adversarial sentence. We conduct a further quantitative analysis and find aggregating human results can induce sampling noise. Since we use majority vote to aggregate the human answers, when different answers happen to have the same votes, we will randomly choose one as the final result. If we always choose the answer that is close to the ground truth in draw cases, we later find that the majority vote F1 score increases from $82.897$ to $89.167$, which indicates that such randomness contributes to the noisy results substantially, instead of the adversarial manipulation. 
+Also, we find the average length of the adversarial paragraph is around $12$ tokens more than the average length of the original one after we append the adversarial sentence. We guess the increasing length of the paragraph also has an impact on the human performance.
+
+% More additional ablation studies in Appendix \S\ref{appendix:ablation} are conducted to explore the attack effectiveness of different autoencoders, changing different attack parameters such as the position of the appended adversarial sentence, and so on.
+
+In Appendix \S\ref{appendix:ablation}, we conduct some ablation studies to explore the attack effectiveness of different autoencoders. We also investigate BERT attention by changing different attack parameters such as the position of the appended adversarial sentence, and draw several interesting conclusions. Appendix \S\ref{appendix:examples} shows more adversarial examples.
+
+
+% 
+
+% When comparing the standard sequential autoencoder with our tree-based autoencoder, we observe that dependency rules are integrated directly based on the tree structures, thus it can intrinsically help regularize the syntactic correctness of generated texts. This is also confirmed by the human study in \S \ref{sec:quality} that \advcodecsent generated adversarial text has higher language quality and is more syntactically correct. Moreover, the tree-based autoencoder can better preserve the semantic meaning of the source sentence, which is confirmed by the following experiment in terms of reconstruction loss.  
+% outperforms standard autoencoder in terms of both attack success rate and linguistic quality. 
+
+% thus increasing the difficulty to find both grammatical correct and adversarial sentences that can successful attack. 
+
+% \subsection{Comparison of Adversarial text Quality}
+% \label{sec:quality}
+% % describe what's the tasks
+%  To evaluate humans' respond to our adversarial data, we present the adversarial text generated by \advcodecsent and \advcodecword based on the same initial seed. Human participants are asked to choose the data they think has better semantic quality. 
+ 
+% \begin{table}\small
+% \centering
+% \caption{ Human evaluation on adversarial text quality aggregated by majority vote.}
+%  \label{advsentcomp}
+% \begin{tabular}{ccccc}
+% \toprule
+% Method      & Sentiment    & Maj Vote  & Maj Acc \\
+% \advcodecsent   & 0.603/0.603 & 65.67\% &                       \\
+% \advcodecword   & 0.603/0.603 & 34.33\% &    \\
+% \bottomrule
+% \end{tabular}
+% \end{table}
+
+ 
+% In this experiement, we prepare $600$ adversarial text pairs from the same paragraphs and initial seeds. We hand out these pairs to $28$ Amazon Turks. Each turk is required to annotate at least 20 pairs and at most 140 pairs to ensure the task has been well understood. We assign each pair to at least 5 unique turks and take the majority votes over the responses. Human evaluation results are shown in Table \ref{advsentcomp}, from which we see that the overall vote ratio for \advcodecsent is $66\%$, meaning \advcodecsent has better language quality than \advcodecword from a human perspective. This  is due to  the fact that \advcodecsent more fully harness the  tree-based autoencoder structure compared to \advcodecsent. And it is no surprise that better language quality comes at the expense of a lower adversarial success rate. As Table \ref{WhiteboxSentiment} shows, the adversarial targeted success rate of \advcodecsent on SAM is $20\%$ lower than that of \advcodecword, which confirms the trade-off between language quality and adversarial success rate.
+
+% \subsection{Human performance on adversarial text}
+% % 4 qa tasks, and 4 sentiment
+% \begin{table}[t]\small
+% %   \begin{minipage}[t]{0.5\linewidth}
+% \centering
+% \caption{\small Human performance on the original dataset and adversarial dataset of Sentiment Analysis and QA.}
+%  \label{humanSentiment}
+% \begin{tabular}{ccc}
+% \toprule
+% \small Dataset         & \small Majority Acc (Sentiment) & Majority F1 (QA) \\
+% \midrule
+% \small Origin & \small 0.95    & 90.99        \\
+% \small \advcodecword &  \small 0.82   & 82.90  \\
+% \small \advcodecsent & \small 0.82   & 81.78 \\
+% \bottomrule
+% \end{tabular}
+% % \end{minipage}
+% %       \begin{minipage}[t]{0.5\linewidth}
+% % \centering
+% % \caption{\small Human performance on QA}
+% %  \label{humanQA}
+% % \begin{tabular}{cc}
+% % \toprule
+% % \small Method        & \small Majority F1 \\
+% % \midrule 
+% % \small Origin      & \small 90.987     \\
+% % \small \advcodecword  & \small 82.897      \\
+% % \small \advcodecsent  & \small 81.784      \\
+% % \bottomrule
+% % \end{tabular} \vspace{-0.5cm}
+% %     \end{minipage}
+% \vspace{-2mm}
+% \end{table}
+
+
+% We also note that humans are  insensitive to both scatter attack examples and appended adversarial examples, while human readers 
+

@@ -1,0 +1,184 @@
+\section{Methodology}
+\label{section: methodology}
+This section describes the data used to run our experiments, the metrics used to assess the performances of the different approaches investigated in this work, as well as the methodology used for training neural-networks to detect anti-patterns.
+\subsection{Building a Reliable Oracle}
+\label{Subsection: oracle}
+
+To train and evaluate the performances of \NAME{}, as well as to compare it with competing classifiers, we needed an oracle reporting the occurrences of the two studied anti-patterns in a set of software systems. Unfortunately, we found no such large dataset in the literature. Indeed, creating a large oracle for anti-patterns is a painful process that requires weeks of manual source code analysis, which explains the unavailability of such data. Hence, we created our oracle following a different procedure for each of the two anti-patterns. 
+
+For God Class, we found two sets of manually-detected occurrences in open-source Java systems, respectively from DECOR~\cite{Moha10-TSE-DECOR} and HIST~\cite{PalombaBPOLP13} replication packages\footnote{ http://www.rcost.unisannio.it/mdipenta/papers/ase2013/}\footnote{http://www.ptidej.net/tools/designsmells/materials/}. Thus, we created our oracle from these sets under two constraints: (1) the full history of the system must be available through Git or SVN, and (2) the occurrences reported must be relevant, i.e., we kept only the systems for which we agreed with the occurrences tagged. After filtering, over the 15 systems available in these replication packages, we retained eight to construct our oracle.  
+
+For Feature Envy, most of the approaches proposed in the literature are evaluated on artificial occurrences, i.e., methods assumed to be correctly placed in the original systems, are then extracted and moved into random classes to produce Feature Envy occurrences (i.e., misplaced methods) \cite{moghadam2012automated, sales2013recommending, liu2018deep}. However, our approach partially relies on the history of code components. Therefore, such artificial occurrences are not usable because they have been willingly introduced in the considered systems' snapshot. Thus, we had to build manually our own oracle.
+
+First, we formed a set of 779 candidate Feature Envy occurrences over the eight subject systems by merging the output of three detection tools (HIST, InCode, and JDeodorant), adjusting their detection thresholds to produce a number of candidate per system proportional to the systems sizes. Second, three different groups of people manually checked each candidate of this set: (1) the authors of this paper, (2) nine M.Sc.\ and Ph.D.\ students, and (3) two software engineers. We gave them access to the source code of the enclosing classes (where the methods were defined) and the potential envied classes. After analyzing each candidate, we asked respondents to report their confidence in the range [\textit{strongly\_approve}, \textit{weakly\_approve}, \textit{weakly\_disapprove}, \textit{strongly\_disapprove}]. To avoid any bias, none of the respondent was aware of the origin of each candidate. We made the final decision using a weighted vote over the reported answers. First we assigned the following weights to each confidence level:
+\begin{center}
+\resizebox{9.5cm}{!}{
+\begin{tabular} {l l l l l l l l}
+$strongly\_approve$ & $\rightarrow$ & $1.00$ && $weakly\_disapprove$ & $\rightarrow$ & $0.33$ \\
+$weakly\_approve$ & $\rightarrow$ & $0.66$ && $strongly\_disapprove$ & $\rightarrow$ & $0.00$
+\end{tabular}
+}
+\end{center}
+
+Then, a candidate is considered as a Feature Envy if the mean weight of the three answers reported for this occurrence is greater than 0.5.
+
+Table~\ref{Table: oracle} reports, for each system, the number of God Classes, the number of produced Feature Envy candidates, and the number of Feature Envy retained after manual-checking.
+
+\begin{table}[htb]
+\caption{Characteristics of the Oracle}
+\label{Table: oracle}
+\resizebox{9.2cm}{!}{
+\begin{tabular} { l l l l}
+\hline
+System name &  \#God\_Class & \#Candidate\_FE& \#Feature\_Envy  \\ \hline
+Android Opt Telephony&11&62&18 \\
+Android Support&4&21&2 \\
+Apache Ant&7&110&25 \\
+Apache Lucene&4&42&4 \\
+Apache Tomcat&5&173&57 \\
+Apache Xerces&15&129&37 \\
+ArgoUML&22&144&24 \\
+Jedit&5&98&22 \\
+\textbf{Total}&\textbf{73}&\textbf{779}&\textbf{189} \\ \hline
+\end{tabular}
+}
+\end{table}
+
+\subsection{Studied Systems}
+\label{subsection: studied systems}
+The context of our study consists of the eight open-source Java software systems presented in Table~\ref{Table: oracle}, which belong to various ecosystems. Two systems belong to the Android APIs\footnote{https://android.googlesource.com/}: Android Opt Telephony and Android Support. Four systems belong to the Apache Foundation\footnote{https://www.apache.org/}: Apache Ant, Apache Tomcat, Apache Lucene, and
+Apache Xerces. Finally, one free UML design software: ArgoUML\footnote{http://argouml.tigris.org/} and one text editor: Jedit\footnote{http://www.jedit.org/} available under GNU General Public License\footnote{https://www.gnu.org/}. Without loss of generalizability, we chose to analyze only the directories that implement the core features of the systems and to ignore test directories. Table~\ref{Table: systems-hand} reports for each system, the Git identification (SHA) of the considered snapshot, its age (i.e., number of commit) and its size (i.e., number of class).
+
+\begin{table}[htb]
+\caption{Characteristics of the Studied Systems}
+\label{Table: systems-hand}
+\resizebox{9.2cm}{!}{
+\begin{tabular} { l l l l l}
+\hline
+System name & Snapshot & Directory &\#Commit & \#Class \\ \hline
+Android Opt Telephony&c241cad&src/java/&98&192 \\
+Android Support&38fc0cf&v4/&195&109 \\
+Apache Ant&e7734de&src/main/&6397&694\\
+Apache Lucene&39f6dc1&src/java/&429&155\\
+Apache Tomcat&398ca7ee&java/org/&3289&925\\
+Apache Xerces&c986230&src/&3453&512\\
+ArgoUML&6edc166&src\_new/&5559&1230 \\
+Jedit&e343491& ./&1181&423\\ \hline
+\end{tabular}
+}
+\end{table}
+
+As explained in Section~\ref{Subsection: oracle}, the choice of these systems has been motivated by the need of manually-detected occurrences of God Class. However, they have been used in prior studies for a similar purpose. Consequently they belong to various domains and as shown in Table~\ref{Table: systems-hand}, they have different sizes and history lengths which comfort us for the generalization of our findings.
+
+\subsection{Evaluation Metrics}
+To compare the performances achieved by different approaches on the studied systems, we consider each approach as a binary classifier able to perform a boolean prediction on each entity of the system. Thus, we evaluate their performances using the following confusion matrix:
+
+\begin{table}[htb]
+\caption{Confusion Matrix for Anti-patterns Detection}
+\label{Table: confusion matrix}
+\begin{center}
+\begin{tabular} {c  c | c  c | c }
+& & \multicolumn{2}{ c |}{\textbf{\textit{predicted}}} & \multirow{2}{*}{\rotatebox[origin=c]{90}{\textbf{\textit{total}}}}\\ 
+& & $1$ & $0$ & \\ \hline
+\multirow{2}{*}{\rotatebox[origin=c]{90}{\textbf{\textit{true}}}}& $1$ & $TP$ & $FN$ & $n_{pos}$ \\
+& $0$ & $FP$ & $TN$ & $n_{neg}$\\ \hline
+\multicolumn{2}{ c |}{\textbf{\textit{total}}}& $m_{pos}$& $m_{neg}$ & $n$
+\end{tabular}
+\end{center}
+\end{table}
+
+
+With ($TP$) the number of true positives; ($FN$) the number of false negatives (or misses); ($FP$) the number of false positives and ($TN$) the number of true negatives. Also, we note $m_{pos}$ and $m_{neg}$ respectively the number of entities positively and negatively labeled by a classifier; $n_{pos}$ and $n_{neg}$ respectively the number of affected and healthy entities in a system ; and $n$ the total number of entities in the system. Then, based on this matrix, we compute the widely adopted \textit{precision} and \textit{recall} metrics:
+
+\begin{center}
+\begin{minipage}{.5\linewidth}
+\begin{equation}
+  precision = \frac{TP}{TP + FP}
+\end{equation}
+\end{minipage}%
+\begin{minipage}{.5\linewidth}
+\begin{equation}
+  recall = \frac{TP}{TP + FN}
+\end{equation}
+\end{minipage}
+\end{center}
+
+Although these two metrics express relevant information about the classification performances, our evaluation of the classifiers investigated in this work should not rely solely on them. Indeed, commonly used evaluation metrics such as precision, recall or F-measure can be biased due to the fact that the positive and negative classes are of different sizes~\cite{powers2011evaluation}. For this reason and to obtain a single aggregated evaluation metric, we also compute the Matthews Correlation Coefficient (MCC)~\cite{matthews1975comparison}, which has been shown to limit the bias mentioned above and provide a more accurate description of the confusion matrix~\cite{powers2011evaluation}:   
+\begin{equation}
+\label{mcc}
+MCC = \frac{TP \times n - n_{pos} \times m_{pos}}{\sqrt{n_{pos} \times m_{pos} \times n_{neg} \times m_{neg}}}
+\end{equation}
+
+\subsection{Training}
+\label{subsection: training}
+Here, we discuss the considerations adopted to train neural-networks on the task of anti-patterns detection. We consider training a multi-layer feed-forward neural-network to assign a boolean value to the entities of a system. First, the training set $\mathcal{D} = \{(\textbf{x}_{i}, y_{i})\}_{i=1}^{n}$ contains the instances and labels associated to each entity of the training systems. With $\textbf{x}_{i}$ the input vector (i.e., instance) corresponding to the $i^{th}$ entity, $y_{i} \in \{0, 1\}$ the true label for this entity and $n$ the size (i.e., number of entities) of the training set. Second, we refer to the set of weights of the network as $\bm{\theta} = \{\textbf{w}_{l}\}_{l=1}^{L}$, with $\textbf{w}_{l}$ being the weight matrix of the $l^{th}$ layer and $L$ the number of layers in the network. Finally, we refer to the output of the neural network corresponding to the positive label, i.e., the predicted probability that an entity is affected as:
+
+\begin{equation}
+   P_{\bm{\theta}}(1|\textbf{x}_{i}) = g(\textbf{x}_{i}.\bm{\theta}) 
+\end{equation}
+
+With $g$ the sigmoid function:
+
+\begin{equation}
+    g(x) = \frac{1}{1 + e^{-x}}
+\end{equation}
+
+\subsubsection{Custom Loss Function}
+\label{section: loss}
+Software systems are usually affected by a small proportion of anti-patterns ($<1\%$) \cite{palomba2018diffuseness}. As a consequence, the distribution of labels within a dataset containing software system entities is highly imbalanced. Such imbalanced dataset compromises the performances of models optimized using conventional loss functions \cite{he2008learning}. Indeed, the conventional \textit{binary\_cross\_entropy} loss function maximizes the expected accuracy on a given dataset ,i.e., the proportion of instances correctly labeled. In the context of anti-patterns, the use of this loss function lead to useless models that assign the majority label to all input instances, thus maximizing the overall accuracy ($>99\%$) during training. To overcome this issue, we must define a loss function that reflects our training objective (i.e., finding the set of weights $\bm{\theta^{*}}$ that maximizes the MCC achieved on the training set) which can be expressed as:
+
+\begin{equation}
+\bm{\theta^{*}} = \argmax_{\bm{\theta}} MCC(\bm{\theta}, \mathcal{D})
+\end{equation}
+
+Which can be addressed through gradient descent by considering a loss: $L = - MCC$. However, to compute the gradient of the loss, we need it to be a continuous and differentiable function of the weights $\bm{\theta}$. As defined in Equation~\ref{mcc}, the MCC does not meet this criterion, which prevents its direct use to define our loss function. Indeed, computing the number of true positives ($TP$) and positives ($m_{pos}$) (cf. Table~\ref{Table: confusion matrix}) requires counting elements from the output probability of the model, which necessarily involves discontinuous operators:
+\begin{equation}
+TP(\bm{\theta}, \mathcal{D}) = \sum_{\substack{i=1 \\ y_{i} = +1}}^{n} \delta(P_{\bm{\theta}}(1|\textbf{x}_{i}) > 0.5)
+\end{equation}
+\begin{equation}
+m_{pos}(\bm{\theta}, \mathcal{D}) = \sum_{i=1}^{n} \delta(P_{\bm{\theta}}(1|\textbf{x}_{i}) > 0.5)
+\end{equation}
+
+With:
+
+\begin{equation}
+\label{kronecker}
+    \delta(x) = \bigg\{\begin{tabular}{l}
+1 if $x$=True\\
+0 if $x$=False
+\end{tabular}
+\end{equation}
+
+To define a continuous and differentiable approximation of the MCC, we proceed similarly to the approach proposed by Jansche~\cite{jansche2005maximum} to maximize the expected F-measure through logistic regression, which relies on the following limit:
+
+\begin{equation}
+\label{equation: approx}
+\delta(P_{\bm{\theta}}(1|\textbf{x}_{i}) > 0.5) = \lim_{\gamma \to + \infty} \text{g}(\gamma\textbf{x}_{i}.\bm{\theta})
+\end{equation}
+
+Thus, to calculate the loss of our model, we compute the MCC as expressed in Equation~\ref{mcc} using the identity $m_{neg} = n - m_{pos}$, as well as the following approximations: 
+
+\begin{equation}
+TP(\bm{\theta}, \mathcal{D}) \approx \sum_{\substack{i=1 \\ y_{i} = +1}}^{n} g(\gamma \textbf{x}_{i}.\bm{\theta}) \quad with \quad \gamma > 0
+\end{equation}
+\begin{equation}
+m_{pos}(\bm{\theta}, \mathcal{D}) \approx \sum_{i=1}^{n} g(\gamma \textbf{x}_{i}.\bm{\theta}) \quad with \quad \gamma > 0
+\end{equation}
+
+Note that the value of the hyper-parameter $\gamma$ will be adjusted during the tuning of our model.
+
+\subsubsection{Regularization}
+\label{subsection: regularization}
+Regularization is a way to prevent a statistical model to learn specific and irrelevant features of its training data, which is known as ``overfitting''. To help our model to generalize to new examples and prevent overfitting, we use the widely adopted $L_{2}$ regularization technique.
+
+$L_{2}$ regularization consists in adding a term to the loss function to encourage the weights to be small \cite{witten2016data}. This term is proportional to the sum of the Euclidean norm of the weight matrices, i.e., $\|\textbf{w}\|_{2}=\sqrt{\textbf{w}^{\top}\textbf{w}}$, also called $L_{2}$-norm. Thus, the $L_{2}$ regularization term added to the loss function can be expressed as:
+
+\begin{equation}
+L_{2} = \lambda \sum_{l=1}^{L+1} \|\textbf{w}_{l}\|_{2}
+\end{equation}
+
+With $\lambda \in \mathbb{R}$ an hyper-parameter adjusted during cross-validation.
+
+\subsubsection{Boosting}
+\label{boosting}
+Before starting to train a neural-network on a given dataset, the values of each weight of the network must me set to an initial value, which is called \textit{weight initialization}. In practice, the weights are often initialized randomly following a Gaussian distribution whose parameters (i.e., mean and standard deviation) depend on the network's shape~\cite{glorot2010understanding}. As a consequence, two neural networks trained identically may achieve different performances due to the randomness of their initialization. To limit this phenomenon, several networks are trained separately and the final prediction is computed from the output of each classifier, which is commonly referred to as \textit{boosting} or \textit{ensemble learning}. Beside stabilizing the output of the model, such technique has been shown to improve the overall performances and even to lead to better results than those of each independent classifier~\cite{dietterich2000ensemble}. In the context of this study, we used the widely adopted Bayesian averaging heuristic to compute the ensemble prediction of the model from the output of several independently trained networks (10 in our study). This heuristic simply consists in taking the average of the probabilities outputed by the different classifiers. 

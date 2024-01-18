@@ -1,0 +1,118 @@
+\section{Introduction}
+\label{sec:introduction}
+Theory and algorithms for large-margin classifiers 
+have been studied extensively 
+since those classifiers guarantee low generalization errors 
+when they have large margins over training examples 
+(e.g.,~\cite{schapire+:as98,mohri+:mitpress18}). 
+In particular, 
+the $\ell_1$-norm regularized soft margin optimization problem, 
+defined later, is a formulation of 
+finding sparse large-margin classifiers based on the linear program (LP). 
+This problem aims to optimize the $\ell_1$-margin 
+by combining multiple hypotheses from some hypothesis class $\hset$. 
+The resulting classifier tends to be sparse, 
+so $\ell_1$-margin optimization is helpful for feature selection tasks.
+Off-the-shelf LP solvers can solve the problem, 
+but they are still not efficient enough for a huge class $\hset$. 
+
+Boosting is a framework 
+for solving the $\ell_1$-norm regularized margin optimization 
+even though $\hset$ is infinitely large. 
+% Roughly speaking, boosting collects a hypothesis one by one
+% to maximize the margin. 
+Various boosting algorithms have been invented. 
+LPBoost~\citep{demiriz+:ml02} is a practical algorithm 
+that often works effectively. 
+% and often works efficiently in practice.
+Although LPBoost terminates rapidly, 
+It is shown that 
+it takes $\Omega(m)$ iterations in the worst case, 
+where $m$ is the number of training examples~\citep{warmuth+:nips07}. 
+\cite{shalev-shwartz+:jml10} invented
+% Shalev-Shwartz and Singer~\citep{shalev-shwartz+:jml10} invented
+%the Relaxed margin algorithm, 
+an algorithm
+called Corrective ERLPBoost 
+(we call this algorithm C-ERLPBoost for shorthand) 
+in the paper on ERLPBoost~\citep{warmuth+:alt08}. 
+C-ERLPBooost and ERLPBoost 
+find $\epsilon$-approximate solutions 
+in $O(\ln(m/\nu) / \epsilon^2)$ iterations, 
+where $\nu \in [1, m]$ is the soft margin parameter. 
+The difference is the time complexity per iteration; 
+ERLPBoost solves a convex program (CP) for each iteration, 
+while C-ERLPBooost solves a sorting-like problem. 
+Although ERLPBoost takes much time per iteration, 
+it takes fewer iterations than C-ERLPBoost 
+in practical applications. 
+For this reason, 
+ERLPBoost is faster than C-ERLPBoost. 
+Our primary motivation is to investigate boosting algorithms 
+with provable iteration bounds, which perform as fast as LPBoost.
+
+This paper has two contributions. 
+Our first contribution is to give 
+a unified view of boosting for soft margin optimization. 
+We show that LPBoost, ERLPBoost, and C-ERLPBoost are 
+instances of the Frank-Wolfe algorithm. 
+%The second one proposes 
+
+
+Our second contribution is to propose
+a generic scheme for boosting based on the unified view.
+Our scheme combines a standard Frank-Wolfe algorithm and \emph{any} algorithm 
+and switches one to the other at each iteration in a non-trivial way.
+%a Modified LPBoost (MLPBoost) \textcolor{red}{(Rename?)}. 
+We show that this scheme guarantees 
+the same convergence rate, $O(\ln(m/\nu) / \epsilon^2)$,  
+as ERLPBoost and C-ERLPBoost.
+One can incorporate any update rule to this scheme
+without losing the convergence guarantee 
+so that it takes advantage of better updates 
+of the second algorithm in practice.
+%with fast computation per iteration. 
+In particular, 
+we propose to choose LPBoost 
+as the secondary algorithm, 
+% as the second algorithm to combine, 
+and we call the resulting algorithm 
+Modified LPBoost (MLPBoost). 
+
+In experiments on real datasets, 
+MLPBoost works comparably with LPBoost, and 
+%if we incorporate the LPBoost update to MLPBoost. 
+MLPBoost is the fastest 
+among theoretically guaranteed algorithms, as expected. 
+
+
+Table~\ref{table:boosting_comparison} compares 
+LPBoost, ERLPBoost, C-ERLPBoost, and MLPBoost. 
+\begin{table}[t]
+    \centering
+    \caption{%
+        Comparison of the boosting algorithms. %
+        C-ERLPBoost solves the problem per iteration %
+        by sorting based algorithm, while our work and %
+        LPBoost solves linear programming (LP). %
+        ERLPBoost solves convex programming (CP) per iteration. %
+        In practice, the algorithms work fast in the order %
+        LPBoost, ERLPBoost, and C-ERLPBoost. %
+        As we show in section~\ref{sec:experiments}, %
+        our algorithm is as fast as LPBoost. %
+    }
+    \label{table:boosting_comparison}
+    \begin{tabular}{|c|cccc|}
+        \toprule
+                    & LPBoost & C-ERLPBoost & ERLPBoost & One of our work \\
+        \midrule
+        Iter. bound 
+            & $\Omega(m)$ 
+            & $O\left(\frac{1}{\epsilon^2} \ln \frac{m}{\nu}\right)$ 
+            & $O\left(\frac{1}{\epsilon^2} \ln \frac{m}{\nu}\right)$ 
+            & $O\left(\frac{1}{\epsilon^2} \ln \frac{m}{\nu}\right)$ \\
+        Problem per iter. & LP & Sorting & CP & LP \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+

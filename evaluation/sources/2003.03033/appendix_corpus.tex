@@ -1,0 +1,75 @@
+
+
+% ------------------------------------------------
+\section{Corpus and Data Cleaning} \label{sec:corpus}
+% ------------------------------------------------
+
+% Before discussing the methodologies of our papers, we first discuss the methodology underlying our own claims. Because most of our conclusions follow directly from reading and tabulating the results in various neural network pruning papers, the bulk of our ``methodology'' is captured by the criteria used to select pruning papers.
+
+We selected the \npapers papers used in our analysis in the following way. First, we conducted an ad hoc literature search, finding widely cited papers introducing pruning methods and identifying other pruning papers that cited them using Google Scholar. We then went through the conference proceedings from the past year's NeurIPS, ICML, CVPR, ECCV, and ICLR and added all relevant papers (though it is possible we had false dismissals if the title and abstract did not seem relevant to pruning). Finally, during the course of cataloging which papers compared to which others, we added to our corpus any pruning paper that at least one existing paper in our corpus purported to compare to. We included both published papers and unpublished ones of reasonable quality (typically on arXiv). Since we make strong claims about the lack of comparisons, we included in our corpus five papers whose methods technically do not meet our definition of pruning but are similar in spirit and compared to by various pruning papers.
+In short, we included essentially every paper introducing a method of pruning neural networks that we could find, taking care to capture the full directed graph of papers and comparisons between them.
+% TODO also manually go thru cvpr and eccv
+
+% We analyze \npapers papers in total. These papers appear in the following venues:
+% \begin{table}
+% \begin{centering}
+% \begin{tabular}{l|c}
+% Venue & Number of Papers \\
+% \hline
+% arXiv & 20 \\
+% NeurIPS & 16 \\
+% ICLR & 12 \\
+% CVPR & 9 \\
+% ICML & 4 \\
+% ECCV & 4 \\
+% BMVC & 3 \\
+% Nature Communications & 1 \\
+% OpenReview & 1 \\
+% IJCAI & 1 \\
+% WACV & 1 \\
+% AAAI & 1 \\
+% CVPR Workshops & 1 \\
+% MM & 1 \\
+% Neurocomputing & 1 \\
+% TPAMI & 1 \\
+% IEEE Access & 1 \\
+% ICASSP & 1 \\
+% ICNN & 1 \\
+% \label{tbl:venues}
+% \end{tabular}
+% \end{centering}
+% % \vspace{2mm}
+% \caption{Venues in which papers in our corpus appeared.}
+% \end{table}
+
+% To conduct our analysis, we normalized the reported
+
+% In addition to choosing the set of papers to use, we also
+
+% Define top venues.
+
+% It is not always obvious what counts as a single method, even within one paper. For example, [uiuc-coreset]
+
+% Define how we split up ``method'' for different papers, which is basically we called all their results one method unless something was an obvious straw man or there were two or more variations that reported values for the same amount of pruning (and therefore yielded two values at a given point on the tradeoff curve).
+
+Because different papers report slightly different metrics, particularly with respect to model size, we converted reported results to a standard set of metrics whenever possible. For example, we converted reported Top-1 error rates to Top-1 accuracies, and fractions of parameters pruned to compression ratios. Note that it is not possible to convert between size metrics and speedup metrics, since the amount of computation associated with a given parameter can depend on the layer in which it resides (since convolutional filters are reused at many spatial positions). For simplicity and uniformity, we only consider self-reported results except where stated otherwise.
+
+We also did not attempt to capture all reported metrics, but instead focused only on model size reduction and theoretical speedup, since 1) these are by far the most commonly reported and, 2) there is already a dearth of directly comparable numbers even for these common metrics. This is not entirely fair to methods designed to optimize other metrics, such as power consumption \cite{bayesian-compression, sze-energy-aware, learning-both, samsung-vbmf-tucker}, memory bandwidth usage \cite{extreme-net-compress, samsung-vbmf-tucker}, or fine-tuning time \cite{uiuc-coreset-pruning, pcas, sss, soft-filter-pruning}, and we consider this a limitation of our analysis.
+
+% A further limitation is that,
+Lastly, as a result of relying on reading of hundreds of pages of dense technical content, we are confident that we have made some number of isolated errors. We therefore welcome correction by email and refer the reader to the arXiv version of this paper for the most up-to-date revision.
+
+% In certain cases, we break down results by whether papers were published in top-tier venues, as opposed to being published elsewhere or not at all. We define top venues as the top five relevant entries among Google Scholar's list of engineering and science venues with largest h5-indices \cite{scholarTopVenues}. The resulting venues are CVPR, NeurIPS, ICLR, ICML, and ECCV. While no list of ``top'' venues will be perfect or uncontroversial, this set accounts for the vast majority of published papers in our corpus. The exact set chosen is also of little consequence since there does not seem to be any difference between these and other papers with respect to the patterns we identify.
+
+% All of the data we aggregated and used in a our analysis is available at TODO.
+
+% Many of the quantitative results
+% Describe results imputation. Note that one can't convert between compression and flops.
+
+% Fact that we're only using self-reported results, and mention that this is what the vast majority of other papers do (or, more commonly, they don't say but kind of imply it).
+
+% Some kind of background about pruning problem setup(s) and why you need particular (dset, architecture, xmetric, ymetric) tuples. Maybe define task = (dset, arch), and configuration = (dset, arch, xmetric, ymetric).
+
+% Also mention something about how different authors care about different things (eg, energy efficiency, or at least one paper that brags about not having to fine-tune for as long as han2015). Mention that we can't capture all the nuance and that we don't try to question the validity of individual papers, except to the extent that they claim to be "state-of-the-art".
+
+% A crucial aspect of the pruning task is that most methods can supply not just a single pruned network, but a family of networks with different sparsities. Which member of the family is returned depends on one or more tuning parameters (in addition to random variations). For example, methods that remove all but the largest-magnitude weights can choose how many weights to remove, and methods that apply L1-regularization to encourage sparsity can tune the L1 penalty. It is therefore crucial to compare pruning methods not just on the same dataset, architecture, and metrics, but also at similar operating points in their tradeoff curves. E.g., if one pruned 10\% of the weights based on magnitude and compared to pruning 50\% of the weights based on LASSO coefficients, the result would not be meaningful unless one method dominated in both efficiency and quality. % This means that a pruning method cannot be fully characterized by a single network it has produced, but must instead be evaluated based on the \textit{tradeoff curve} it supplies for a given dataset, model, efficiency metric, and quality metric. This is similar to the need for precision-recall curves, Precision at K, and/or Recall at K curves for search and ranking algorithms. % , or the Receiver Operating Characteristic (ROC) curve for risk stratification algorithms. % However, while some of these other curves have widely-accepted summary statistics such as mean average precision (mAP) or Area Under the Curve (AUC), there is no such statistic for arbitrary tradeoff curves. % AUC could perhaps be adapted, but only with great difficulty since the efficiency metric is either unbounded

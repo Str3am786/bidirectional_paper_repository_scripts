@@ -1,0 +1,79 @@
+\section{Introduction}
+\label{sec:introduction}
+
+
+Most flows in nature and in engineering are turbulent.
+Such turbulent flows are characterized by a wide range of active flow scales oftentimes spanning orders of magnitude.
+Even though the governing equations of fluid motion, the Navier-Stokes equations, are known, the direct numerical simulation (DNS) of this broad range of flow scales is usually intractable.
+Instead, reduced model equations are solved, which consider only the most important scales of the flow.
+The most popular approaches are the Reynolds-averaged Navier-Stokes (RANS) equations, which compute the time averaged flow field, and the large eddy simulation (LES), which resolves only the most energetic flow scales in space and time.
+Both approaches introduce additional terms into the governing equations on the coarse level, which embody the footprint of the non-resolved fine scales onto the resolved flow field.
+Since these terms are a function of the unknown full solution, the equations remain unclosed.
+Turbulence models are typically employed to approximate the unknown closure terms based on the available coarse scale data in order to close the equations.
+Despite decades of research, no overall \textit{best} model has emerged yet.
+Moreover, most models employ empirical model parameters that have to be tuned to the specific flow and discretization at hand.
+To this end, recent advances in turbulence modeling increasingly strive to complement the established mathematical and physical modeling strategies by the emerging data-driven paradigm of machine learning (ML).
+
+As of today, most of the research in the field of data-driven turbulence modeling is concerned with supervised learning (SL) \cite{brunton2020machine,beck2021perspective,duraisamy2019turbulence}.
+In SL, artificial neural networks (ANN) are used to approximate the functional relationship between an input and an output quantity based on example data pairs.
+These example data pairs are drawn from a training dataset, which in the context of turbulence modeling is typically obtained a priori from experimental or high-fidelity numerical data.
+ANN comprise free parameters (\textit{weights}) which can be fitted to the dataset through optimization, which is then referred to as \textit{training} or \textit{learning}.
+In principle, other functions like kernel methods \cite{wenzel2021novel} can be applied as ansatz functions as well, but ANN represent the most prominent choice.
+In one of the first works in the field of ANN-based turbulence modeling, Sarghini et al. \cite{sarghini2003neural} applied an ANN as surrogate for the computation of the dynamic viscosity parameter of a mixed turbulence model in order to reduce its computational cost.
+Ling et al. \cite{ling2016reynolds} proposed a novel architecture to embed Galilean invariance into their ANN-based turbulence model for RANS.
+Gamahara and Hattori \cite{gamahara2017searching} applied a fully-connected ANN to predict the sub-grid stresses for LES of turbulent channel flow.
+More sophisticated ANN architectures are applied for turbulence modeling in LES among others by Beck et al. \cite{beck2019deep} and Kurz and Beck \cite{kurz2022machine}, who used convolutional and recurrent ANN, respectively.
+
+
+The premise of SL is that a sufficiently large dataset with defined input and output quantities is available to train the ANN on.
+In the context of LES, this requires that the true closure terms have to be known in order to serve as target for the training.
+This is a rather natural assumption for RANS, since here the closure terms are uniquely defined through the temporal averaging.
+The same holds for LES with a predefined filter form, which is also called an explicitly filtered LES.
+Since the spatial filter is known, the exact closure terms can also be computed from DNS data by applying the prescribed LES filter.
+Both approaches thus provide consistent input and target quantities for training in the SL context.
+However, for most applications of LES the filter form is not given explicitly.
+Instead, the underresolved discretization itself acts as an implicit LES filter that separates the flow scales into resolved and non-resolved scales.
+This improves the efficiency of the simulation significantly, but the form of the implicit filter induced by the discretization is typically unknown.
+Moreover, the induced filter is typically non-linear and depends on the grid spacing as well as the type of discretization scheme employed.
+As a consequence, the closure terms for implicitly filtered LES cannot be computed from high-fidelity DNS data, since the filter that would have to be applied is unknown.
+
+Typically, ANN are trained on surrogate targets instead.
+Such surrogate targets are oftentimes obtained by using an explicit LES filter that approximates the discretization's unknown implicit filter form.
+A common example is the use of the box filter kernel as approximated LES filter for finite volume methods. %
+However, this leads to severe inconsistencies between the training and actual simulations, since the targets the ANN trains on are not the correct closure terms required by the implicit LES \cite{beck2019deep}.
+This can lead to inaccurate results or even unstable simulations.
+Common approaches to alleviate these problems are either to project the (inconsistent) predictions onto a stable basis to ensure stability \cite{beck2019deep,maulik2019subgrid}, or to use additional regularization during training to increase the robustness of the ANN against this mismatch \cite{kurz2021investigating}.
+Rasp et al. \cite{rasp2020coupled} proposed a coupled online training design, in which the pre-trained models are corrected for these inconsistencies by running the model in parallel with a high-fidelity simulation and guiding the model towards this accurate solution.
+However, the SL approach for turbulence modeling in implicitly filtered LES is, from our perspective, ill-posed, since the training targets are generally unknown.
+
+An alternative approach that alleviates these problems is the reinforcement learning (RL) paradigm.
+In RL, the ML model is not trained by means of an offline training set, but learns by interacting directly with the dynamical environment itself in order to achieve some high-level target.
+This allows to optimize data-driven turbulence models based on how they act in actual simulations in the context of the genuine implicit LES filter instead of training ANN on static snapshots of the flow with uncertain labels.
+RL is thus conceptually opposite to SL.
+In SL, the training data needs to be well-defined a priori, since each input data point requires a known \textit{true} output.
+In RL, the training data is generated from the evolving system (i.e. the discretized equations) itself and the \textit{best} outputs are found by the RL algorithm in order to fulfill its overall goal. %
+In this sense, RL is a much more natural way of learning in and for dynamical systems that contain a degree of uncertainty as is the case for implicitly filtered LES.
+
+Originally, RL was especially employed for flow control tasks in numerical and experimental setups, e.g. \cite{rabault2019accelerating,rabault2019artificial,tang2020robust,fan2020reinforcement}.
+More recently, Novati et al. \cite{novati2021automating} employed an actor-critic RL algorithm to derive data-driven turbulence models for homogeneous isotropic turbulence.
+Moreover, Kim et al. \cite{kim2022deep} derived an RL-based model for the Reynolds stresses in turbulent channel flow and Bae and Koumoutsakos \cite{bae2022scientific} applied RL for wall-modeling in turbulent channel flow.
+
+Based on these encouraging results, we contribute in this paper the following.
+We apply the novel RL framework Relexi\footnote{\url{https://github.com/flexi-framework/relexi}} proposed in \cite{kurz2022deep,kurz2022relexi} to derive data-driven turbulence models for implicitly filtered LES with a modern high-order discontinuous Galerkin (DG) scheme.
+While this discretization choice serves to demonstrate the suitability of our method for modern, high-order discretizations of practical relevance, it also introduces a significant difficulty in the modeling process.
+The induced a priori filter form of DG is an element-local $L_2$-projection onto the polynomial basis of the DG method.
+However, since the elements are coupled via the numerical fluxes across the element faces, the resulting hybrid operator of the DG method introduces a complex filter form that typically has a non-linear kernel.
+We use forced homogeneous isotropic turbulence as a representative canonical test case for training, and learn an optimal, time- and space-dependent eddy viscosity.
+We employ the proximal policy optimization (PPO) algorithm for training, which achieves state-of-the-art results in many RL tasks, while being relatively straight-forward to implement.
+The architecture of the policy network is based on three-dimensional convolutional layers, which allows to incorporate the flow state in the vicinity of the investigated point into the prediction.
+However, the inputs and outputs of the policy are strictly element-local, which means that no information of the global flow state is required as input by the policy.
+The locality of the input is a crucial property for practical applications, since global flow statistics are generally expensive to obtain during simulations and are also oftentimes ill-defined therein, especially on more complex computational domains.
+This improves on the policy inputs employed by Novati et al. \cite{novati2021automating}, who used additionally the global dissipation rate and the global energy spectrum as inputs for the policy.
+We demonstrate that the derived models are long-term stable and that they outperform established analytical LES models in terms of accuracy.
+In a last step, we show that the trained models generalize well to different resolutions and to flows at higher Reynolds numbers.
+
+The paper is organized as follows.
+\secref{sec:rl} gives a brief outline of the RL paradigm and the PPO algorithm.
+In \secref{sec:turbulence}, the task of turbulence modeling is introduced and formulated as an RL problem, which can be solved with the proposed RL framework.
+The results in \secref{sec:results} give details on the training results and assess the performance and the properties of the trained RL-based models.
+\secref{sec:conclusion} concludes the paper.

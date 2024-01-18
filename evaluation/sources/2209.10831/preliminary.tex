@@ -1,0 +1,276 @@
+\section{Basic definitions}
+\label{sec:preliminary}
+This paper considers binary classification boosting. 
+We use the same notations as in~\citep{shalev-shwartz+:jml10}. 
+Let $S := ((\bm{x}_i, y_i))_{i=1}^m \in (\xset \times \{\pm 1\})^m$ be 
+a sequence of $m$-examples, where $\xset$ is some set. 
+Let $\hset \subset [-1, +1]^\xset$ be a set of hypotheses. 
+For simplicity, we assume $|\hset| = |\{h_1, h_2, \dots, h_n\}| = n$. 
+Note that our scheme can use an infinite set $\hset$. 
+It is convenient to regard each $h_j \in \hset$ as 
+a canonical basis vector $\bm{e}_j \in \mathbb{R}^n$. 
+Let $A = (y_i h_j(\bm x_i))_{i, j} \in [-1, +1]^{m \times n}$ 
+be a matrix of size $m \times n$. 
+We denote $m$-dimensional capped probability simplex as 
+$\psimplex{m}_{\nu} := \{ \bm{d} \in [0, 1/\nu]^m \mid \| \bm{d} \|_1 = 1\}$, 
+where $\nu \in [1, m]$. 
+We write $\psimplex{m} = \psimplex{m}_{1}$ for shorthand. 
+For a set $\cset \subset \mathbb R^n$, 
+we denote the convex hull of $\cset$ as 
+$
+    \convhull (\cset) 
+        := \left\{
+            \sum_{k} w_k \bm{s}_k
+            \mid \sum_k w_k = 1, w_k \geq 0,
+            \{\bm{s}_k\}_k \subset \cset
+        \right\}
+$.
+
+Next, we define some properties for convex functions. 
+\begin{def.}[smooth function]
+    A function $f : \mathbb R^m \to \mathbb R$ is 
+    said to be $\eta$-smooth 
+    over a convex set $\cset \subset \mathbb R^m$ 
+    w.r.t. a norm $\| \cdot \|$ if 
+    \begin{align}
+        \label{eq:smoothness}
+        \forall \bm{x}, \bm{y} \in \cset, \quad
+        f(\bm{y}) 
+        \leq f(\bm{x}) + (\bm{y} - \bm{x})^\top \nabla f(\bm{x})
+        + \frac{\eta}{2} \|\bm{y} - \bm{x}\|^2.
+    \end{align}
+\end{def.}
+
+Similarly, we define the strongly convex function. 
+\begin{def.}[strongly convex function]
+    A function $f : \mathbb R^m \to \mathbb R$ is 
+    said to be $\eta$-strongly convex 
+    over a convex set $C \subset \mathbb R^m$ 
+    w.r.t. a norm $\| \cdot \|$ if 
+    \begin{align}
+        \nonumber
+        \forall \bm{x}, \bm{y} \in \cset, \quad
+        f(\bm{y}) 
+        \geq f(\bm{x}) + (\bm{y} - \bm{x})^\top \nabla f(\bm{x})
+        + \frac{\eta}{2} \|\bm{y} - \bm{x}\|^2.
+    \end{align}
+\end{def.}
+
+We also define Fenchel conjugate. 
+\begin{def.}[Fenchel conjugate]
+    The Fenchel conjugate $f^\star$ of 
+    a function $f : \mathbb{R}^m \to [-\infty, +\infty]$ is defined as
+    \begin{align*}
+        f^\star(\bm{\theta}) = \sup_{\bm{d} \in \mathbb{R}^m} 
+        \left( \bm{d}^\top \bm{\theta} - f(\bm{d}) \right).
+    \end{align*}
+\end{def.}
+It is well known that if $f$ is a $1/\eta$-strongly convex function 
+w.r.t. the norm $\|\cdot\|$ for some $\eta > 0$, 
+$f^\star$ is an $\eta$-smooth function
+w.r.t. the dual norm $\|\cdot\|_\star$. 
+Further, if $f$ is a strongly convex function, 
+the gradient vector of $f^\star$ is written as
+\begin{align}
+    \nonumber
+    \nabla f^\star(\bm{\theta}) = 
+    \arg \sup_{\bm{d} \in \mathbb{R}^m}
+    \left( \bm{d}^\top \bm{\theta} - f(\bm{d}) \right).
+\end{align}
+One can find the proof of these properties 
+here~\citep{borwein+:springer06,shalev-shwartz+:jml10}.
+
+\begin{lem.}
+    \label{lem:fenchel_conjugate_functions}
+    Let $f, \tilde{f} : \mathbb{R}^m \to (-\infty, +\infty]$ be 
+    functions such that 
+    \begin{align*}
+        \exists c > 0, \forall \bm{\theta},
+        f(\bm{\theta}) \leq \tilde{f}(\bm{\theta}) \leq f(\bm{\theta}) + c.
+    \end{align*}
+    Then, 
+    $
+        f^\star(\bm{\mu}) - c
+        \leq \tilde{f}^\star(\bm{\mu})
+        \leq f^\star(\bm{\mu})
+    $ holds for all $\bm{\mu}$.
+\end{lem.}
+Finally, we show the duality theorem~\citep{borwein+:springer06}.
+\begin{thm.}[\cite{borwein+:springer06}]
+    \label{thm:strong_duality}
+    Let $f : \mathbb{R}^m \to (-\infty, +\infty]$ and 
+    $g : \mathbb{R}^n \to (-\infty, +\infty]$ be convex functions, 
+    and a linear map $A : \mathbb{R}^m \to \mathbb{R}^n$. 
+    Define the Fenchel problems
+    \begin{align}
+        \label{eq:strong_duality_primal}
+        \gamma & = \inf_{\bm{d}} f(\bm{d}) + g(A^\top\bm{d}), \\
+        \label{eq:strong_duality_dual}
+        \rho   & = \sup_{\bm{w}} -f^\star(-A \bm{w}) - g^\star(\bm{w}).
+    \end{align}
+    Then, $\gamma \geq \rho$ holds. 
+    Further, $\gamma = \rho$ holds if~\footnote{%
+        For a set $\cset \subset \mathbb{R}^n$, %
+        $
+            \interior(C) = \{
+                \bm{w} \in C \mid
+                    \forall \bm{v} \in \mathbb{R}^n,
+                    \exists t > 0,
+                    \forall \tau \in [0, t], \bm{w} + \tau \bm{v} \in C
+            \}
+        $ and \\ %
+        $
+            \domain g - A^\top \domain f
+            = \{ \bm{w} - A^\top \bm{d} \mid
+                \bm{w} \in \domain g,
+                \bm{d} \in \domain f
+            \}
+        $. %
+    }
+    $\bm{0} \in \interior \left(\domain g - A^\top \domain f\right)$. 
+    Furthermore, points $\bar{\bm{d}} \in \psimplex{m}_{\nu}$ and 
+    $\bar{\bm{w}} \in \psimplex{n}$ are optimal solutions 
+    for problems~(\ref{eq:strong_duality_primal}) 
+    and~(\ref{eq:strong_duality_dual}), respectively, 
+    if and only if $-A \bar{\bm{w}} \in \partial f(\bar{\bm{d}})$ 
+    and $\bar{\bm{w}} \in \partial g(A^\top \bar{\bm{d}})$.
+\end{thm.}
+
+
+With these notations, 
+we define the soft margin optimization problem 
+as the dual problem of the edge minimization problem. 
+The edge minimization problem is defined as 
+\begin{align}
+    \label{eq:edge_minimization}
+    \min_{\bm{d}}
+        \max_{j \in [n]} (\bm{d}^\top A)_j
+        + f(\bm{d}),
+    \quad
+    \text{where}
+    \quad
+    f(\bm{d}) = 
+    \begin{cases}
+        0 & \bm{d} \in \psimplex{m}_{\nu} \\
+        +\infty & \bm{d} \notin \psimplex{m}_{\nu}
+    \end{cases}.
+\end{align}
+The quantity $(\bm{d}^\top A)_j = \sum_{i=1}^m d_i y_i h_j(\bm{x}_i)$ is 
+often called the \emph{edge} of the hypothesis $h_j$ 
+w.r.t. the distribution $\bm{d} \in \psimplex{m}_{\nu}$. 
+\cite{shalev-shwartz+:jml10} showed that 
+the $\ell_1$-norm regularized soft margin optimization problem is 
+formulated via Fenchel duality as 
+\begin{align}
+    \label{eq:soft_margin_maximization}
+    \max_{\bm w \in \psimplex{n}} - f^\star(- A\bm w)
+    = \max_{\bm w \in \psimplex{n}} \min_{\bm{d} \in \psimplex{m}_{\nu}}
+    \bm{d}^\top A \bm{w}.
+\end{align}
+Furthermore, the duality gap between~(\ref{eq:edge_minimization}) 
+and~(\ref{eq:soft_margin_maximization}) is zero. 
+The soft margin optimization aims 
+to find an optimal combined hypothesis 
+$H_{T} = \sum_{j=1}^n \bar{w}_j h_j$, 
+where $\bar{\bm{w}} \in \psimplex{n}$ is 
+an optimal solution of~(\ref{eq:soft_margin_maximization}). 
+Although the edge minimization and soft margin optimization problems are 
+formulated as a linear program, 
+solving the problem for a huge class $\hset$ is hard. 
+Boosting is a standard approach to dealing with the problem. 
+
+
+\subsection{Boosting}
+Boosting is a protocol between two algorithms; 
+the booster and the weak learner. 
+For each iteration $t = 0, 1, 2, \dots, T$, 
+the booster chooses a distribution $\bm{d}_t \in \psimplex{m}_{\nu}$ 
+over the training examples $S$. 
+Then, the weak learner returns a hypothesis $h_{j_{t+1}} \in \hset$ 
+to the booster that satisfies $({\bm{d}_t}^\top A)_{j_{t+1}} \geq g$ 
+for some unknown guarantee $g > 0$. 
+The boosting algorithm aims to produce a convex combination 
+$H_T = \sum_{t=1}^T w_{T,j_t} h_{j_t}$ 
+of the hypotheses $\{h_{j_1}, h_{j_2}, \dots, h_{j_T}\} \subset \hset$ 
+that satisfies 
+\begin{align}
+    \label{eq:boosting_goal}
+    -f^\star ( - A \bm{w}_T )
+    = \min_{\bm{d} \in \psimplex{m}_{\nu}} 
+    \bm{d}^\top A \bm{w}_T
+    = \min_{\bm{d} \in \psimplex{m}_{\nu}} 
+    \sum_{i=1}^m d_i y_i H_T(\bm{x}_i)
+    \geq g - \epsilon
+\end{align}
+for any predefined $\epsilon > 0$. 
+Suppose that the weak learner always returns a max-edge hypothesis 
+for any given distribution $\bm{d} \in \psimplex{m}_{\nu}$. 
+In that case, 
+the goal is to find an $\epsilon$-approximate solution 
+of~(\ref{eq:soft_margin_maximization}). 
+
+\subsection{The Frank-Wolfe algorithms}
+We briefly introduce the standard Frank-Wolfe algorithm. 
+The original Frank-Wolfe (FW) algorithm is 
+a first-order iterative algorithm 
+invented by~\cite{marguerite+:nrl56}. 
+The FW algorithm solves the problems of the form:
+$\min_{\bm{x} \in \cset} f(\bm{x})$, 
+where $\cset \subset \mathbb R^m$ is a closed convex set 
+and $f : \cset \to \mathbb R$ is an $\eta$-smooth and convex function. 
+
+In each iteration $t$, 
+the FW algorithm seeks an extreme point 
+$
+    \bm{s}_{t+1}
+    \in \arg \min_{\bm{s} \in \cset} \bm{s}^\top \nabla f(\bm{x}_t)
+$. 
+Then, it updates the iterate as 
+$\bm{x}_{t+1} = \bm{x}_t + \lambda_t (\bm{s}_{t+1} - \bm{x}_t)$ 
+for some $\lambda_t \in [0, 1]$. 
+Although the classical result~\citep{marguerite+:nrl56,jaggi:icml13}
+suggests $\lambda_t = 2/(t+2)$, 
+$\lambda_t$ has many choices. 
+% there are many choices of $\lambda_t$. 
+For example, one can choose $\lambda_t$ as
+\begin{align}
+    \label{eq:short_step_update}
+    \lambda_t := 
+        \clip
+        \frac{(\bm{x}_t - \bm{s}_{t+1})^\top \nabla f(\bm{x}_t)}
+             {\eta \|\bm{s}_{t+1} - \bm{x}_t\|^2},
+\end{align}
+where $\clip x = \max\{0, \min\{1, x\}\}$. 
+This optimal solution minimizes 
+the right-hand side of the inequality~(\ref{eq:smoothness}) 
+and is often called the \emph{short-step} strategy.
+Alternatively, one can choose 
+$
+    \lambda_t \in 
+    \arg\min_{\lambda \in [0, 1]} 
+    f(\bm{x}_t + \lambda (\bm{s}_{t+1} - \bm{x}_t))
+$ by line search. 
+This step size improve the objective more than the short-step strategy. 
+Since the FW algorithm aims to find an optimal solution, 
+one can choose $\bm{x}_{t+1}$ by solving the problem:
+$
+    \bm{x}_{t+1} \gets
+    \arg \min_{
+        \bm{x} \in \mathop{\rm CH}(\{\bm{s}_1, \dots, \bm{s}_{t+1}\})
+    } f(\bm x)
+$. 
+This update rule is 
+called the \emph{Fully Corrective} FW algorithm~(e.g., \cite{jaggi:icml13}). 
+Although the fully corrective update yields $\bm{x}_{t+1}$ 
+that most decreases the objective over the convex hull, 
+it loses the fast computational advantage per iteration.
+
+The FW algorithms converge to 
+an $\epsilon$-approximate solution in $O(\eta/\epsilon)$ iterations 
+if the objective function is $\eta$-smooth w.r.t. 
+some norm over $\cset$~\citep{jaggi:icml13,marguerite+:nrl56}. 
+The best advantage of the FW algorithm is the projection-free property; 
+there is no projection onto $\cset$, 
+so the running time per iteration is 
+faster than the projected gradient methods. 
+
