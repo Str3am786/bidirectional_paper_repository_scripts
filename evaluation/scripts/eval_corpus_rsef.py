@@ -1,6 +1,7 @@
 import pandas as pd
 import json
 import re
+import os
 
 ARXIV_REGEX = r'.*(\d{4}\.\d{4,5}).*'
 
@@ -13,9 +14,9 @@ def str_to_arxivID(string):
     except:
         return None
 
-def calculate_metrics(json_path, tsv_path, output_path):
+def calculate_metrics(json_path, xlsx_path, output_path):
     # Read Corpus TSV
-    tsv_data = pd.read_csv(tsv_path, dtype=str, sep='\t')
+    xlsx_data = df = pd.read_excel(xlsx_path, "public", dtype=str)
 
     with open(json_path, 'r') as f:
         json_data = json.load(f)
@@ -27,23 +28,22 @@ def calculate_metrics(json_path, tsv_path, output_path):
     FalsePositive = 0
     fails = {"FalseNeg": [], "FalsePos": []}
 
-    for index, row in tsv_data.iterrows():
+    for index, row in xlsx_data.iterrows():
         corp_arxiv = str_to_arxivID(row['paper_arxiv_id'])
         if corp_arxiv is None:
             continue
         
-        prediction = row['BiDirectional_ids'] == 'TRUE'  # Assuming the value in TSV is 'True' or 'False'
-        if corp_arxiv == "2006.09044":
-            print(prediction)
+        prediction = row['BiDirectional'] == 'True'  # Assuming the value in sheet is 'True' or 'False'
+        print(True)
         # Check against JSON data
-        test = json_data.keys()
-        if corp_arxiv in test: # SSKG considers it bidirectional
+        rsef_arxivs = json_data.keys()
+        if corp_arxiv in rsef_arxivs: # RSEF considers it bidirectional
             if prediction:
                 TruePositive += 1
             else:
                 FalsePositive += 1
                 fails["FalsePos"].append(corp_arxiv)
-        else: # SSKG does not consider it bidirectional
+        else: # RSEF does not consider it bidirectional
             if prediction:
                 FalseNegative += 1
                 fails["FalseNeg"].append(corp_arxiv)
@@ -57,7 +57,7 @@ def calculate_metrics(json_path, tsv_path, output_path):
 
     # Prepare result
     result = {
-        "_failed Repos": fails,
+        "_failed Rlsepos": fails,
         "f1_score": f1_score,
         "precision": precision,
         "recall": recall
@@ -70,7 +70,14 @@ def calculate_metrics(json_path, tsv_path, output_path):
     return result
 
 # Example usage
-tsv_path = "../corpus.tsv"
-json_file_path = "./bidir.json"
-output_json_path = 'output_metrics.json'
-calculate_metrics(json_file_path, tsv_path, output_json_path)
+current_script_path = os.path.dirname(os.path.abspath(__file__))
+xlsx_file = "corpus_arxiv_bidirectional_12_23.xlsx"
+xlsx_path = os.path.join(current_script_path, "..", "..", "corpus", xlsx_file)
+
+
+json_file_name = "bidir.json"
+json_file_path = os.path.join(current_script_path, "..", "output", json_file_name)
+print(json_file_path)
+
+output_json_path = 'output_metrics_RSEF.json'
+calculate_metrics(json_file_path, xlsx_path, output_json_path)

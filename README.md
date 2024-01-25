@@ -48,25 +48,48 @@ This folder contains a script to download and evaluate each of the pipelines as 
 
 To evaluate the pipelines you will need to run ``evaluate.sh``.
 
-**- To evalute RSEF :**  
+**- Evaluating RSEF :**  
 
-Ensure RSEF is installed and is running. Make sure you are within the evaluate directory and use ``./evaluate.sh``.  If it does not work you may need to change  the file permissions ``chmod +x evaluate.sh``.
 
-**- To evalute hackathon pipeline :**  
 
-You will need to move the ./sources folder into the Directory of the hackathon python package.
+- First, confirm that RSEF is installed and operational. 
+1. Navigate to the `./evaluation` directory.
+2. Execute the script by running `./evaluate.sh`. If the script fails to run, modify its file permissions using the command `chmod +x evaluate.sh`.
+3. Pick the right options for you
+``` 
+Please select an option:
+1: Evaluate RSEF
+2: Evaluate Latex pipeline (Hackathon)
+3: Exit
 
-You will need to set the environment variable: ``GITHUB_TOKEN``.   
+Please input your first option:
+```
+Select a number and press enter, in this case it would be 1
+```
+Option for RSEF selected. Please choose a sub-option:
+
+1: Redownload all files
+2: Use existing files
+
+Please input your second option:
+```
+Here you can choose to use already downloaded Repositories and PDF's or you can choose to redownload all for the most up to date evaluation. **Warning** This may result in mismatch with previously established corpus
+
+**- Evaluating hackathon pipeline :**  
+
+1. You will need to move the `./sources` folder into the Directory of the hackathon python package.
+
+2. You will need to set the environment variable: ``GITHUB_TOKEN``.   
 Run this command: ``export GITHUB_TOKEN="XXXXXX"``
 You can generate a new token here:  [https://github.com/settings/tokens](https://github.com/settings/tokens) and set the env var.
 
-Then run:
-``python main.py merge-latex``
-``python main.py run --type latex``
+3. Then run ``python main.py merge-latex`` 
+4. Then run ``python main.py run --type latex``
+5. Once the results_sources_XXXXXX.csv has been created move it to the evaluate folder and run ``python eval
 
-Once the results_sources_XXXXXX.csv has been created move it to the evaluate folder and run ``python eval
 
-Also, you can find the results of the pipelines.
+
+**- Within Evaluation you can find previous results of the pipelines.**
 
 * bidir.json: It is the file with the results of the PDF pipeline.
 
@@ -94,8 +117,7 @@ First, you have to install the python libraries.
 
   
 
-pip install -r requirements.txt
-
+ `pip install -r requirements.txt`
   
 
 Then you can execute each script. Please, note that the folders and name of the files (found in evaluation) can be different, so you will have to change the code to add the correct pathname.
